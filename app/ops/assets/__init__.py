@@ -1,0 +1,1 @@
+"""Immutable asset metadata."""

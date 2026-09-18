@@ -1,0 +1,1 @@
+"""Multilingual Ayin terminology registry."""

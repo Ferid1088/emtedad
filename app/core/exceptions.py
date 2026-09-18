@@ -46,3 +46,11 @@ class ObjectConflictError(StorageError):
     code = "object_conflict"
     public_message = "The immutable storage location contains conflicting data."
     status_code = 409
+
+
+class ResourceNotFoundError(ApplicationError):
+    """Raised when a requested domain identity does not exist."""
+
+    code = "resource_not_found"
+    public_message = "The requested resource was not found."
+    status_code = 404

@@ -1,0 +1,69 @@
+{
+  "manifest_version": "1",
+  "source_sha256": "676c210e0ef6be5f0fe5228190f63d9e38f39dccc7a9ea6b0b815d487124566c",
+  "expected_page_count": 146,
+  "concepts": [
+    {"stable_key":"emtedad","definition":"پیوستگی چیزی پیش از موجود تا موجود و از اثرهای موجود به آینده؛ امتداد با تکرار یکی نیست.","page":132,"anchor":"امتداد :پیوستگی"},
+    {"stable_key":"bon","definition":"تعین بنیادین و یگانه‌ای که امتداد در یک موجود مشخص می‌یابد؛ اشاره به «این موجود بودن»، نه فهرست صفات او.","page":132,"anchor":"ُب ن :تعین بنیادین"},
+    {"stable_key":"jan","definition":"در موجود زنده، نام نسبت بُن با زنده‌بودن؛ نه مترادف هوش، آگاهی یا خودآگاهی و نه جایگزین زیست‌شناسی.","page":132,"anchor":"جان :در موجود زنده"},
+    {"stable_key":"awareness","definition":"آگاهی زیسته: وجود تجربهٔ اول‌شخص؛ اینکه برای موجود چیزی «چگونه بودن» داشته باشد.","page":135,"anchor":"آگاهی زیسته :وجود"},
+    {"stable_key":"self_awareness","definition":"توان بازنمایی بخشی از وضعیت، مرز، تاریخ، ظرفیت، عمل یا شناخت خود به شکلی که در پاسخ سهم داشته باشد.","page":135,"anchor":"خودآگاهی :توان"},
+    {"stable_key":"tahigah","definition":"جای باز پرسش «من چه هستم؟» که پاسخ آن از پیش توسط آیین یا دیگری پر نمی‌شود.","page":132,"anchor":"تهیگاه :جای باز"},
+    {"stable_key":"conditions","definition":"میدان وسیع چیزهایی که در زندگی حضور دارند و می‌توانند زمینهٔ رخدادها و پاسخ‌ها باشند.","page":132,"anchor":"شرایط :میدان وسیع"},
+    {"stable_key":"factor","definition":"چیزی که در یک موضوع مشخص با شکل‌گیری، فعال‌شدن یا ادامهٔ وضعیت یا الگو مرتبط دانسته می‌شود؛ ثبت عامل به‌خودی‌خود اثبات علیت علمی نیست.","page":132,"anchor":"عامل :چیزی که"},
+    {"stable_key":"pattern","definition":"فرایند یا پاسخ تکرارشونده و قابل نمونه در موقعیت‌های مشخص.","page":133,"anchor":"الگو :فرایند"},
+    {"stable_key":"direction","definition":"چیزی که تلاش را برای شخص ارزشمند می‌کند؛ می‌تواند نزدیک‌شدن به چیزی یا دورشدن از چیزی باشد.","page":133,"anchor":"جهت :چیزی که"},
+    {"stable_key":"majal","definition":"گشودگی فرایند پاسخ از انحصار الگو یا فشار مسلط در یک موقعیت مشخص؛ نه آزادی از علیت و نه تعداد گزینه‌ها.","page":133,"anchor":"مجال :گشودگی"},
+    {"stable_key":"change","definition":"تغییر می‌تواند در پاسخ، در شرایط جاری یا در هر دو رخ دهد.","page":136,"anchor":"تغییر می تواند در پاسخ"},
+    {"stable_key":"suffering","definition":"رنج مستقیم با واقعیت جاری مرتبط است؛ رنج الگومند از فرایندهای تکرارشونده‌ای اثر می‌گیرد که در شکل‌گیری یا ادامهٔ آن سهم دارند.","page":134,"anchor":"رنج مستقیم :رنجی"},
+    {"stable_key":"vitality","definition":"لحظه یا تجربه‌ای که حضور و ارزش زندگی را بی‌واسطه برجسته می‌کند.","page":134,"anchor":"سرزندگی مستقیم :لحظه"},
+    {"stable_key":"acceptance","definition":"دیدن اینکه چیزی اکنون هست، بدون نتیجه‌گیری اینکه باید باشد.","page":134,"anchor":"پذیرش :دیدن"},
+    {"stable_key":"other","definition":"مرکز یگانهٔ دیگری که به نقش او در داستان من فروکاستنی نیست.","page":134,"anchor":"دیگری :مرکز"},
+    {"stable_key":"between","definition":"کیفیت یا الگویی که در رابطه شکل می‌گیرد و تماماً متعلق به هیچ‌یک از دو سوی رابطه نیست.","page":134,"anchor":"میان :کیفیت"},
+    {"stable_key":"ethics_of_majal","definition":"جهت اخلاقی‌ای که کاهش رنج قابل کاهش، پرهیز از رنج اضافی و بازکردن مجال را همراه با حفاظت از مجال و حقوق دیگران دنبال می‌کند.","page":134,"anchor":"اخلاق مجال :جهت"},
+    {"stable_key":"emergence","definition":"پدیدارشدن الگو یا قابلیتی در مقیاس کل از تعامل اجزا، به‌گونه‌ای که آن الگو به همان صورت به یک جزء منفرد نسبت داده نمی‌شود.","page":135,"anchor":"برآمدگی :پدیدارشدن"},
+    {"stable_key":"causality","definition":"برای توضیح تغییر لازم نیست گسستی از علیت فرض شود؛ علت‌مندبودن تغییر آن را غیرواقعی نمی‌کند.","page":62,"anchor":"پاسخ سطح عمومی آیین"}
+  ],
+  "distinctions": [
+    {"stable_key":"emtedad_not_repetition","left":"emtedad","relation":"IS_NOT","right_label":"تکرار","explanation":"امتداد، تکرار نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"امتداد ،تکرار نیست"},
+    {"stable_key":"bon_not_personality","left":"bon","relation":"IS_NOT","right_label":"شخصیت","explanation":"بُن با شخصیت یکی نیست.","discourse_type":"CONCEPTUAL","page":5,"anchor":"ب ن» با ژن"},
+    {"stable_key":"bon_not_genes","left":"bon","relation":"IS_NOT","right_label":"ژن","explanation":"بُن با ژن یکی نیست.","discourse_type":"CONCEPTUAL","page":5,"anchor":"ب ن» با ژن"},
+    {"stable_key":"bon_not_social_identity","left":"bon","relation":"IS_NOT","right_label":"هویت اجتماعی","explanation":"بُن نقش یا هویت اجتماعی نیست.","discourse_type":"CONCEPTUAL","page":18,"anchor":"ب ن هویت اجتماعی نیست"},
+    {"stable_key":"bon_not_consciousness","left":"bon","relation":"IS_NOT","right_label":"آگاهی","explanation":"بُن، آگاهی نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"نه ژن ،بدن ،ذهن ،روح ،آگاهی"},
+    {"stable_key":"bon_not_required_soul_definition","left":"bon","relation":"IS_NOT","right_label":"روح به‌عنوان تعریف الزامی","explanation":"در تعریف عمومی، بُن همان روح نیست؛ نسبت احتمالی به خوانش شخص تعلق دارد.","discourse_type":"CONCEPTUAL","page":128,"anchor":"در تعریف عمومی نه"},
+    {"stable_key":"jan_not_intelligence","left":"jan","relation":"IS_NOT","right_label":"هوش","explanation":"جان با هوش یکی نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"جان با هوش"},
+    {"stable_key":"jan_not_awareness","left":"jan","relation":"IS_NOT","right_label":"آگاهی","explanation":"جان با آگاهی یکی نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"جان با هوش"},
+    {"stable_key":"pattern_not_identity","left":"pattern","relation":"IS_NOT","right_label":"هویت شخص","explanation":"الگو یک پاسخ تکرارشونده است، نه هویت کامل شخص.","discourse_type":"CONCEPTUAL","page":136,"anchor":"الگو یک پاسخ"},
+    {"stable_key":"acceptance_not_surrender","left":"acceptance","relation":"IS_NOT","right_label":"تسلیم","explanation":"پذیرش، تسلیم نیست.","discourse_type":"CONCEPTUAL","page":5,"anchor":"پذیرش» تسلیم نیست"},
+    {"stable_key":"majal_not_outside_causality","left":"majal","relation":"IS_NOT","right_label":"آزادی بیرون از علیت","explanation":"مجال آزادی از علت نیست.","discourse_type":"CONCEPTUAL","page":63,"anchor":"مجال آزادی از علت نیست"}
+  ],
+  "principles": [
+    {"stable_key":"no_being_begins_from_itself","statement":"هیچ موجودی از خودش آغاز نشده است.","discourse_type":"CONCEPTUAL","page":136,"anchor":"هیچ موجودی از خودش"},
+    {"stable_key":"bon_uniqueness_not_awareness_dependent","statement":"یگانگی بُن به آگاهی وابسته نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"یگانگی ُب ن"},
+    {"stable_key":"tahigah_not_filled_for_another","statement":"تهیگاه را کسی به جای دیگری پر نمی‌کند.","discourse_type":"ETHICAL","page":136,"anchor":"تهیگاه را کسی"},
+    {"stable_key":"recognition_not_change","statement":"بازشناسی به‌تنهایی تغییر نیست.","discourse_type":"DESCRIPTIVE","page":136,"anchor":"بازشناسی به تنهایی"},
+    {"stable_key":"change_within_causality","statement":"مجال آزادی از علت نیست؛ گشودگی عملی از انحصار یک الگو یا فشار است.","discourse_type":"CONCEPTUAL","page":136,"anchor":"مجال آزادی از علت"},
+    {"stable_key":"not_all_suffering_solvable","statement":"هر رنجی مسئلهٔ قابل حل نیست.","discourse_type":"ETHICAL","page":136,"anchor":"هر رنجی مسئل"},
+    {"stable_key":"other_is_own_center","statement":"دیگری مرکز خودش است.","discourse_type":"ETHICAL","page":137,"anchor":"دیگری مرکز خودش"},
+    {"stable_key":"between_not_owned_by_one_side","statement":"میان، تماماً متعلق به هیچ‌کدام از دو سوی رابطه نیست.","discourse_type":"CONCEPTUAL","page":137,"anchor":"میان ،تمام"},
+    {"stable_key":"majal_does_not_destroy_other","statement":"مجال خود، حق نابودی مجال دیگری را ایجاد نمی‌کند.","discourse_type":"ETHICAL","page":137,"anchor":"مجال خود"},
+    {"stable_key":"emergence_not_proof","statement":"برآمدگی به‌تنهایی بُن، جان یا آگاهی تازه را اثبات نمی‌کند.","discourse_type":"DESCRIPTIVE","page":137,"anchor":"برآمدگی به تنهایی"},
+    {"stable_key":"metaphysical_reading_optional","statement":"خوانش متافیزیکی اختیاری است.","discourse_type":"OPTIONAL_METAPHYSICAL","page":137,"anchor":"خوانش متافیزیکی اختیاری"},
+    {"stable_key":"ayin_open_to_criticism","statement":"آیین امتداد از نقد مصون نیست.","discourse_type":"ETHICAL","page":137,"anchor":"آیین امتداد از نقد"}
+  ],
+  "open_questions": [
+    {"stable_key":"definition_of_unit","question":"واحد دقیقاً چیست؟","context":"مرز یک موجود در کلونی‌ها، قارچ‌ها، سامانه‌های شبکه‌ای و ساختارهای مصنوعی دشوار می‌شود.","discourse_type":"CONCEPTUAL","page":130,"anchor":"واحد دقیقًا چیست"},
+    {"stable_key":"bon_continuity_radical_change","question":"بُن در تغییر شدید چگونه تداوم دارد؟","context":"چارچوب نظریهٔ کامل هویت در طول زمان ارائه نمی‌دهد.","discourse_type":"CONCEPTUAL","page":130,"anchor":"ُب ن در تغییر شدید"},
+    {"stable_key":"metaphysical_status_of_jan","question":"جان چقدر متافیزیکی است؟","context":"بازبودن جان و تعهد حداقلی احتمالی آن موضوع نقد و ادامهٔ گفت‌وگو است.","discourse_type":"OPTIONAL_METAPHYSICAL","page":131,"anchor":"جان چقدر متافیزیکی"},
+    {"stable_key":"conflicting_majal","question":"وقتی مجال‌ها با هم تعارض پیدا می‌کنند چه؟","context":"اخلاق مجال به‌تنهایی برای همهٔ تعارض‌ها کافی نیست.","discourse_type":"ETHICAL","page":131,"anchor":"وقتی مجال ها"},
+    {"stable_key":"ai_copyability_and_bon","question":"هوش مصنوعی چه آزمونی برای مفهوم بُن ایجاد می‌کند؟","context":"کپی، توقف، بازگردانی و ادغام، مرز «این موجود مشخص» را دشوار می‌کند.","discourse_type":"CONCEPTUAL","page":131,"anchor":"هوش مصنوعی چه آزمونی"}
+  ],
+  "terms": [
+    {"stable_key":"emtedad","concept":"emtedad","page":132,"anchor":"امتداد :پیوستگی","forms":[{"language":"fa","script":"Arab","form":"امتداد","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Emtedad","form_type":"transliteration","status":"review"}]},
+    {"stable_key":"bon","concept":"bon","page":132,"anchor":"ُب ن :تعین بنیادین","forms":[{"language":"fa","script":"Arab","form":"بُن","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Bon","form_type":"transliteration","status":"review"},{"language":"en","script":"Latn","form":"soul","form_type":"forbidden_equivalent","status":"review"},{"language":"en","script":"Latn","form":"personality","form_type":"forbidden_equivalent","status":"review"},{"language":"en","script":"Latn","form":"self","form_type":"forbidden_equivalent","status":"review"}]},
+    {"stable_key":"jan","concept":"jan","page":132,"anchor":"جان :در موجود زنده","forms":[{"language":"fa","script":"Arab","form":"جان","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Jan","form_type":"transliteration","status":"review"}]},
+    {"stable_key":"majal","concept":"majal","page":133,"anchor":"مجال :گشودگی","forms":[{"language":"fa","script":"Arab","form":"مجال","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Majal","form_type":"transliteration","status":"review"}]},
+    {"stable_key":"between","concept":"between","page":134,"anchor":"میان :کیفیت","forms":[{"language":"fa","script":"Arab","form":"میان","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Miyan","form_type":"transliteration","status":"review"}]},
+    {"stable_key":"tahigah","concept":"tahigah","page":132,"anchor":"تهیگاه :جای باز","forms":[{"language":"fa","script":"Arab","form":"تهیگاه","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Tahigah","form_type":"transliteration","status":"review"}]}
+  ]
+}

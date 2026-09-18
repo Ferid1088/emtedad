@@ -7,8 +7,11 @@ from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.core.ayin import models as ayin_models  # noqa: F401
 from app.core.config import get_settings
+from app.core.terminology import models as terminology_models  # noqa: F401
 from app.db.base import Base
+from app.ops.assets import models as asset_models  # noqa: F401
 
 config = context.config
 

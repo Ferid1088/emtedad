@@ -4,9 +4,9 @@ A production-oriented, versioned platform for preserving Ayin-e Emtedad,
 modeling Manasek, researching external knowledge, and eventually producing
 evidence-grounded Persian, English, and Arabic lectures.
 
-The repository currently contains the completed Phase 1 platform foundation.
-It does not yet import or model Ayin, Manasek, external sources, retrieval data,
-or generated lectures.
+The repository contains the Phase 1 platform foundation and the Phase 2 Ayin
+knowledge core. It imports the supplied Ayin PDF only as `AYIN_WORKING`; it does
+not model Manasek, external sources, retrieval data, or generated lectures.
 
 ## Authority and current source status
 
@@ -31,7 +31,7 @@ Ayin. Manasek remains separate from lecture content because ritual is an
 optional experiential layer with its own safety and consent requirements, not
 evidence that proves Ayin.
 
-## Phase 1 architecture
+## Phase 1-2 architecture
 
 The initial system is a modular monolith with one FastAPI application and one
 PostgreSQL 17 source of truth.
@@ -56,8 +56,9 @@ PostgreSQL namespaces reserve explicit ownership boundaries:
 | `content` | Research, lecture, localization, and publication artifacts |
 | `ops` | Operational assets, jobs, audit, review, and cache infrastructure |
 
-Phase 1 creates only these empty schemas and enables pgvector. It creates no
-future-domain tables or vector indexes.
+Phase 1 created these namespaces and enabled pgvector. Phase 2 owns only the
+`core` Ayin/terminology tables and `ops.object_assets`; it creates no Manasek,
+external-knowledge, retrieval, content, or vector-index implementation.
 
 ## Prerequisites
 
@@ -124,13 +125,48 @@ curl --fail http://127.0.0.1:8000/health/ready
 connectivity, PostgreSQL major version 17, pgvector, and all six namespaces. It
 returns HTTP 503 without exposing connection details when a dependency fails.
 
+Phase 2 read endpoints are:
+
+- `GET /ayin/documents` and `GET /ayin/documents/{id}`
+- `GET /ayin/concepts` and `GET /ayin/concepts/{stable_key}`
+- `GET /ayin/distinctions`
+- `GET /ayin/relations`
+- `GET /ayin/principles`
+- `GET /ayin/open-questions`
+- `GET /ayin/terms?query=...`
+
+No Canon approval or source-text publication endpoint exists.
+
+## Ayin Working import and inspection
+
+The importer uses direct Poppler text extraction (not OCR), stores exact source
+bytes by SHA-256, retains raw and normalized passage text separately, and is
+safe to rerun. The reviewed seed creates only source-backed Working proposals.
+
+```bash
+uv run python -m app.cli ayin import \
+  docs/source_material/Ayin_Emtedad_Baznevisi_Shodeh.pdf
+uv run python -m app.cli ayin list-concepts
+uv run python -m app.cli ayin show-concept bon
+uv run python -m app.cli ayin list-distinction
+uv run python -m app.cli ayin list-relations
+uv run python -m app.cli ayin list-principles
+uv run python -m app.cli ayin list-open-questions
+uv run python -m app.cli ayin terminology Bon
+uv run python -m app.cli ayin validate
+```
+
+`inspect-document` accepts the UUID emitted by the import command. Use
+`--without-seed` only when importing passages from a different Ayin Working
+version for which no reviewed ontology manifest exists.
+
 ## Docker application image
 
 The Dockerfile excludes source PDFs, tests, local storage, Git data, and secrets
 from its build context.
 
 ```bash
-docker build -t emtedad-platform:phase1 .
+docker build -t emtedad-platform:phase2 .
 ```
 
 Deployment topology and production object storage remain open review items; the
@@ -144,9 +180,9 @@ atomic link. Storage keys are generated from the digest. Duplicate bytes reuse
 the same object, while corrupt conflicts, traversal, and symlink escapes fail
 explicitly.
 
-Original bytes stay outside PostgreSQL. Later phases will add typed,
-foreign-keyed domain association tables; no generic `owner_type`/`owner_id`
-relationship is used.
+Original bytes stay outside PostgreSQL. Phase 2 links each Canon version to its
+source asset through a typed, foreign-keyed association; no generic
+`owner_type`/`owner_id` relationship is used.
 
 ## Verification
 
@@ -174,15 +210,19 @@ the developer database.
 
 ```text
 app/
-  api/routes/       Thin system HTTP routes
+  api/routes/       Thin system and Ayin read routes
+  core/ayin/        Ayin domain, importer, services, and validator
+  core/terminology/ Multilingual term registry models
   core/             Typed configuration and explicit exceptions
   db/               Metadata, async sessions, and readiness checks
-  ops/              Structured logging
+  ops/              Structured logging and immutable asset metadata
   storage/          Immutable-object storage port and local adapter
 alembic/             Baseline migration and environment
 tests/
-  unit/              Dependency-free foundation behavior
-  integration/       PostgreSQL and migration behavior
+  unit/              Foundation and Ayin policy behavior
+  importers/         Exact PDF extraction behavior
+  integration/       PostgreSQL, migration, import, and API behavior
+resources/ayin/      Reviewed Working seed manifest
 docs/                Specifications, architecture, ADRs, audits, and plans
 ```
 
@@ -192,8 +232,8 @@ docs/                Specifications, architecture, ADRs, audits, and plans
   remain documented review items.
 - Authentication, workers, cloud storage, and production operations are not yet
   implemented.
-- Phase 2 will introduce the versioned Ayin Working/Canon data model and importer
-  only after its plan is reviewed.
+- Phase 2 introduced the versioned Ayin Working/Canon data model and current
+  Working import without enabling Canon approval.
 - Later phases add Manasek, external ingestion, retrieval, dialogue, research,
   Semantic Masters, multilingual localization, publishing, and evaluation in
   that order.

@@ -99,21 +99,27 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
         vector_version = connection.execute(
             "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
         ).fetchone()
-        domain_table_count_row = connection.execute(
-            "SELECT count(*) FROM information_schema.tables "
+        domain_table_rows = connection.execute(
+            "SELECT table_schema, table_name FROM information_schema.tables "
             "WHERE table_schema = ANY(%s)",
             (list(SCHEMA_NAMES),),
-        ).fetchone()
+        ).fetchall()
 
     assert version_row is not None
-    assert domain_table_count_row is not None
     version = int(version_row[0])
-    domain_table_count = int(domain_table_count_row[0])
+    domain_tables = {(str(row[0]), str(row[1])) for row in domain_table_rows}
 
     assert version // 10_000 == 17
     assert vector_version is not None
     assert _schema_names(disposable_database_url) == set(SCHEMA_NAMES)
-    assert domain_table_count == 0
+    assert ("core", "canon_documents") in domain_tables
+    assert ("core", "canon_versions") in domain_tables
+    assert ("core", "canon_passages") in domain_tables
+    assert ("ops", "object_assets") in domain_tables
+    assert not any(
+        schema in {"ritual", "knowledge", "retrieval", "content"}
+        for schema, _ in domain_tables
+    )
 
     command.downgrade(config, "base")
     assert _schema_names(disposable_database_url) == set()

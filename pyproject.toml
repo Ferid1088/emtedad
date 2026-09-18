@@ -7,6 +7,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.16,<2",
     "fastapi>=0.116,<1",
+    "pypdf>=6.0,<7",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.10,<3",
     "sqlalchemy[asyncio]>=2.0.43,<3",
@@ -48,5 +49,6 @@ addopts = ["--strict-config", "--strict-markers"]
 asyncio_mode = "auto"
 markers = [
     "integration: requires the Docker Compose PostgreSQL service",
+    "source_pdf: requires the repository Ayin source PDF",
 ]
 testpaths = ["tests"]

@@ -10,6 +10,7 @@ Completed phase evidence:
 
 - `PHASE_0_REPOSITORY_AUDIT.md`
 - `PHASE_1_COMPLETION.md`
+- `PHASE_2_COMPLETION.md`
 
 Audit reports must distinguish observed facts, inferences, recommendations,
 risks, and unresolved decisions.

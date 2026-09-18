@@ -11,13 +11,14 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: None - Phase 2 plan is pending repository-owner review
-- Last completed phase: Phase 1 - Platform Foundation (2026-09-18)
-- Application runnable: Yes; liveness and PostgreSQL-backed readiness verified
-- Open blocker: None remaining for Phase 1. Phase 2 activation requires review
-  of passage-location identity, ontology seed ownership, and approval boundary.
-  Rights, deployment, backup, privacy, and editorial governance remain recorded
-  later-phase/production review items.
+- Active phase: None; Phase 3 is pending repository-owner review
+- Last completed phase: Phase 2 - Ayin Knowledge Core (2026-09-18)
+- Application runnable: Yes; health, PostgreSQL readiness, Ayin read API, CLI
+  import, and structural validation are verified
+- Open blocker: None remaining for Phase 2. Phase 3 requires explicit approval
+  of its prepared plan and review dependencies. Rights, deployment, backup,
+  privacy, and editorial governance remain recorded later-phase/production
+  review items.
 
 ## Phase plan
 
@@ -25,7 +26,7 @@ Only one phase may be `in_progress` at a time.
 |---:|---|---|---|
 | 0 | Repository Audit | complete | Verified bootstrap baseline, source inspection, requirements mapping, and Phase 1 plan |
 | 1 | Platform Foundation | complete | Runnable FastAPI/PostgreSQL foundation |
-| 2 | Ayin Canon | pending | Versioned canonical corpus and ontology |
+| 2 | Ayin Canon | complete | Versioned Working/Canon corpus boundary and Working ontology |
 | 3 | Manasek | pending | Versioned ritual model and safety validation |
 | 4 | External Knowledge Ingestion | pending | Provenance-preserving adapters, YouTube first |
 | 5 | Retrieval | pending | Multilingual, lane-specific hybrid retrieval |
@@ -106,15 +107,34 @@ Target scope: canon documents, versions, passages, concepts and their versions,
 distinctions, principles, open questions, discourse types, terminology,
 importers, immutability, and version-pinning tests.
 
-Prepared plan: `docs/execution/CURRENT_PHASE.md` (pending user review; not yet
-active). The supplied Ayin PDF must enter as `AYIN_WORKING`, and approval remains
-disabled until the documented governance requirements are resolved.
+Verified result (2026-09-18):
+
+- Added the typed, versioned Ayin document, passage, ontology, concept-relation,
+  terminology, review, and immutable source-asset model through Alembic revision
+  `20260918_0002`.
+- Imported the exact 146-page source as `AYIN_WORKING`/`draft` with verified
+  SHA-256, 1,019 host-extracted passages, source-pinned Working ontology and
+  terminology, and 56 explicit extraction review items.
+- Kept raw and normalized text separate, retained exact source bytes outside
+  PostgreSQL, and used typed foreign keys throughout without generic owner IDs.
+- Enforced Canon approval metadata and approved-version immutability at the
+  database layer while exposing no approval command or endpoint.
+- Verified transactional rollback, idempotent repeat import, distinct parser
+  identities, read API/CLI behavior, structural validation, migration
+  downgrade/re-upgrade and drift checks, Docker image construction, Ruff,
+  strict mypy, and all 46 tests.
+- Confirmed zero `AYIN_CANON` versions and no Phase 3 implementation.
+
+Completion evidence: `docs/audits/PHASE_2_COMPLETION.md`.
 
 ## Phase 3 — Manasek
 
 Target scope: ritual families, five gates, seven stages, Return, separate
 collective architecture, versions, concept links, importers, safety policies,
 and structural validators.
+
+Pending plan: `docs/execution/CURRENT_PHASE.md`. It is not authorized for
+implementation until repository-owner review.
 
 ## Phase 4 — External Knowledge Ingestion
 
