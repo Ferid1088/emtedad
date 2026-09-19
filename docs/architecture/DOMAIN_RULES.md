@@ -108,3 +108,16 @@ Every Ayin lecture:
 When wording, meaning, terminology, translation, classification, or source
 identity is unclear: preserve the ambiguity, create a review item, and do not
 invent certainty.
+# External knowledge rules
+
+- External provider content is stored only as `EXTERNAL_PRIMARY` in Phase 4.
+- Source identity, immutable source version, raw segment, extraction window,
+  extraction run, mention, claim, and resolution candidate are distinct.
+- Raw transcript text and timestamps are immutable; normalization is derived
+  and separately stored.
+- Extracted claims are attributed assertions, never automatic truth or Ayin
+  principles. Resolution of a cited work does not verify a claim.
+- Ambiguous external identities retain candidates and review state. Strong
+  identifiers may deduplicate; uncertain names and titles must not auto-merge.
+- External material does not create Ayin/Manasek Canon or cross-domain dialogue
+  judgments. Those require later explicit editorial workflows.

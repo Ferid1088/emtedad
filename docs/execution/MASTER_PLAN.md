@@ -192,12 +192,20 @@ Completion evidence: `docs/audits/PHASE_3_COMPLETION.md`.
 
 ## Phase 4 — External Knowledge Ingestion
 
-Target scope: generic adapters, YouTube-first ingestion, immutable transcripts,
-timestamps, extraction, claims, references, resolution, media, caching, and
-idempotency.
+Verified result (2026-09-19):
 
-Pending plan: `docs/execution/CURRENT_PHASE.md`. It is not authorized for
-implementation until repository-owner review.
+- Added generic adapters and a real YouTube implementation with immutable
+  source versions, exact timestamped raw segments, separate normalization,
+  deterministic overlapping windows, and independent cached extraction jobs.
+- Added typed external identities, labels, strong identifiers, mentions,
+  attributed claims, evidence links, resolver candidates, quality metadata,
+  content-addressed media links, and review state in `knowledge`.
+- Integrated replaceable structured LLM extraction through non-interactive
+  Codex CLI and Crossref, OpenAlex, Open Library, and Wikidata resolvers.
+- Verified reversible/drift-free migrations, failure isolation, exact-repeat
+  cache reuse, live YouTube acquisition/extraction, and no Phase 5 behavior.
+
+Completion evidence: `docs/audits/PHASE_4_COMPLETION.md`.
 
 ## Phase 5 — Retrieval
 

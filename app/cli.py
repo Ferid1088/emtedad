@@ -15,6 +15,19 @@ from app.core.ayin.service import AyinExtractionService, AyinReadService
 from app.core.ayin.validator import AyinStructuralValidator
 from app.core.config import get_settings
 from app.db.session import Database, create_database
+from app.knowledge.adapters.youtube import YouTubeAdapter
+from app.knowledge.importer import ExternalKnowledgeImporter
+from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.media import MediaService
+from app.knowledge.resolution import (
+    CrossrefResolver,
+    OpenAlexResolver,
+    OpenLibraryResolver,
+    WikidataResolver,
+)
+from app.knowledge.resolution_service import ResolutionService
+from app.knowledge.service import KnowledgeReadService
+from app.knowledge.validator import KnowledgeStructuralValidator
 from app.ops.logging import configure_logging
 from app.ritual.importer import ManasekImporter
 from app.ritual.models import SafetyValidationResult
@@ -68,6 +81,34 @@ def _parser() -> argparse.ArgumentParser:
     ritual_commands.add_parser("validate")
     safety_check = ritual_commands.add_parser("safety-check")
     safety_check.add_argument("ritual_id", type=UUID)
+
+    knowledge = domains.add_parser("knowledge")
+    knowledge_commands = knowledge.add_subparsers(dest="command", required=True)
+    ingest_youtube = knowledge_commands.add_parser("ingest-youtube")
+    ingest_youtube.add_argument("locator")
+    ingest_youtube.add_argument("--model", default="configured-default")
+    ingest_youtube.add_argument("--window-size", type=int, default=50)
+    ingest_youtube.add_argument("--overlap", type=int, default=8)
+    inspect_source = knowledge_commands.add_parser("inspect-source")
+    inspect_source.add_argument("id", type=UUID)
+    list_segments = knowledge_commands.add_parser("list-segments")
+    list_segments.add_argument("version_id", type=UUID)
+    list_mentions = knowledge_commands.add_parser("list-mentions")
+    list_mentions.add_argument("--source-id", type=UUID)
+    list_references = knowledge_commands.add_parser("list-references")
+    list_references.add_argument("--source-id", type=UUID)
+    knowledge_commands.add_parser("list-claims")
+    knowledge_commands.add_parser("list-people")
+    knowledge_commands.add_parser("list-works")
+    inspect_person = knowledge_commands.add_parser("inspect-person")
+    inspect_person.add_argument("id", type=UUID)
+    inspect_work = knowledge_commands.add_parser("inspect-work")
+    inspect_work.add_argument("id", type=UUID)
+    knowledge_commands.add_parser("list-review")
+    resolve = knowledge_commands.add_parser("resolve-pending")
+    resolve.add_argument("--source-id", type=UUID)
+    resolve.add_argument("--limit", type=int)
+    knowledge_commands.add_parser("validate")
     return parser
 
 
@@ -87,6 +128,8 @@ async def _run(args: argparse.Namespace) -> int:
     try:
         if args.domain == "manasek":
             return await _run_manasek(args, database, store)
+        if args.domain == "knowledge":
+            return await _run_knowledge(args, database, store)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -173,6 +216,68 @@ async def _run_manasek(
             )
         else:
             raise RuntimeError(f"unsupported Manasek command: {args.command}")
+    print(_json(output))
+    return 0 if not hasattr(output, "valid") or output.valid else 1
+
+
+async def _run_knowledge(
+    args: argparse.Namespace, database: Database, store: LocalObjectStore
+) -> int:
+    if args.command == "ingest-youtube":
+        result = await ExternalKnowledgeImporter(
+            database,
+            YouTubeAdapter(),
+            CodexCliProvider(),
+            model=args.model,
+            window_size=args.window_size,
+            overlap=args.overlap,
+            media_service=MediaService(database, store),
+        ).ingest(args.locator)
+        print(_json(asdict(result)))
+        return 0 if result.failed_windows == 0 else 1
+    if args.command == "resolve-pending":
+        resolution_result = await ResolutionService(
+            database,
+            [
+                CrossrefResolver(),
+                OpenAlexResolver(),
+                OpenLibraryResolver(),
+                WikidataResolver(),
+            ],
+        ).resolve_pending(args.source_id, limit=args.limit)
+        print(_json(asdict(resolution_result)))
+        return 0
+    async with database.transaction() as session:
+        service = KnowledgeReadService(session)
+        if args.command == "inspect-source":
+            output: Any = {
+                "source": await service.source(args.id),
+                "versions": await service.versions(args.id),
+            }
+        elif args.command == "list-segments":
+            output = await service.segments(args.version_id)
+        elif args.command in {"list-mentions", "list-references"}:
+            output = (
+                await service.source_mentions(args.source_id)
+                if args.source_id
+                else await service.mentions()
+            )
+        elif args.command == "list-claims":
+            output = await service.claims()
+        elif args.command == "list-people":
+            output = await service.people()
+        elif args.command == "list-works":
+            output = await service.works()
+        elif args.command == "inspect-person":
+            output = await service.person(args.id)
+        elif args.command == "inspect-work":
+            output = await service.work(args.id)
+        elif args.command == "list-review":
+            output = await service.review_queue()
+        elif args.command == "validate":
+            output = await KnowledgeStructuralValidator(session).validate()
+        else:
+            raise RuntimeError(f"unsupported knowledge command: {args.command}")
     print(_json(output))
     return 0 if not hasattr(output, "valid") or output.valid else 1
 

@@ -13,6 +13,11 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.43,<3",
     "structlog>=25.4,<26",
     "uvicorn[standard]>=0.35,<1",
+    "httpx>=0.28,<1",
+    "youtube-transcript-api>=1.2,<2",
+    "yt-dlp>=2025.9,<2027",
+    "rapidfuzz>=3.14,<4",
+    "pymupdf>=1.26,<2",
 ]
 
 [dependency-groups]

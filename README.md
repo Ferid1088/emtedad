@@ -5,9 +5,10 @@ modeling Manasek, researching external knowledge, and eventually producing
 evidence-grounded Persian, English, and Arabic lectures.
 
 The repository contains the Phase 1 platform foundation, the Phase 2/2.1 Ayin
-knowledge core and provenance stabilization, and the Phase 3 Manasek ritual
-domain. It imports the supplied PDFs only as Working sources. It does not model
-external sources, retrieval data, or generated lectures.
+knowledge core, the Phase 3 Manasek ritual domain, and the Phase 4 external
+knowledge ingestion domain. Ayin and Manasek remain Working sources; external
+material remains separate research evidence. Retrieval and generated lectures
+are not implemented.
 
 ## Authority and current source status
 
@@ -32,7 +33,7 @@ Ayin. Manasek remains separate from lecture content because ritual is an
 optional experiential layer with its own safety and consent requirements, not
 evidence that proves Ayin.
 
-## Phase 1-3 architecture
+## Phase 1-4 architecture
 
 The initial system is a modular monolith with one FastAPI application and one
 PostgreSQL 17 source of truth.
@@ -58,9 +59,10 @@ PostgreSQL namespaces reserve explicit ownership boundaries:
 | `ops` | Operational assets, jobs, audit, review, and cache infrastructure |
 
 Phase 1 created these namespaces and enabled pgvector. Phase 2 owns the `core`
-Ayin/terminology tables and `ops.object_assets`. Phase 3 owns the `ritual`
-Manasek tables. No external-knowledge, retrieval, content, or vector-index
-implementation exists yet.
+Ayin/terminology tables and `ops.object_assets`. Phase 3 owns `ritual`. Phase 4
+owns the provenance-preserving `knowledge` source, segment, extraction, entity,
+claim, resolution, media, and review tables. No retrieval/content tables or
+vector indexes exist.
 
 Source and extraction identities are intentionally separate:
 
@@ -162,6 +164,24 @@ Phase 3 read endpoints are:
 - `GET /ritual/stages/{id}/sequence`
 - `GET /ritual/safety-rules`
 - `GET /ritual/review-queue`
+
+Phase 4 read endpoints are:
+
+- `GET /knowledge/sources` and `GET /knowledge/sources/{id}`
+- `GET /knowledge/sources/{id}/versions`
+- `GET /knowledge/versions/{id}/segments`
+- `GET /knowledge/mentions`, `/knowledge/claims`, `/knowledge/people`, and
+  `/knowledge/works`
+- `GET /knowledge/review-queue`
+
+The generic YouTube adapter accepts a URL or video ID. Structured extraction
+uses an authenticated local Codex CLI session and caches successful windows:
+
+```bash
+uv run python -m app.cli knowledge ingest-youtube 331XLUCCybU
+uv run python -m app.cli knowledge resolve-pending --limit 10
+uv run python -m app.cli knowledge validate
+```
 
 ## Ayin Working import and inspection
 

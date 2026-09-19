@@ -11,6 +11,7 @@ from app.core.ayin import models as ayin_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.terminology import models as terminology_models  # noqa: F401
 from app.db.base import Base
+from app.knowledge import models as knowledge_models  # noqa: F401
 from app.ops.assets import models as asset_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 

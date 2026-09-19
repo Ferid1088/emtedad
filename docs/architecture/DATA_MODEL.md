@@ -177,6 +177,14 @@ ADR-006 for the implemented boundary.
 - evidence relations, criticism, alternatives, and confidence metadata;
 - source-quality and epistemic metadata.
 
+Phase 4 implements this domain with separate `sources`, immutable
+`source_versions`, exact `source_segments`, configurable `extraction_windows`,
+typed window-to-segment membership, configuration-pinned `extraction_runs`,
+and independently retryable `window_results`. People, works, organizations,
+concepts, labels, strong identifiers, mentions, candidates, attributed claims,
+evidence links, media links, quality records, and review flags use typed foreign
+keys. See ADR-007.
+
 Critical constraints:
 
 - raw content, timestamps, page references, and acquisition provenance are
