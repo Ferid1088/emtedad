@@ -210,10 +210,11 @@ Every result preserves corpus zone, epistemic role, immutable source version,
 source location, query/filter configuration, and model/configuration identity.
 Raw cross-corpus vector score never encodes authority.
 
-Embedding storage must accommodate versioned models without silently accepting
-the wrong vector dimension. Phase 5 must choose and test a PostgreSQL layout and
-index strategy after measuring the selected multilingual model; no HNSW or
-IVFFlat index is created in Phase 1.
+Embedding storage accommodates versioned model records without silently
+accepting the wrong vector dimension. Phase 5 uses pgvector with a database
+trigger that checks each vector against its registered model dimensions. The
+initial 131-chunk corpus uses exact cosine search; no HNSW or IVFFlat index is
+created before multilingual scale/recall benchmarks justify one.
 
 ## Research and lectures
 

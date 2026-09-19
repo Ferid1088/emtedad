@@ -29,6 +29,15 @@ from app.knowledge.resolution_service import ResolutionService
 from app.knowledge.service import KnowledgeReadService
 from app.knowledge.validator import KnowledgeStructuralValidator
 from app.ops.logging import configure_logging
+from app.retrieval.chunking import ChunkBuilder
+from app.retrieval.domain import QueryLanguage, RetrievalLane
+from app.retrieval.embeddings import (
+    EmbeddingService,
+    SentenceTransformerEmbeddingProvider,
+)
+from app.retrieval.evaluation import RetrievalEvaluationService
+from app.retrieval.service import HybridRetrievalService
+from app.retrieval.validator import RetrievalStructuralValidator
 from app.ritual.importer import ManasekImporter
 from app.ritual.models import SafetyValidationResult
 from app.ritual.safety import VALIDATOR_VERSION, RitualSafetyValidator
@@ -109,6 +118,30 @@ def _parser() -> argparse.ArgumentParser:
     resolve.add_argument("--source-id", type=UUID)
     resolve.add_argument("--limit", type=int)
     knowledge_commands.add_parser("validate")
+
+    retrieval = domains.add_parser("retrieval")
+    retrieval_commands = retrieval.add_subparsers(dest="command", required=True)
+    retrieval_commands.add_parser("build-chunks")
+    build_embeddings = retrieval_commands.add_parser("build-embeddings")
+    build_embeddings.add_argument("chunking_run_id", type=UUID)
+    search = retrieval_commands.add_parser("search")
+    search.add_argument("query")
+    search.add_argument(
+        "--language", choices=[item.value for item in QueryLanguage], required=True
+    )
+    search.add_argument("--chunking-run-id", type=UUID, required=True)
+    search.add_argument("--embedding-model-id", type=UUID, required=True)
+    search.add_argument(
+        "--lane", action="append", choices=[item.value for item in RetrievalLane]
+    )
+    seed_evaluation = retrieval_commands.add_parser("seed-evaluation")
+    seed_evaluation.add_argument("chunking_run_id", type=UUID)
+    evaluate = retrieval_commands.add_parser("evaluate")
+    evaluate.add_argument("chunking_run_id", type=UUID)
+    evaluate.add_argument("embedding_model_id", type=UUID)
+    validate_retrieval = retrieval_commands.add_parser("validate")
+    validate_retrieval.add_argument("chunking_run_id", type=UUID)
+    validate_retrieval.add_argument("--embedding-model-id", type=UUID)
     return parser
 
 
@@ -130,6 +163,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_manasek(args, database, store)
         if args.domain == "knowledge":
             return await _run_knowledge(args, database, store)
+        if args.domain == "retrieval":
+            return await _run_retrieval(args, database, settings.storage_root)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -174,6 +209,55 @@ async def _run(args: argparse.Namespace) -> int:
         return 0
     finally:
         await database.dispose()
+
+
+async def _run_retrieval(
+    args: argparse.Namespace, database: Database, storage_root: Path
+) -> int:
+    provider = SentenceTransformerEmbeddingProvider(
+        cache_folder=storage_root / "models"
+    )
+    if args.command == "build-chunks":
+        output: Any = asdict(await ChunkBuilder(database).build())
+    elif args.command == "build-embeddings":
+        output = asdict(
+            await EmbeddingService(database, provider).build(args.chunking_run_id)
+        )
+    elif args.command == "search":
+        output = await HybridRetrievalService(database, provider).search(
+            args.query,
+            QueryLanguage(args.language),
+            chunking_run_id=args.chunking_run_id,
+            embedding_model_id=args.embedding_model_id,
+            lanes=[RetrievalLane(item) for item in args.lane] if args.lane else None,
+        )
+    elif args.command == "seed-evaluation":
+        count = await RetrievalEvaluationService(
+            database, HybridRetrievalService(database, provider)
+        ).seed_ayin_queries(args.chunking_run_id)
+        output = {"query_count": count}
+    elif args.command == "evaluate":
+        summary = await RetrievalEvaluationService(
+            database, HybridRetrievalService(database, provider)
+        ).evaluate(
+            chunking_run_id=args.chunking_run_id,
+            embedding_model_id=args.embedding_model_id,
+        )
+        output = asdict(summary)
+        print(_json(output))
+        return 0 if summary.passed else 1
+    elif args.command == "validate":
+        async with database.transaction() as session:
+            result = await RetrievalStructuralValidator(session).validate(
+                args.chunking_run_id, args.embedding_model_id
+            )
+        output = asdict(result)
+        print(_json(output))
+        return 0 if result.valid else 1
+    else:
+        raise RuntimeError(f"unsupported retrieval command: {args.command}")
+    print(_json(output))
+    return 0
 
 
 async def _run_manasek(

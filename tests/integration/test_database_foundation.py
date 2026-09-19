@@ -154,7 +154,10 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
     assert ("ritual", "ritual_versions") in domain_tables
     assert ("knowledge", "sources") in domain_tables
     assert ("knowledge", "source_segments") in domain_tables
-    assert not any(schema in {"retrieval", "content"} for schema, _ in domain_tables)
+    assert ("retrieval", "chunks") in domain_tables
+    assert ("retrieval", "chunk_embeddings") in domain_tables
+    assert ("retrieval", "evaluation_runs") in domain_tables
+    assert not any(schema == "content" for schema, _ in domain_tables)
 
     command.downgrade(config, "base")
     assert _schema_names(disposable_database_url) == set()

@@ -1,63 +1,44 @@
-# Pending Phase: Phase 5 — Retrieval
+# Pending Phase: Phase 6 — Ayin–External Dialogue
 
 ## Execution status
 
-Phase 4 is complete as of 2026-09-19. Phase 5 is prepared for repository-owner
-review but is not active. Do not implement Phase 5 until the owner explicitly
+Phase 5 is complete as of 2026-09-19. Phase 6 is prepared for repository-owner
+review but is not active. Do not implement Phase 6 until the owner explicitly
 approves this plan.
 
-Completion evidence for Phase 4:
-`docs/audits/PHASE_4_COMPLETION.md`.
+Completion evidence for Phase 5: `docs/audits/PHASE_5_COMPLETION.md`.
 
 ## Goal
 
-Build provenance-preserving multilingual retrieval over approved/queryable
-Ayin, Manasek, and external material. Retrieval must preserve corpus zone and
-epistemic role rather than treating similarity score as authority.
+Model an explicitly reviewed dialogue between Ayin and external knowledge while
+preserving authority, epistemic status, counterevidence, and uncertainty.
 
 ## Proposed scope
 
-- versioned chunks derived from immutable parent passages or segments;
-- separate Persian, Arabic, and English lexical normalization;
-- PostgreSQL full-text search configurations and measured indexes;
-- versioned multilingual embedding models and vector dimensions;
-- idempotent embedding jobs/results with immutable input hashes;
-- separate Ayin, external, ritual, and generated-content retrieval lanes;
-- fusion, reranking, parent expansion, provenance, and authority filters;
-- retrieval runs and evaluation fixtures with explicit configuration identity;
-- thin read/evaluation APIs, CLI commands, migrations, and serious tests.
-
-## Required review before activation
-
-1. embedding model, license, hosting, dimension, and cost;
-2. chunk policy per source domain and parent-expansion rules;
-3. language configurations and Persian normalization policy;
-4. HNSW/IVFFlat choice only after measured corpus/query benchmarks;
-5. lane weights, fusion/reranking policy, and authority filters;
-6. evaluation gold-set ownership and acceptance thresholds;
-7. privacy, retention, deletion, and re-embedding policy.
+- typed Ayin-to-external proposed relations and review workflow;
+- evidence-role classification, conflicts, alternatives, and counterevidence;
+- explicit uncertainty and provenance for every proposed interpretation;
+- validators preventing external sources from redefining Ayin;
+- versioned classifications, API/CLI boundaries, migrations, and evaluation.
 
 ## Out of scope
 
-- Ayin-to-external dialogue classification (Phase 6);
 - ResearchPlan, ResearchPackage, and Ayin Spine (Phase 7);
 - lecture generation, localization, publishing, music, or TTS;
-- automatic Canon promotion or claim verification.
+- automatic Canon promotion, automatic claim verification, or generated Canon.
 
 ## Required invariants
 
-- Every chunk and embedding pins an immutable source version and exact ordered
-  parent records.
-- Model/config changes create new versioned results; old vectors are retained.
-- Corpus zone, source type, language, epistemic status, and authority filters
-  remain queryable through every retrieval result.
-- External similarity cannot redefine Ayin; Manasek is not evidence.
-- Raw vector score never encodes authority.
-- Important relations use typed foreign keys, not generic owner IDs.
+- Ayin Working/Canon, Manasek Working/Canon, external primary/derived, and
+  generated content remain distinct.
+- External material may enter dialogue with Ayin but cannot redefine it.
+- Manasek is experiential and cannot be used as evidence proving Ayin.
+- Every relation preserves typed source provenance, uncertainty, and review
+  state; no generic owner IDs are permitted.
 
 ## Acceptance gate
 
-Phase 5 requires owner approval, an accepted retrieval ADR, clean reversible
-migrations, deterministic fixtures, measured lexical/vector/fusion evaluation,
-failure isolation, API/CLI tests, Ruff, strict mypy, and the full suite. Phase 6
-must not begin as part of Phase 5.
+Phase 6 requires explicit owner approval, an accepted ADR, reversible and
+drift-free migrations, serious classification/review tests, domain validators,
+Ruff, strict mypy, and the full suite. Phase 7 must not begin as part of Phase
+6.

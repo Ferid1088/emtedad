@@ -3,6 +3,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from pgvector.psycopg import register_vector_async
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -21,6 +23,13 @@ class Database:
             database_url,
             pool_pre_ping=True,
         )
+
+        @event.listens_for(self.engine.sync_engine, "connect")
+        def register_vector_types(dbapi_connection: object, _record: object) -> None:
+            """Teach psycopg to encode and decode pgvector values."""
+
+            dbapi_connection.run_async(register_vector_async)  # type: ignore[attr-defined]
+
         self.session_factory = async_sessionmaker(
             bind=self.engine,
             class_=AsyncSession,

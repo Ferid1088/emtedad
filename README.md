@@ -61,8 +61,10 @@ PostgreSQL namespaces reserve explicit ownership boundaries:
 Phase 1 created these namespaces and enabled pgvector. Phase 2 owns the `core`
 Ayin/terminology tables and `ops.object_assets`. Phase 3 owns `ritual`. Phase 4
 owns the provenance-preserving `knowledge` source, segment, extraction, entity,
-claim, resolution, media, and review tables. No retrieval/content tables or
-vector indexes exist.
+claim, resolution, media, and review tables. Phase 5 owns immutable chunks,
+typed provenance, lexical search, embeddings, lane-aware retrieval runs, and
+evaluation records in `retrieval`. No `content` tables or approximate vector
+indexes exist.
 
 Source and extraction identities are intentionally separate:
 

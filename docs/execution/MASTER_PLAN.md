@@ -11,12 +11,12 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: None; Phase 4 is pending repository-owner review
-- Last completed checkpoint: Phase 3 - Manasek Ritual Domain
+- Active phase: None; Phase 6 is pending repository-owner review
+- Last completed checkpoint: Phase 5 - Retrieval
   (2026-09-19)
-- Application runnable: Yes; health, PostgreSQL readiness, Ayin and Manasek read
-  APIs, CLI imports, and structural/safety validation are verified
-- Open blocker: None remaining for Phase 3. Phase 4 requires explicit approval
+- Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
+  external-knowledge, and retrieval APIs/CLIs and validators are verified
+- Open blocker: None remaining for Phase 5. Phase 6 requires explicit approval
   of its prepared plan. Rights, deployment, backup, privacy, and editorial
   governance remain recorded later-phase/production review items.
 
@@ -29,8 +29,8 @@ Only one phase may be `in_progress` at a time.
 | 2 | Ayin Canon | complete | Versioned Working/Canon corpus boundary and Working ontology |
 | 2.1 | Provenance Stabilization | complete | Source versions separated from reproducible extraction runs |
 | 3 | Manasek | complete | Versioned ritual model and safety validation |
-| 4 | External Knowledge Ingestion | pending | Provenance-preserving adapters, YouTube first |
-| 5 | Retrieval | pending | Multilingual, lane-specific hybrid retrieval |
+| 4 | External Knowledge Ingestion | complete | Provenance-preserving adapters, YouTube first |
+| 5 | Retrieval | complete | Multilingual, lane-specific hybrid retrieval |
 | 6 | Ayin–External Dialogue | pending | Typed relations, classification, criticism and review |
 | 7 | Research Engine | pending | Ayin Spine, ResearchPlan and frozen ResearchPackage |
 | 8 | Lecture Master | pending | Cited Semantic Master and validators |
@@ -212,6 +212,21 @@ Completion evidence: `docs/audits/PHASE_4_COMPLETION.md`.
 Target scope: retrieval chunks, multilingual normalization, full-text search,
 pgvector, embedding registry, separate retrieval lanes, RRF, reranking, parent
 expansion, filters, and evaluation fixtures.
+
+Verified result (2026-09-19):
+
+- Built immutable/versioned chunks over Ayin Working, Manasek Working
+  structured ritual content, and external primary segments with typed source
+  membership and complete provenance.
+- Added multilingual normalization, PostgreSQL FTS, pinned multilingual E5
+  embeddings, exact cosine search, entity-aware retrieval, deterministic RRF,
+  deterministic reranking, and source-local context expansion.
+- Preserved lane authority through explicit per-lane fusion and deterministic
+  lane interleaving; similarity never promotes Canon or implies evidence.
+- Passed Persian, English, and Arabic retrieval evaluation, steady-state
+  latency, reversible migrations, structural validation, and full checks.
+
+Completion evidence: `docs/audits/PHASE_5_COMPLETION.md`.
 
 ## Phase 6 — Ayin–External Dialogue
 

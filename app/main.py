@@ -13,12 +13,14 @@ from fastapi.responses import JSONResponse, Response
 from app.api.routes.ayin import router as ayin_router
 from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
+from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.ritual import router as ritual_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ApplicationError
 from app.db.health import DatabaseReadinessService, ReadinessService
 from app.db.session import Database, create_database
 from app.ops.logging import configure_logging
+from app.retrieval.embeddings import SentenceTransformerEmbeddingProvider
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
@@ -50,6 +52,9 @@ def create_app(
         if readiness_service is None:
             database = create_database(resolved_settings)
             app.state.database = database
+            app.state.embedding_provider = SentenceTransformerEmbeddingProvider(
+                cache_folder=resolved_settings.storage_root / "models"
+            )
             app.state.readiness_service = DatabaseReadinessService(database.engine)
         else:
             app.state.readiness_service = readiness_service
@@ -75,6 +80,7 @@ def create_app(
     app.include_router(ayin_router)
     app.include_router(ritual_router)
     app.include_router(knowledge_router)
+    app.include_router(retrieval_router)
 
     @app.middleware("http")
     async def request_context(

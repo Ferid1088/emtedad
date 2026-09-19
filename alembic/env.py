@@ -13,6 +13,7 @@ from app.core.terminology import models as terminology_models  # noqa: F401
 from app.db.base import Base
 from app.knowledge import models as knowledge_models  # noqa: F401
 from app.ops.assets import models as asset_models  # noqa: F401
+from app.retrieval import models as retrieval_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 
 config = context.config
