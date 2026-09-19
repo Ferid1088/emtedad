@@ -14,7 +14,9 @@ from app.core.ayin.models import (
     CanonPassage,
     CanonVersion,
     CanonVersionSourceAsset,
+    ExtractionRun,
 )
+from app.core.ayin.provenance import passage_set_hash
 from app.core.ayin.schemas import ValidationIssue, ValidationReport
 from app.ops.assets.models import ObjectAsset
 from app.storage.base import ObjectStore
@@ -42,7 +44,23 @@ class AyinStructuralValidator:
                         record_id=version.id,
                     )
                 )
-            await self._validate_passages(version, issues)
+            runs = list(
+                await self._session.scalars(
+                    select(ExtractionRun).where(
+                        ExtractionRun.canon_version_id == version.id
+                    )
+                )
+            )
+            if not runs:
+                issues.append(
+                    ValidationIssue(
+                        code="missing_extraction_run",
+                        message="Source version has no reproducible extraction run.",
+                        record_id=version.id,
+                    )
+                )
+            for run in runs:
+                await self._validate_passages(run, issues)
 
         approved_duplicates = await self._session.execute(
             select(
@@ -68,12 +86,12 @@ class AyinStructuralValidator:
         )
 
     async def _validate_passages(
-        self, version: CanonVersion, issues: list[ValidationIssue]
+        self, run: ExtractionRun, issues: list[ValidationIssue]
     ) -> None:
         passages = list(
             await self._session.scalars(
                 select(CanonPassage)
-                .where(CanonPassage.canon_version_id == version.id)
+                .where(CanonPassage.extraction_run_id == run.id)
                 .order_by(CanonPassage.sequence)
             )
         )
@@ -83,7 +101,7 @@ class AyinStructuralValidator:
                 ValidationIssue(
                     code="passage_order",
                     message="Passage sequence is not contiguous.",
-                    record_id=version.id,
+                    record_id=run.id,
                 )
             )
         page_order = [item.page_number for item in passages]
@@ -92,7 +110,33 @@ class AyinStructuralValidator:
                 ValidationIssue(
                     code="page_order",
                     message="Passage page order is not monotonic.",
-                    record_id=version.id,
+                    record_id=run.id,
+                )
+            )
+        if len(passages) != run.passage_count:
+            issues.append(
+                ValidationIssue(
+                    code="passage_count",
+                    message="Extraction run passage count does not match its output.",
+                    record_id=run.id,
+                )
+            )
+        if passages and max(item.page_number for item in passages) != run.page_count:
+            issues.append(
+                ValidationIssue(
+                    code="page_count",
+                    message=(
+                        "Extraction run page count does not match passage locations."
+                    ),
+                    record_id=run.id,
+                )
+            )
+        if passage_set_hash(passages) != run.output_hash:
+            issues.append(
+                ValidationIssue(
+                    code="extraction_output_hash",
+                    message="Extraction run output hash does not match its passages.",
+                    record_id=run.id,
                 )
             )
         for passage in passages:

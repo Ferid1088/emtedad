@@ -11,10 +11,12 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,6 +29,7 @@ from app.core.ayin.domain import (
     LanguageCode,
     OpenQuestionStatus,
     ReviewKind,
+    ReviewReason,
     ReviewStatus,
 )
 from app.db.base import Base, PostgresSchema
@@ -76,7 +79,14 @@ class CanonVersion(Base):
 
     __tablename__ = "canon_versions"
     __table_args__ = (
-        UniqueConstraint("document_id", "source_file_hash", "importer_version"),
+        Index(
+            "uq_canon_versions_source_identity",
+            "document_id",
+            "source_file_hash",
+            "corpus_zone",
+            text("COALESCE(semantic_version, '')"),
+            unique=True,
+        ),
         CheckConstraint("source_file_hash ~ '^[0-9a-f]{64}$'", name="valid_hash"),
         CheckConstraint(
             "((corpus_zone = 'AYIN_WORKING' AND status IN "
@@ -108,10 +118,6 @@ class CanonVersion(Base):
     )
     corpus_zone: Mapped[CorpusZone] = mapped_column(_enum(CorpusZone, "corpus_zone"))
     source_file_hash: Mapped[str] = mapped_column(String(64))
-    importer_version: Mapped[str] = mapped_column(String(64))
-    extractor_name: Mapped[str] = mapped_column(String(64))
-    extractor_version: Mapped[str] = mapped_column(String(128))
-    page_count: Mapped[int] = mapped_column(Integer)
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     change_summary: Mapped[str] = mapped_column(Text)
@@ -142,13 +148,93 @@ class CanonVersionSourceAsset(Base):
     )
 
 
+class ExtractionRun(Base):
+    """Reproducible transformation of one immutable source version."""
+
+    __tablename__ = "extraction_runs"
+    __table_args__ = (
+        UniqueConstraint("id", "canon_version_id"),
+        UniqueConstraint(
+            "canon_version_id",
+            "importer_version",
+            "extractor_name",
+            "extractor_version",
+            "normalization_version",
+            "segmentation_version",
+            "configuration_hash",
+        ),
+        ForeignKeyConstraint(
+            ["canon_version_id", "source_asset_id"],
+            [
+                f"{CORE}.canon_version_source_assets.canon_version_id",
+                f"{CORE}.canon_version_source_assets.source_asset_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("page_count > 0", name="positive_page_count"),
+        CheckConstraint("passage_count > 0", name="positive_passage_count"),
+        CheckConstraint(
+            "configuration_hash ~ '^[0-9a-f]{64}$'", name="valid_configuration_hash"
+        ),
+        CheckConstraint("output_hash ~ '^[0-9a-f]{64}$'", name="valid_output_hash"),
+        {"schema": CORE},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    canon_version_id: Mapped[UUID] = mapped_column(index=True)
+    source_asset_id: Mapped[UUID]
+    importer_version: Mapped[str] = mapped_column(String(64))
+    extractor_name: Mapped[str] = mapped_column(String(64))
+    extractor_version: Mapped[str] = mapped_column(String(128))
+    normalization_version: Mapped[str] = mapped_column(String(64))
+    segmentation_version: Mapped[str] = mapped_column(String(64))
+    configuration: Mapped[dict[str, object]] = mapped_column(JSONB)
+    configuration_hash: Mapped[str] = mapped_column(String(64))
+    output_hash: Mapped[str] = mapped_column(String(64))
+    page_count: Mapped[int] = mapped_column(Integer)
+    passage_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class PreferredExtractionRun(Base):
+    """Explicit operator-selected extraction for a source version."""
+
+    __tablename__ = "preferred_extraction_runs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["extraction_run_id", "canon_version_id"],
+            [f"{CORE}.extraction_runs.id", f"{CORE}.extraction_runs.canon_version_id"],
+            ondelete="RESTRICT",
+        ),
+        {"schema": CORE},
+    )
+
+    canon_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CORE}.canon_versions.id", ondelete="CASCADE"), primary_key=True
+    )
+    extraction_run_id: Mapped[UUID]
+    selected_by: Mapped[str] = mapped_column(String(255))
+    reason: Mapped[str] = mapped_column(Text)
+    selected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
 class CanonPassage(Base):
     """Addressable extracted text pinned to version, asset, and location."""
 
     __tablename__ = "canon_passages"
     __table_args__ = (
-        UniqueConstraint("canon_version_id", "sequence"),
+        UniqueConstraint("extraction_run_id", "sequence"),
         UniqueConstraint("id", "canon_version_id"),
+        UniqueConstraint("id", "extraction_run_id"),
+        ForeignKeyConstraint(
+            ["extraction_run_id", "canon_version_id"],
+            [f"{CORE}.extraction_runs.id", f"{CORE}.extraction_runs.canon_version_id"],
+            ondelete="RESTRICT",
+        ),
         ForeignKeyConstraint(
             ["canon_version_id", "source_asset_id"],
             [
@@ -166,6 +252,7 @@ class CanonPassage(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     canon_version_id: Mapped[UUID] = mapped_column(index=True)
+    extraction_run_id: Mapped[UUID] = mapped_column(index=True)
     source_asset_id: Mapped[UUID]
     sequence: Mapped[int] = mapped_column(Integer)
     page_number: Mapped[int] = mapped_column(Integer)
@@ -421,18 +508,39 @@ class AyinReviewItem(Base):
     """Typed review issue attached to one imported Ayin version."""
 
     __tablename__ = "ayin_review_items"
-    __table_args__ = ({"schema": CORE},)
+    __table_args__ = (
+        UniqueConstraint("id", "extraction_run_id"),
+        CheckConstraint(
+            "(status = 'open' AND reviewed_at IS NULL) OR "
+            "(status IN ('resolved', 'dismissed') AND reviewed_at IS NOT NULL)",
+            name="review_completion_metadata",
+        ),
+        ForeignKeyConstraint(
+            ["extraction_run_id", "canon_version_id"],
+            [f"{CORE}.extraction_runs.id", f"{CORE}.extraction_runs.canon_version_id"],
+            ondelete="RESTRICT",
+        ),
+        {"schema": CORE},
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     canon_version_id: Mapped[UUID] = mapped_column(
         ForeignKey(f"{CORE}.canon_versions.id", ondelete="RESTRICT"), index=True
     )
+    extraction_run_id: Mapped[UUID] = mapped_column(index=True)
     kind: Mapped[ReviewKind] = mapped_column(_enum(ReviewKind, "ayin_review_kind"))
+    reason_for_review: Mapped[ReviewReason] = mapped_column(
+        _enum(ReviewReason, "ayin_review_reason")
+    )
     status: Mapped[ReviewStatus] = mapped_column(
         _enum(ReviewStatus, "ayin_review_status")
     )
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     message: Mapped[str] = mapped_column(Text)
+    reviewer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )
@@ -442,12 +550,25 @@ class AyinPassageReview(Base):
     """Foreign-keyed passage target for an Ayin review item."""
 
     __tablename__ = "ayin_passage_reviews"
-    __table_args__ = ({"schema": CORE},)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["review_item_id", "extraction_run_id"],
+            [
+                f"{CORE}.ayin_review_items.id",
+                f"{CORE}.ayin_review_items.extraction_run_id",
+            ],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["passage_id", "extraction_run_id"],
+            [f"{CORE}.canon_passages.id", f"{CORE}.canon_passages.extraction_run_id"],
+            ondelete="RESTRICT",
+        ),
+        {"schema": CORE},
+    )
 
     review_item_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CORE}.ayin_review_items.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    passage_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CORE}.canon_passages.id", ondelete="RESTRICT"), index=True
-    )
+    extraction_run_id: Mapped[UUID]
+    passage_id: Mapped[UUID] = mapped_column(index=True)

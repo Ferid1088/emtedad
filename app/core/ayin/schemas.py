@@ -22,15 +22,38 @@ class ReadModel(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class ExtractionRunRead(ReadModel):
+    id: UUID
+    importer_version: str
+    extractor_name: str
+    extractor_version: str
+    normalization_version: str
+    segmentation_version: str
+    configuration: dict[str, object]
+    configuration_hash: str
+    output_hash: str
+    page_count: int
+    passage_count: int
+    created_at: datetime
+
+
 class VersionSummary(ReadModel):
     id: UUID
     status: EditorialStatus
     corpus_zone: CorpusZone
     semantic_version: str | None
     source_file_hash: str
-    importer_version: str
-    page_count: int
     created_at: datetime
+    preferred_extraction_run_id: UUID | None
+    extraction_runs: list[ExtractionRunRead]
+
+
+class PreferredExtractionRead(ReadModel):
+    canon_version_id: UUID
+    extraction_run_id: UUID
+    selected_by: str
+    reason: str
+    selected_at: datetime
 
 
 class DocumentSummary(ReadModel):

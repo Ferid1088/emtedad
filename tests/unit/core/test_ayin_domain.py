@@ -7,6 +7,7 @@ from app.core.ayin.domain import (
     EditorialStatus,
     LanguageCode,
     OpenQuestionStatus,
+    ReviewReason,
     TermFormType,
     status_allowed_in_zone,
 )
@@ -79,3 +80,15 @@ def test_bon_forbidden_equivalents_are_reviewable_data() -> None:
         if form.form_type is TermFormType.FORBIDDEN_EQUIVALENT
     }
     assert forbidden == {"soul", "personality", "self"}
+
+
+def test_extraction_review_reasons_are_specific() -> None:
+    assert {item.value for item in ReviewReason} == {
+        "suspicious_extraction",
+        "heading_uncertainty",
+        "broken_paragraph",
+        "character_corruption",
+        "page_layout_ambiguity",
+        "possible_missing_content",
+        "seed_provenance",
+    }

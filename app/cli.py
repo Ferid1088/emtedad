@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.core.ayin.importer import AyinImporter, default_seed_manifest
-from app.core.ayin.service import AyinReadService
+from app.core.ayin.service import AyinExtractionService, AyinReadService
 from app.core.ayin.validator import AyinStructuralValidator
 from app.core.config import get_settings
 from app.db.session import create_database
@@ -44,6 +44,10 @@ def _parser() -> argparse.ArgumentParser:
     terminology = commands.add_parser("terminology")
     terminology.add_argument("term")
     commands.add_parser("validate")
+    prefer = commands.add_parser("prefer-extraction")
+    prefer.add_argument("run_id", type=UUID)
+    prefer.add_argument("--selected-by", required=True)
+    prefer.add_argument("--reason", required=True)
     return parser
 
 
@@ -70,6 +74,14 @@ async def _run(args: argparse.Namespace) -> int:
             return 0
 
         async with database.transaction() as session:
+            if args.command == "prefer-extraction":
+                preference_output = await AyinExtractionService(session).prefer(
+                    args.run_id,
+                    selected_by=args.selected_by,
+                    reason=args.reason,
+                )
+                print(_json(preference_output))
+                return 0
             service = AyinReadService(session)
             if args.command == "inspect-document":
                 output: Any = await service.document(args.id)

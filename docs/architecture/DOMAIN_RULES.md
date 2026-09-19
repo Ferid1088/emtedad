@@ -20,7 +20,10 @@ workflow.
 
 ## Ayin invariants
 
-- Canonical passages must remain traceable to document, version, and location.
+- Canonical passages must remain traceable to document, source/editorial
+  version, extraction run, and location.
+- Extraction tooling changes create reproducible extraction runs, not new
+  intellectual/source versions.
 - Concepts, distinctions, principles, open questions, and terminology are
   versioned rather than overwritten.
 - Preserve discourse type instead of flattening philosophical, symbolic,

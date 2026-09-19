@@ -4,6 +4,9 @@ Date: 2026-09-18
 
 Status: complete; Phase 3 is pending repository-owner review.
 
+> Historical note: Phase 2.1 corrected the extractor/source-version identity
+> described in this report. See `PHASE_2_1_STABILIZATION.md` and ADR-005.
+
 ## A. Files created or modified
 
 Created:
@@ -195,9 +198,9 @@ questions, glossary, and principles.
   do not invalidate the structural import.
 - Poppler 26.08.0 on the host yields 1,019 passages; Poppler 25.03.0 in the
   current Debian image yields 1,018 because one wrapped segment is grouped
-  differently. Extractor name/version is part of import identity, so both are
-  retained as distinct Working versions over the same immutable source asset.
-  The container result is independently idempotent and validates successfully.
+  differently. Phase 2 initially represented these as distinct Working
+  versions. Phase 2.1 superseded that model: they are now distinct extraction
+  runs under one immutable Working source version and asset.
 - Rights, public-distribution permission, Canon approval authority, editorial
   governance, production deployment, backup/restore, and privacy remain the
   previously recorded review items. None was technically required for this

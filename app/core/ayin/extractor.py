@@ -8,12 +8,15 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+from app.core.ayin.domain import ReviewReason
 from app.core.ayin.normalization import digits_to_ascii, normalize_persian_text
 
 _PAGE_SEPARATOR = "\f"
 _BLOCK_SEPARATOR = re.compile(r"\n[ \t]*\n+")
 _SUSPICIOUS_GLYPH = re.compile(r"(?:[آ-ی]\s*n|n\s*[آ-ی]|#|�)")
 _SENTENCE_ENDINGS = (".", "!", "؛", ";", ":")
+NORMALIZATION_VERSION = "persian-v1"
+SEGMENTATION_VERSION = "logical-blocks-v1"
 
 
 @dataclass(frozen=True)
@@ -28,7 +31,13 @@ class ExtractedPassage:
     raw_text: str
     normalized_text: str
     content_hash: str
-    needs_review: bool
+    review_reasons: tuple[ReviewReason, ...]
+
+    @property
+    def needs_review(self) -> bool:
+        """Return whether any explicit extraction concern was detected."""
+
+        return bool(self.review_reasons)
 
 
 @dataclass(frozen=True)
@@ -38,6 +47,9 @@ class PdfExtraction:
     page_count: int
     extractor_name: str
     extractor_version: str
+    normalization_version: str
+    segmentation_version: str
+    configuration: dict[str, object]
     passages: tuple[ExtractedPassage, ...]
 
 
@@ -93,6 +105,9 @@ class PopplerPdfExtractor:
             page_count=page_count,
             extractor_name="poppler-pdftotext",
             extractor_version=version,
+            normalization_version=NORMALIZATION_VERSION,
+            segmentation_version=SEGMENTATION_VERSION,
+            configuration={"encoding": "UTF-8", "layout": True, "ocr": False},
             passages=tuple(passages),
         )
 
@@ -155,7 +170,11 @@ class PopplerPdfExtractor:
                         raw_text=raw_text,
                         normalized_text=normalized,
                         content_hash=hashlib.sha256(raw_text.encode()).hexdigest(),
-                        needs_review=bool(_SUSPICIOUS_GLYPH.search(normalized)),
+                        review_reasons=(
+                            (ReviewReason.CHARACTER_CORRUPTION,)
+                            if _SUSPICIOUS_GLYPH.search(normalized)
+                            else ()
+                        ),
                     )
                 )
         return passages

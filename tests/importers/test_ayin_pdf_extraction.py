@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from app.core.ayin.domain import ReviewReason
 from app.core.ayin.extractor import PopplerPdfExtractor
+from app.core.ayin.provenance import passage_set_hash
 
 pytestmark = pytest.mark.source_pdf
 
@@ -55,9 +57,13 @@ def test_repeated_extraction_has_identical_passage_hashes(extraction) -> None:  
     assert [item.content_hash for item in repeated.passages] == [
         item.content_hash for item in extraction.passages
     ]
+    assert passage_set_hash(repeated.passages) == passage_set_hash(extraction.passages)
 
 
 def test_suspicious_embedded_font_output_is_flagged(extraction) -> None:  # type: ignore[no-untyped-def]
     flagged = [item for item in extraction.passages if item.needs_review]
     assert flagged
     assert any(item.page_number == 5 for item in flagged)
+    assert all(
+        ReviewReason.CHARACTER_CORRUPTION in item.review_reasons for item in flagged
+    )

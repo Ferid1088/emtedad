@@ -50,3 +50,28 @@ def phase2_database_url() -> Iterator[str]:
                 (name,),
             )
             connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))
+
+
+@pytest.fixture
+def pre_stabilization_database_url() -> Iterator[str]:
+    """Database pinned to Phase 2 for migration backfill verification."""
+
+    base_url = _database_url()
+    name = f"emtedad_phase2_pre_{uuid4().hex}"
+    admin_url = _sync_url(_url_for_database(base_url, "postgres"))
+    with psycopg.connect(admin_url, autocommit=True) as connection:
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    url = _url_for_database(base_url, name)
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    command.upgrade(config, "20260918_0002")
+    try:
+        yield url
+    finally:
+        with psycopg.connect(admin_url, autocommit=True) as connection:
+            connection.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid()",
+                (name,),
+            )
+            connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))

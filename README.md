@@ -4,9 +4,10 @@ A production-oriented, versioned platform for preserving Ayin-e Emtedad,
 modeling Manasek, researching external knowledge, and eventually producing
 evidence-grounded Persian, English, and Arabic lectures.
 
-The repository contains the Phase 1 platform foundation and the Phase 2 Ayin
-knowledge core. It imports the supplied Ayin PDF only as `AYIN_WORKING`; it does
-not model Manasek, external sources, retrieval data, or generated lectures.
+The repository contains the Phase 1 platform foundation, Phase 2 Ayin knowledge
+core, and Phase 2.1 provenance stabilization. It imports the supplied Ayin PDF
+only as `AYIN_WORKING`; it does not model Manasek, external sources, retrieval
+data, or generated lectures.
 
 ## Authority and current source status
 
@@ -31,7 +32,7 @@ Ayin. Manasek remains separate from lecture content because ritual is an
 optional experiential layer with its own safety and consent requirements, not
 evidence that proves Ayin.
 
-## Phase 1-2 architecture
+## Phase 1-2.1 architecture
 
 The initial system is a modular monolith with one FastAPI application and one
 PostgreSQL 17 source of truth.
@@ -59,6 +60,20 @@ PostgreSQL namespaces reserve explicit ownership boundaries:
 Phase 1 created these namespaces and enabled pgvector. Phase 2 owns only the
 `core` Ayin/terminology tables and `ops.object_assets`; it creates no Manasek,
 external-knowledge, retrieval, content, or vector-index implementation.
+
+Source and extraction identities are intentionally separate:
+
+```mermaid
+flowchart LR
+    D[Canon document] --> V[Source/editorial version]
+    V --> R1[Extraction run A]
+    V --> R2[Extraction run B]
+    R1 --> P1[Passage set A]
+    R2 --> P2[Passage set B]
+```
+
+Changing Poppler, normalization, segmentation, or extraction configuration
+creates a new extraction run, not a new Ayin source version.
 
 ## Prerequisites
 
@@ -141,7 +156,9 @@ No Canon approval or source-text publication endpoint exists.
 
 The importer uses direct Poppler text extraction (not OCR), stores exact source
 bytes by SHA-256, retains raw and normalized passage text separately, and is
-safe to rerun. The reviewed seed creates only source-backed Working proposals.
+safe to rerun. Each toolchain/configuration receives a reproducible extraction
+run and output hash. The reviewed seed creates only source-backed Working
+proposals and is not duplicated for another extraction of the same source.
 
 ```bash
 uv run python -m app.cli ayin import \
@@ -159,6 +176,18 @@ uv run python -m app.cli ayin validate
 `inspect-document` accepts the UUID emitted by the import command. Use
 `--without-seed` only when importing passages from a different Ayin Working
 version for which no reviewed ontology manifest exists.
+
+Imports do not guess which extraction is best. After deterministic/manual QA,
+an operator may select one retained run explicitly:
+
+```bash
+uv run python -m app.cli ayin prefer-extraction RUN_UUID \
+  --selected-by EDITOR_ID \
+  --reason "Documented QA basis for this selection"
+```
+
+The source version can have only one preferred run. Selecting another run
+updates the preference record without deleting either run or passage set.
 
 ## Docker application image
 
@@ -234,6 +263,8 @@ docs/                Specifications, architecture, ADRs, audits, and plans
   implemented.
 - Phase 2 introduced the versioned Ayin Working/Canon data model and current
   Working import without enabling Canon approval.
+- Phase 2.1 separates immutable source versions from reproducible extraction
+  runs and preserves parser-specific passage sets independently.
 - Later phases add Manasek, external ingestion, retrieval, dialogue, research,
   Semantic Masters, multilingual localization, publishing, and evaluation in
   that order.

@@ -3,7 +3,6 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
-from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -17,6 +16,7 @@ from app.core.ayin.domain import (
     LanguageCode,
     OpenQuestionStatus,
     ReviewKind,
+    ReviewReason,
     ReviewStatus,
 )
 from app.core.ayin.extractor import (
@@ -39,8 +39,11 @@ from app.core.ayin.models import (
     CanonPassage,
     CanonVersion,
     CanonVersionSourceAsset,
+    ExtractionRun,
+    PreferredExtractionRun,
 )
 from app.core.ayin.normalization import normalize_persian_text
+from app.core.ayin.provenance import configuration_hash, passage_set_hash
 from app.core.ayin.repository import AyinRepository
 from app.core.ayin.seed import AyinSeedManifest, load_seed_manifest
 from app.core.terminology.models import Term, TermForm
@@ -62,7 +65,9 @@ class ImportResult:
 
     document_id: UUID
     version_id: UUID
+    extraction_run_id: UUID
     source_sha256: str
+    output_hash: str
     page_count: int
     passage_count: int
     concept_count: int
@@ -72,7 +77,9 @@ class ImportResult:
     term_count: int
     term_form_count: int
     review_item_count: int
-    created: bool
+    source_version_created: bool
+    extraction_run_created: bool
+    is_preferred: bool
     corpus_zone: CorpusZone
     status: EditorialStatus
 
@@ -105,12 +112,10 @@ class AyinImporter:
             self._prepare_source, source, seed_manifest
         )
 
+        config_hash = configuration_hash(extraction.configuration)
+        output_hash = passage_set_hash(extraction.passages)
+
         async with self._database.transaction() as session:
-            import_identity = _import_identity(
-                self._importer_version,
-                extraction.extractor_name,
-                extraction.extractor_version,
-            )
             repository = AyinRepository(session)
             document = await repository.document_by_slug(DOCUMENT_SLUG)
             if document is None:
@@ -124,44 +129,113 @@ class AyinImporter:
                 session.add(document)
                 await session.flush()
 
-            existing = await repository.version_by_import_identity(
-                document.id, stored.sha256, import_identity
-            )
-            if existing is not None:
-                return await self._existing_result(session, document, existing)
-
             asset, _ = await AssetRepository(session).get_or_create(
                 stored,
                 media_type="application/pdf",
                 original_filename=source.name,
             )
-            version = CanonVersion(
-                document_id=document.id,
-                semantic_version=None,
-                status=EditorialStatus.DRAFT,
-                corpus_zone=CorpusZone.AYIN_WORKING,
-                source_file_hash=stored.sha256,
-                importer_version=import_identity,
+            version = await repository.version_by_source_identity(
+                document.id, stored.sha256
+            )
+            source_version_created = version is None
+            if version is None:
+                version = CanonVersion(
+                    document_id=document.id,
+                    semantic_version=None,
+                    status=EditorialStatus.DRAFT,
+                    corpus_zone=CorpusZone.AYIN_WORKING,
+                    source_file_hash=stored.sha256,
+                    change_summary=(
+                        "Working source artifact; extraction runs are versioned "
+                        "separately."
+                    ),
+                )
+                session.add(version)
+                await session.flush()
+                session.add(
+                    CanonVersionSourceAsset(
+                        canon_version_id=version.id,
+                        source_asset_id=asset.id,
+                    )
+                )
+                await session.flush()
+            else:
+                linked_asset = await session.scalar(
+                    select(CanonVersionSourceAsset.source_asset_id).where(
+                        CanonVersionSourceAsset.canon_version_id == version.id
+                    )
+                )
+                if linked_asset != asset.id:
+                    raise AyinImportError(
+                        "source version does not reference the content-addressed asset"
+                    )
+
+            run = await repository.extraction_run_by_identity(
+                version.id,
+                importer_version=self._importer_version,
                 extractor_name=extraction.extractor_name,
                 extractor_version=extraction.extractor_version,
-                page_count=extraction.page_count,
-                change_summary=(
-                    "Direct PDF extraction; Working source, not Canon approval."
-                ),
+                normalization_version=extraction.normalization_version,
+                segmentation_version=extraction.segmentation_version,
+                configuration_hash=config_hash,
             )
-            session.add(version)
-            await session.flush()
-            session.add(
-                CanonVersionSourceAsset(
-                    canon_version_id=version.id,
-                    source_asset_id=asset.id,
+            if run is not None:
+                if (
+                    run.output_hash != output_hash
+                    or run.page_count != extraction.page_count
+                    or run.passage_count != len(extraction.passages)
+                ):
+                    raise AyinImportError(
+                        "identical extraction identity produced different output"
+                    )
+                passage_models = list(
+                    await session.scalars(
+                        select(CanonPassage)
+                        .where(CanonPassage.extraction_run_id == run.id)
+                        .order_by(CanonPassage.sequence)
+                    )
                 )
+                if seed_manifest is not None and not await _has_seed_data(
+                    session, version.id
+                ):
+                    await self._load_seed(
+                        session,
+                        version.id,
+                        run.id,
+                        passage_models,
+                        seed_manifest,
+                    )
+                    await session.flush()
+                return await self._run_result(
+                    session,
+                    document,
+                    version,
+                    run,
+                    source_version_created=source_version_created,
+                    extraction_run_created=False,
+                )
+
+            run = ExtractionRun(
+                canon_version_id=version.id,
+                source_asset_id=asset.id,
+                importer_version=self._importer_version,
+                extractor_name=extraction.extractor_name,
+                extractor_version=extraction.extractor_version,
+                normalization_version=extraction.normalization_version,
+                segmentation_version=extraction.segmentation_version,
+                configuration=extraction.configuration,
+                configuration_hash=config_hash,
+                output_hash=output_hash,
+                page_count=extraction.page_count,
+                passage_count=len(extraction.passages),
             )
+            session.add(run)
             await session.flush()
 
             passage_models = [
                 CanonPassage(
                     canon_version_id=version.id,
+                    extraction_run_id=run.id,
                     source_asset_id=asset.id,
                     sequence=item.sequence,
                     page_number=item.page_number,
@@ -178,36 +252,31 @@ class AyinImporter:
             session.add_all(passage_models)
             await session.flush()
             await self._add_extraction_reviews(
-                session, version.id, extraction.passages, passage_models
+                session,
+                version.id,
+                run.id,
+                extraction.passages,
+                passage_models,
             )
 
-            counts = _SeedCounts()
-            if seed_manifest is not None:
-                counts = await self._load_seed(
-                    session, version.id, passage_models, seed_manifest
+            if seed_manifest is not None and not await _has_seed_data(
+                session, version.id
+            ):
+                await self._load_seed(
+                    session,
+                    version.id,
+                    run.id,
+                    passage_models,
+                    seed_manifest,
                 )
             await session.flush()
-            review_count = await session.scalar(
-                select(func.count(AyinReviewItem.id)).where(
-                    AyinReviewItem.canon_version_id == version.id
-                )
-            )
-            return ImportResult(
-                document_id=document.id,
-                version_id=version.id,
-                source_sha256=stored.sha256,
-                page_count=extraction.page_count,
-                passage_count=len(passage_models),
-                concept_count=counts.concepts,
-                distinction_count=counts.distinctions,
-                principle_count=counts.principles,
-                open_question_count=counts.open_questions,
-                term_count=counts.terms,
-                term_form_count=counts.term_forms,
-                review_item_count=int(review_count or 0),
-                created=True,
-                corpus_zone=CorpusZone.AYIN_WORKING,
-                status=EditorialStatus.DRAFT,
+            return await self._run_result(
+                session,
+                document,
+                version,
+                run,
+                source_version_created=source_version_created,
+                extraction_run_created=True,
             )
 
     def _prepare_source(
@@ -227,17 +296,22 @@ class AyinImporter:
             raise AyinImportError("source page count does not match the seed manifest")
         return stored, extraction
 
-    async def _existing_result(
-        self, session: AsyncSession, document: CanonDocument, version: CanonVersion
+    async def _run_result(
+        self,
+        session: AsyncSession,
+        document: CanonDocument,
+        version: CanonVersion,
+        run: ExtractionRun,
+        *,
+        source_version_created: bool,
+        extraction_run_created: bool,
     ) -> ImportResult:
         count_models = (
-            (CanonPassage, "passages"),
             (AyinConceptVersion, "concepts"),
             (AyinDistinctionVersion, "distinctions"),
             (AyinPrincipleVersion, "principles"),
             (AyinOpenQuestionVersion, "open_questions"),
             (TermForm, "term_forms"),
-            (AyinReviewItem, "reviews"),
         )
         counts: dict[str, int] = {}
         for model, key in count_models:
@@ -245,21 +319,44 @@ class AyinImporter:
                 select(func.count(model.id)).where(model.canon_version_id == version.id)
             )
             counts[key] = int(count or 0)
-        term_count = await session.scalar(select(func.count(Term.id)))
+        passage_count = await session.scalar(
+            select(func.count(CanonPassage.id)).where(
+                CanonPassage.extraction_run_id == run.id
+            )
+        )
+        review_count = await session.scalar(
+            select(func.count(AyinReviewItem.id)).where(
+                AyinReviewItem.extraction_run_id == run.id
+            )
+        )
+        term_count = await session.scalar(
+            select(func.count(func.distinct(TermForm.term_id))).where(
+                TermForm.canon_version_id == version.id
+            )
+        )
+        preferred = await session.scalar(
+            select(PreferredExtractionRun.extraction_run_id).where(
+                PreferredExtractionRun.canon_version_id == version.id
+            )
+        )
         return ImportResult(
             document_id=document.id,
             version_id=version.id,
+            extraction_run_id=run.id,
             source_sha256=version.source_file_hash,
-            page_count=version.page_count,
-            passage_count=counts["passages"],
+            output_hash=run.output_hash,
+            page_count=run.page_count,
+            passage_count=int(passage_count or 0),
             concept_count=counts["concepts"],
             distinction_count=counts["distinctions"],
             principle_count=counts["principles"],
             open_question_count=counts["open_questions"],
             term_count=int(term_count or 0),
             term_form_count=counts["term_forms"],
-            review_item_count=counts["reviews"],
-            created=False,
+            review_item_count=int(review_count or 0),
+            source_version_created=source_version_created,
+            extraction_run_created=extraction_run_created,
+            is_preferred=preferred == run.id,
             corpus_zone=version.corpus_zone,
             status=version.status,
         )
@@ -268,29 +365,36 @@ class AyinImporter:
     async def _add_extraction_reviews(
         session: AsyncSession,
         version_id: UUID,
+        extraction_run_id: UUID,
         extracted: tuple[ExtractedPassage, ...],
         passages: list[CanonPassage],
     ) -> None:
         for item, passage in zip(extracted, passages, strict=True):
-            if not item.needs_review:
-                continue
-            review = AyinReviewItem(
-                canon_version_id=version_id,
-                kind=ReviewKind.EXTRACTION_AMBIGUITY,
-                status=ReviewStatus.OPEN,
-                page_number=item.page_number,
-                message="Direct extraction contains a suspicious embedded-font glyph.",
-            )
-            session.add(review)
-            await session.flush()
-            session.add(
-                AyinPassageReview(review_item_id=review.id, passage_id=passage.id)
-            )
+            for reason in item.review_reasons:
+                review = AyinReviewItem(
+                    canon_version_id=version_id,
+                    extraction_run_id=extraction_run_id,
+                    kind=ReviewKind.EXTRACTION_AMBIGUITY,
+                    reason_for_review=reason,
+                    status=ReviewStatus.OPEN,
+                    page_number=item.page_number,
+                    message=_review_message(reason),
+                )
+                session.add(review)
+                await session.flush()
+                session.add(
+                    AyinPassageReview(
+                        review_item_id=review.id,
+                        extraction_run_id=extraction_run_id,
+                        passage_id=passage.id,
+                    )
+                )
 
     async def _load_seed(
         self,
         session: AsyncSession,
         version_id: UUID,
+        extraction_run_id: UUID,
         passages: list[CanonPassage],
         manifest: AyinSeedManifest,
     ) -> "_SeedCounts":
@@ -304,6 +408,7 @@ class AyinImporter:
             concept_passage = await self._source_passage(
                 session,
                 version_id,
+                extraction_run_id,
                 by_page,
                 concept_seed.page,
                 concept_seed.anchor,
@@ -341,6 +446,7 @@ class AyinImporter:
             distinction_passage = await self._source_passage(
                 session,
                 version_id,
+                extraction_run_id,
                 by_page,
                 distinction_seed.page,
                 distinction_seed.anchor,
@@ -381,6 +487,7 @@ class AyinImporter:
             principle_passage = await self._source_passage(
                 session,
                 version_id,
+                extraction_run_id,
                 by_page,
                 principle_seed.page,
                 principle_seed.anchor,
@@ -415,6 +522,7 @@ class AyinImporter:
             question_passage = await self._source_passage(
                 session,
                 version_id,
+                extraction_run_id,
                 by_page,
                 question_seed.page,
                 question_seed.anchor,
@@ -449,7 +557,12 @@ class AyinImporter:
         term_form_count = 0
         for term_seed in manifest.terms:
             term_passage = await self._source_passage(
-                session, version_id, by_page, term_seed.page, term_seed.anchor
+                session,
+                version_id,
+                extraction_run_id,
+                by_page,
+                term_seed.page,
+                term_seed.anchor,
             )
             concept = concepts.get(term_seed.concept)
             if term_passage is None or concept is None:
@@ -503,6 +616,7 @@ class AyinImporter:
     async def _source_passage(
         session: AsyncSession,
         version_id: UUID,
+        extraction_run_id: UUID,
         by_page: dict[int, list[CanonPassage]],
         page: int,
         anchor: str,
@@ -518,7 +632,9 @@ class AyinImporter:
         session.add(
             AyinReviewItem(
                 canon_version_id=version_id,
+                extraction_run_id=extraction_run_id,
                 kind=ReviewKind.SEED_PROVENANCE,
+                reason_for_review=ReviewReason.SEED_PROVENANCE,
                 status=ReviewStatus.OPEN,
                 page_number=page,
                 message=(
@@ -568,16 +684,32 @@ async def _next_term_form_version(
     return int(result or 0) + 1
 
 
-def _import_identity(
-    importer_version: str, extractor_name: str, extractor_version: str
-) -> str:
-    """Keep parser provenance distinct within the database length limit."""
+async def _has_seed_data(session: AsyncSession, version_id: UUID) -> bool:
+    count = await session.scalar(
+        select(func.count(AyinConceptVersion.id)).where(
+            AyinConceptVersion.canon_version_id == version_id
+        )
+    )
+    return bool(count)
 
-    identity = f"{importer_version}:{extractor_name}:{extractor_version}"
-    if len(identity) <= 64:
-        return identity
-    digest = sha256(identity.encode()).hexdigest()[:32]
-    return f"{identity[:31]}:{digest}"
+
+def _review_message(reason: ReviewReason) -> str:
+    messages = {
+        ReviewReason.SUSPICIOUS_EXTRACTION: "Direct extraction requires review.",
+        ReviewReason.HEADING_UNCERTAINTY: "Extracted heading boundary is uncertain.",
+        ReviewReason.BROKEN_PARAGRAPH: "Extracted paragraph boundary may be broken.",
+        ReviewReason.CHARACTER_CORRUPTION: (
+            "Direct extraction contains a suspicious embedded-font glyph."
+        ),
+        ReviewReason.PAGE_LAYOUT_AMBIGUITY: (
+            "Page layout may have changed extraction order or grouping."
+        ),
+        ReviewReason.POSSIBLE_MISSING_CONTENT: (
+            "Direct extraction may be missing source content."
+        ),
+        ReviewReason.SEED_PROVENANCE: "Seed source anchor requires review.",
+    }
+    return messages[reason]
 
 
 def default_seed_manifest() -> AyinSeedManifest:

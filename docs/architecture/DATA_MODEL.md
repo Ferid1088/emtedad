@@ -93,8 +93,11 @@ provider/model, and configuration versions.
 ## Ayin Canon
 
 - Canon documents and immutable versions;
-- canonical passages with PDF index, printed label where present, heading path,
-  sequence, raw text, normalized search text, and exact source asset/version;
+- reproducible extraction runs separated from source/editorial versions, with
+  toolchain, normalization, segmentation, configuration, and output hashes;
+- extracted passages with PDF index, printed label where present, heading path,
+  sequence, raw text, normalized search text, and exact source
+  asset/version/run;
 - concepts and concept versions;
 - distinctions and their sides/relationships;
 - principles;
@@ -105,6 +108,9 @@ provider/model, and configuration versions.
 Critical constraints:
 
 - approved versions cannot be mutated;
+- extraction tooling changes create runs, not source/editorial versions;
+- a source version has at most one explicitly selected preferred extraction,
+  while all prior runs and passage sets remain retained;
 - a document has at most one effective approved version for a validity instant;
 - canonical objects pin their source version and, where asserted from text,
   their source passage;

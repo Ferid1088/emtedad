@@ -18,6 +18,8 @@ from app.core.ayin.models import (
     AyinRelation,
     CanonDocument,
     CanonVersion,
+    ExtractionRun,
+    PreferredExtractionRun,
 )
 from app.core.ayin.schemas import (
     ConceptRead,
@@ -26,8 +28,10 @@ from app.core.ayin.schemas import (
     DistinctionVersionRead,
     DocumentDetail,
     DocumentSummary,
+    ExtractionRunRead,
     OpenQuestionRead,
     OpenQuestionVersionRead,
+    PreferredExtractionRead,
     PrincipleRead,
     PrincipleVersionRead,
     RelationRead,
@@ -37,6 +41,7 @@ from app.core.ayin.schemas import (
 )
 from app.core.exceptions import ResourceNotFoundError
 from app.core.terminology.models import Term, TermForm
+from app.ops.assets.models import utc_now
 
 
 class AyinReadService:
@@ -55,15 +60,50 @@ class AyinReadService:
         document = await self._session.get(CanonDocument, document_id)
         if document is None:
             raise ResourceNotFoundError
-        versions = await self._session.scalars(
-            select(CanonVersion)
-            .where(CanonVersion.document_id == document_id)
-            .order_by(CanonVersion.created_at)
+        versions = list(
+            await self._session.scalars(
+                select(CanonVersion)
+                .where(CanonVersion.document_id == document_id)
+                .order_by(CanonVersion.created_at)
+            )
         )
+        version_ids = [item.id for item in versions]
+        runs = list(
+            await self._session.scalars(
+                select(ExtractionRun)
+                .where(ExtractionRun.canon_version_id.in_(version_ids))
+                .order_by(ExtractionRun.created_at)
+            )
+        )
+        preferred = {
+            item.canon_version_id: item.extraction_run_id
+            for item in await self._session.scalars(
+                select(PreferredExtractionRun).where(
+                    PreferredExtractionRun.canon_version_id.in_(version_ids)
+                )
+            )
+        }
+        runs_by_version: dict[UUID, list[ExtractionRunRead]] = defaultdict(list)
+        for run in runs:
+            runs_by_version[run.canon_version_id].append(
+                ExtractionRunRead.model_validate(run)
+            )
         base = DocumentSummary.model_validate(document).model_dump()
         return DocumentDetail(
             **base,
-            versions=[VersionSummary.model_validate(row) for row in versions],
+            versions=[
+                VersionSummary(
+                    id=version.id,
+                    status=version.status,
+                    corpus_zone=version.corpus_zone,
+                    semantic_version=version.semantic_version,
+                    source_file_hash=version.source_file_hash,
+                    created_at=version.created_at,
+                    preferred_extraction_run_id=preferred.get(version.id),
+                    extraction_runs=runs_by_version[version.id],
+                )
+                for version in versions
+            ],
         )
 
     async def concepts(self) -> list[ConceptRead]:
@@ -202,3 +242,37 @@ class AyinReadService:
             if folded in item.stable_key.casefold()
             or any(folded in form.form.casefold() for form in item.forms)
         ]
+
+
+class AyinExtractionService:
+    """Manage explicit extraction preference without deleting run history."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def prefer(
+        self, run_id: UUID, *, selected_by: str, reason: str
+    ) -> PreferredExtractionRead:
+        if not selected_by.strip() or not reason.strip():
+            raise ValueError("selected_by and reason are required")
+        run = await self._session.get(ExtractionRun, run_id)
+        if run is None:
+            raise ResourceNotFoundError
+        preference = await self._session.get(
+            PreferredExtractionRun, run.canon_version_id
+        )
+        if preference is None:
+            preference = PreferredExtractionRun(
+                canon_version_id=run.canon_version_id,
+                extraction_run_id=run.id,
+                selected_by=selected_by,
+                reason=reason,
+            )
+            self._session.add(preference)
+        else:
+            preference.extraction_run_id = run.id
+            preference.selected_by = selected_by
+            preference.reason = reason
+            preference.selected_at = utc_now()
+        await self._session.flush()
+        return PreferredExtractionRead.model_validate(preference)

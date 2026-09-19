@@ -12,7 +12,8 @@ Only one phase may be `in_progress` at a time.
 ## Program status
 
 - Active phase: None; Phase 3 is pending repository-owner review
-- Last completed phase: Phase 2 - Ayin Knowledge Core (2026-09-18)
+- Last completed checkpoint: Phase 2.1 - Ayin Provenance Stabilization
+  (2026-09-19)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin read API, CLI
   import, and structural validation are verified
 - Open blocker: None remaining for Phase 2. Phase 3 requires explicit approval
@@ -27,6 +28,7 @@ Only one phase may be `in_progress` at a time.
 | 0 | Repository Audit | complete | Verified bootstrap baseline, source inspection, requirements mapping, and Phase 1 plan |
 | 1 | Platform Foundation | complete | Runnable FastAPI/PostgreSQL foundation |
 | 2 | Ayin Canon | complete | Versioned Working/Canon corpus boundary and Working ontology |
+| 2.1 | Provenance Stabilization | complete | Source versions separated from reproducible extraction runs |
 | 3 | Manasek | pending | Versioned ritual model and safety validation |
 | 4 | External Knowledge Ingestion | pending | Provenance-preserving adapters, YouTube first |
 | 5 | Retrieval | pending | Multilingual, lane-specific hybrid retrieval |
@@ -119,13 +121,41 @@ Verified result (2026-09-18):
   PostgreSQL, and used typed foreign keys throughout without generic owner IDs.
 - Enforced Canon approval metadata and approved-version immutability at the
   database layer while exposing no approval command or endpoint.
-- Verified transactional rollback, idempotent repeat import, distinct parser
-  identities, read API/CLI behavior, structural validation, migration
+- Verified transactional rollback, idempotent repeat import, parser provenance,
+  read API/CLI behavior, structural validation, migration
   downgrade/re-upgrade and drift checks, Docker image construction, Ruff,
   strict mypy, and all 46 tests.
 - Confirmed zero `AYIN_CANON` versions and no Phase 3 implementation.
 
 Completion evidence: `docs/audits/PHASE_2_COMPLETION.md`.
+
+## Phase 2.1 — Ayin Provenance Stabilization
+
+Verified result (2026-09-19):
+
+- Separated intellectual document, source/editorial version, extraction run,
+  and extracted passage-set identities in ADR-005 and Alembic revision
+  `20260918_0003`.
+- Keyed Working source identity by document, exact SHA-256, corpus zone, and
+  explicit source-version metadata rather than extraction tooling.
+- Added immutable extraction-run provenance for importer, extractor,
+  normalization, segmentation, configuration, source asset, output hash, page
+  count, and passage count.
+- Added an integrity-safe, one-row-per-source-version preferred-extraction
+  table with explicit selector and reason. Imports do not auto-select a run.
+- Added extraction-run-pinned review metadata with specific reason, status,
+  reviewer notes, and review time while retaining all 56 flagged passages per
+  real extraction run.
+- Verified the exact PDF with host Poppler 26.08.0 and container Poppler
+  25.03.0 as one `AYIN_WORKING` source version, two extraction runs, and
+  independent 1,019/1,018-passage sets. Structured concept identities remained
+  20 concepts and 20 concept versions.
+- Passed clean migrations, legacy Phase 2 data backfill, guarded duplicate
+  handling, repeat-import idempotency, preference switching/history, Ruff,
+  strict mypy, and all 49 tests.
+- Confirmed zero `AYIN_CANON` versions and no Phase 3 implementation.
+
+Completion evidence: `docs/audits/PHASE_2_1_STABILIZATION.md`.
 
 ## Phase 3 — Manasek
 

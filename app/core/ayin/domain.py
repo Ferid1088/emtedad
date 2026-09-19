@@ -90,6 +90,18 @@ class ReviewKind(StrEnum):
     SEED_PROVENANCE = "seed_provenance"
 
 
+class ReviewReason(StrEnum):
+    """Specific extraction conditions requiring later editorial inspection."""
+
+    SUSPICIOUS_EXTRACTION = "suspicious_extraction"
+    HEADING_UNCERTAINTY = "heading_uncertainty"
+    BROKEN_PARAGRAPH = "broken_paragraph"
+    CHARACTER_CORRUPTION = "character_corruption"
+    PAGE_LAYOUT_AMBIGUITY = "page_layout_ambiguity"
+    POSSIBLE_MISSING_CONTENT = "possible_missing_content"
+    SEED_PROVENANCE = "seed_provenance"
+
+
 APPROVAL_REQUIRED_FIELDS = (
     "semantic_version",
     "approved_by",

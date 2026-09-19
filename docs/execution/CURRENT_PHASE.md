@@ -2,12 +2,13 @@
 
 ## Execution status
 
-Phase 2 is complete as of 2026-09-18. Phase 3 is prepared for repository-owner
-review but is not active. Do not implement Phase 3 until the owner explicitly
-approves this plan. Do not begin Phase 4.
+Phase 2 and its Phase 2.1 provenance stabilization are complete as of
+2026-09-19. Phase 3 is prepared for repository-owner review but is not active.
+Do not implement Phase 3 until the owner explicitly approves this plan. Do not
+begin Phase 4.
 
 Completion evidence for the prior phase:
-`docs/audits/PHASE_2_COMPLETION.md`.
+`docs/audits/PHASE_2_1_STABILIZATION.md`.
 
 ## Goal
 
