@@ -149,7 +149,21 @@ Critical constraints:
 
 Aggregate counts require database-enforced designs appropriate to PostgreSQL,
 such as constrained slots plus deferred validation. Service-only counting is
-insufficient; Phase 3 must document and test the chosen mechanism.
+insufficient.
+
+Phase 3 implements this design in the `ritual` schema. Source versions and
+extraction runs are separate; passages pin both. Stable family, gate, ritual,
+and safety-rule identities have source-backed versions. `architecture_versions`
+distinguish `INDIVIDUAL` and `COLLECTIVE`; relational sequence items encode the
+seven-by-six individual cycle, while `returns` adds a checked Return-only
+extension. Cues, music specifications, localizations, Ayin concept links,
+safety bindings/results, and review flags all retain typed provenance.
+
+Deferred PostgreSQL constraint triggers validate approved architecture
+completeness and ritual/localization publishability. Approved source,
+architecture, ritual, localization, gate, family, and safety versions are
+immutable. Current imported records remain Working/draft or review. See
+ADR-006 for the implemented boundary.
 
 ## External knowledge
 

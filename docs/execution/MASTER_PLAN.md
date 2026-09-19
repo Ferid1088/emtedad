@@ -11,15 +11,14 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: None; Phase 3 is pending repository-owner review
-- Last completed checkpoint: Phase 2.1 - Ayin Provenance Stabilization
+- Active phase: None; Phase 4 is pending repository-owner review
+- Last completed checkpoint: Phase 3 - Manasek Ritual Domain
   (2026-09-19)
-- Application runnable: Yes; health, PostgreSQL readiness, Ayin read API, CLI
-  import, and structural validation are verified
-- Open blocker: None remaining for Phase 2. Phase 3 requires explicit approval
-  of its prepared plan and review dependencies. Rights, deployment, backup,
-  privacy, and editorial governance remain recorded later-phase/production
-  review items.
+- Application runnable: Yes; health, PostgreSQL readiness, Ayin and Manasek read
+  APIs, CLI imports, and structural/safety validation are verified
+- Open blocker: None remaining for Phase 3. Phase 4 requires explicit approval
+  of its prepared plan. Rights, deployment, backup, privacy, and editorial
+  governance remain recorded later-phase/production review items.
 
 ## Phase plan
 
@@ -29,7 +28,7 @@ Only one phase may be `in_progress` at a time.
 | 1 | Platform Foundation | complete | Runnable FastAPI/PostgreSQL foundation |
 | 2 | Ayin Canon | complete | Versioned Working/Canon corpus boundary and Working ontology |
 | 2.1 | Provenance Stabilization | complete | Source versions separated from reproducible extraction runs |
-| 3 | Manasek | pending | Versioned ritual model and safety validation |
+| 3 | Manasek | complete | Versioned ritual model and safety validation |
 | 4 | External Knowledge Ingestion | pending | Provenance-preserving adapters, YouTube first |
 | 5 | Retrieval | pending | Multilingual, lane-specific hybrid retrieval |
 | 6 | Ayin–External Dialogue | pending | Typed relations, classification, criticism and review |
@@ -163,14 +162,42 @@ Target scope: ritual families, five gates, seven stages, Return, separate
 collective architecture, versions, concept links, importers, safety policies,
 and structural validators.
 
-Pending plan: `docs/execution/CURRENT_PHASE.md`. It is not authorized for
-implementation until repository-owner review.
+Verified result (2026-09-19):
+
+- Added a dedicated, typed `ritual` schema with Manasek document/source version,
+  extraction-run, run-pinned passage, architecture, ritual, cue, music,
+  localization, Ayin-link, safety, and review records through Alembic revision
+  `20260919_0004`.
+- Imported the exact 42-page PDF as one `MANASEK_WORKING` / `draft` source
+  version. Host Poppler 26.08.0 and container Poppler 25.03.0 produced two
+  independently retained 42-passage extraction runs without duplicating stable
+  ritual identities.
+- Represented five ordered gates, seven stages, 35 gate pieces, seven
+  separately typed Returns, the 42-piece individual sequence, and one separate
+  collective architecture. Database constraints make Return-as-gate and
+  Working-as-approved invalid.
+- Stored 224 timed cues, 43 source-preserving music specifications, Persian
+  draft localizations, 62 resolved typed Ayin links, and one reviewable
+  `horizontal_emtedad` proposal without inventing a Canon concept.
+- Added 33 versioned safety rules and deterministic structural/safety
+  validation. All imported rituals retain the complete safety binding set and
+  remain non-publishable drafts.
+- Verified clean/repeat/reversible migrations, drift, exact/idempotent imports,
+  transaction rollback, API/CLI reads, page-aware manual QA, Docker image,
+  Ruff, strict mypy, and the full Phase 1–3 suite.
+- Confirmed zero `MANASEK_CANON` and `AYIN_CANON` versions and no Phase 4
+  implementation.
+
+Completion evidence: `docs/audits/PHASE_3_COMPLETION.md`.
 
 ## Phase 4 — External Knowledge Ingestion
 
 Target scope: generic adapters, YouTube-first ingestion, immutable transcripts,
 timestamps, extraction, claims, references, resolution, media, caching, and
 idempotency.
+
+Pending plan: `docs/execution/CURRENT_PHASE.md`. It is not authorized for
+implementation until repository-owner review.
 
 ## Phase 5 — Retrieval
 

@@ -4,10 +4,10 @@ A production-oriented, versioned platform for preserving Ayin-e Emtedad,
 modeling Manasek, researching external knowledge, and eventually producing
 evidence-grounded Persian, English, and Arabic lectures.
 
-The repository contains the Phase 1 platform foundation, Phase 2 Ayin knowledge
-core, and Phase 2.1 provenance stabilization. It imports the supplied Ayin PDF
-only as `AYIN_WORKING`; it does not model Manasek, external sources, retrieval
-data, or generated lectures.
+The repository contains the Phase 1 platform foundation, the Phase 2/2.1 Ayin
+knowledge core and provenance stabilization, and the Phase 3 Manasek ritual
+domain. It imports the supplied PDFs only as Working sources. It does not model
+external sources, retrieval data, or generated lectures.
 
 ## Authority and current source status
 
@@ -32,7 +32,7 @@ Ayin. Manasek remains separate from lecture content because ritual is an
 optional experiential layer with its own safety and consent requirements, not
 evidence that proves Ayin.
 
-## Phase 1-2.1 architecture
+## Phase 1-3 architecture
 
 The initial system is a modular monolith with one FastAPI application and one
 PostgreSQL 17 source of truth.
@@ -57,9 +57,10 @@ PostgreSQL namespaces reserve explicit ownership boundaries:
 | `content` | Research, lecture, localization, and publication artifacts |
 | `ops` | Operational assets, jobs, audit, review, and cache infrastructure |
 
-Phase 1 created these namespaces and enabled pgvector. Phase 2 owns only the
-`core` Ayin/terminology tables and `ops.object_assets`; it creates no Manasek,
-external-knowledge, retrieval, content, or vector-index implementation.
+Phase 1 created these namespaces and enabled pgvector. Phase 2 owns the `core`
+Ayin/terminology tables and `ops.object_assets`. Phase 3 owns the `ritual`
+Manasek tables. No external-knowledge, retrieval, content, or vector-index
+implementation exists yet.
 
 Source and extraction identities are intentionally separate:
 
@@ -152,6 +153,16 @@ Phase 2 read endpoints are:
 
 No Canon approval or source-text publication endpoint exists.
 
+Phase 3 read endpoints are:
+
+- `GET /ritual/families`
+- `GET /ritual/gates`
+- `GET /ritual/stages`
+- `GET /ritual/rituals` and `GET /ritual/rituals/{id}`
+- `GET /ritual/stages/{id}/sequence`
+- `GET /ritual/safety-rules`
+- `GET /ritual/review-queue`
+
 ## Ayin Working import and inspection
 
 The importer uses direct Poppler text extraction (not OCR), stores exact source
@@ -189,13 +200,37 @@ uv run python -m app.cli ayin prefer-extraction RUN_UUID \
 The source version can have only one preferred run. Selecting another run
 updates the preference record without deleting either run or passage set.
 
+## Manasek Working import and inspection
+
+The Manasek importer preserves the same document/source-version/extraction-run
+separation. It imports the 42-page source as `MANASEK_WORKING` / `draft`, stores
+five gates, seven stages, 35 gate pieces, seven separately typed Returns, and a
+separate collective ritual. It also stores timed cues, music intent, Persian
+draft localization, Ayin Working links, and machine-enforced safety policy.
+
+```bash
+uv run python -m app.cli manasek import docs/source_material/Manasek_V1.pdf
+uv run python -m app.cli manasek list-gates
+uv run python -m app.cli manasek list-stages
+uv run python -m app.cli manasek list-rituals
+uv run python -m app.cli manasek show-ritual RITUAL_UUID
+uv run python -m app.cli manasek inspect-document DOCUMENT_UUID
+uv run python -m app.cli manasek validate
+uv run python -m app.cli manasek safety-check RITUAL_UUID
+```
+
+There is no approval, public execution, playback, music-generation, TTS, or
+translation command. Between and Life families are modeled, but no missing
+source ritual is fabricated. `horizontal_emtedad` remains a reviewable typed
+proposal until Ayin editorial review creates or rejects that concept.
+
 ## Docker application image
 
 The Dockerfile excludes source PDFs, tests, local storage, Git data, and secrets
 from its build context.
 
 ```bash
-docker build -t emtedad-platform:phase2 .
+docker build -t emtedad-platform:phase3 .
 ```
 
 Deployment topology and production object storage remain open review items; the
@@ -209,8 +244,8 @@ atomic link. Storage keys are generated from the digest. Duplicate bytes reuse
 the same object, while corrupt conflicts, traversal, and symlink escapes fail
 explicitly.
 
-Original bytes stay outside PostgreSQL. Phase 2 links each Canon version to its
-source asset through a typed, foreign-keyed association; no generic
+Original bytes stay outside PostgreSQL. Ayin and Manasek source versions link
+to source assets through typed, foreign-keyed associations; no generic
 `owner_type`/`owner_id` relationship is used.
 
 ## Verification
@@ -239,16 +274,17 @@ the developer database.
 
 ```text
 app/
-  api/routes/       Thin system and Ayin read routes
+  api/routes/       Thin system, Ayin, and Manasek read routes
   core/ayin/        Ayin domain, importer, services, and validator
   core/terminology/ Multilingual term registry models
   core/             Typed configuration and explicit exceptions
   db/               Metadata, async sessions, and readiness checks
   ops/              Structured logging and immutable asset metadata
+  ritual/           Manasek import, structure, safety, services, and validator
   storage/          Immutable-object storage port and local adapter
 alembic/             Baseline migration and environment
 tests/
-  unit/              Foundation and Ayin policy behavior
+  unit/              Foundation, Ayin, and ritual policy behavior
   importers/         Exact PDF extraction behavior
   integration/       PostgreSQL, migration, import, and API behavior
 resources/ayin/      Reviewed Working seed manifest
@@ -265,10 +301,12 @@ docs/                Specifications, architecture, ADRs, audits, and plans
   Working import without enabling Canon approval.
 - Phase 2.1 separates immutable source versions from reproducible extraction
   runs and preserves parser-specific passage sets independently.
-- Later phases add Manasek, external ingestion, retrieval, dialogue, research,
-  Semantic Masters, multilingual localization, publishing, and evaluation in
-  that order.
-- Codex CLI, YouTube ingestion, embeddings, RAG, lecture generation,
+- Phase 3 models Manasek structure and safety without Canon approval or a
+  ritual execution engine.
+- Later phases add external ingestion, retrieval, dialogue, research, Semantic
+  Masters, multilingual localization, publishing, and evaluation in that
+  order.
+- YouTube ingestion, embeddings, RAG, lecture generation, generated
   localization, Canon revision impact analysis, and publishing commands do not
   exist yet. The README will document them only after their owning phases pass.
 

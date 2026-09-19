@@ -1,0 +1,1 @@
+"""Versioned Manasek ritual domain."""

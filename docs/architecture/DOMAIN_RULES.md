@@ -53,6 +53,11 @@ terminology registry and review process.
 - Collective ritual architecture is separate from the individual architecture.
 - Gates are symbolic attentional perspectives, not Bon or metaphysical
   elements.
+- Ordered stages are sequences, not mandatory calendar days.
+- Between and Life ritual identities may exist without fabricated ritual
+  versions when the source does not define sufficient content.
+- Ayin links pin real concept versions and source passages. Missing concepts
+  remain typed proposals rather than being created as Canon automatically.
 
 ## Ritual safety
 
@@ -68,6 +73,11 @@ Every ritual remains optional and preserves:
 
 Safety policies must be machine-enforced and tested. A generation workflow
 cannot bypass a failed or unresolved safety decision.
+
+Approved rituals require a Canon source version, complete required safety-rule
+bindings, a passing deterministic safety validation, and no open blocking
+safety review. A localization must retain the exact safety bindings of its
+parent ritual and cannot weaken stop, leave, consent, or optionality language.
 
 ## Lecture invariants
 

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from app.api.routes.ayin import router as ayin_router
 from app.api.routes.health import router as health_router
+from app.api.routes.ritual import router as ritual_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ApplicationError
 from app.db.health import DatabaseReadinessService, ReadinessService
@@ -71,6 +72,7 @@ def create_app(
     app.state.settings = resolved_settings
     app.include_router(health_router)
     app.include_router(ayin_router)
+    app.include_router(ritual_router)
 
     @app.middleware("http")
     async def request_context(

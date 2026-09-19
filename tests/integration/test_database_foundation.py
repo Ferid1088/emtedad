@@ -116,9 +116,10 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
     assert ("core", "canon_versions") in domain_tables
     assert ("core", "canon_passages") in domain_tables
     assert ("ops", "object_assets") in domain_tables
+    assert ("ritual", "versions") in domain_tables
+    assert ("ritual", "ritual_versions") in domain_tables
     assert not any(
-        schema in {"ritual", "knowledge", "retrieval", "content"}
-        for schema, _ in domain_tables
+        schema in {"knowledge", "retrieval", "content"} for schema, _ in domain_tables
     )
 
     command.downgrade(config, "base")

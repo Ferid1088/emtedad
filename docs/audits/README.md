@@ -12,6 +12,7 @@ Completed phase evidence:
 - `PHASE_1_COMPLETION.md`
 - `PHASE_2_COMPLETION.md`
 - `PHASE_2_1_STABILIZATION.md`
+- `PHASE_3_COMPLETION.md`
 
 Audit reports must distinguish observed facts, inferences, recommendations,
 risks, and unresolved decisions.

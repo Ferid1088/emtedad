@@ -1,4 +1,4 @@
-"""Operator CLI for Phase 2 Ayin import, inspection, and validation."""
+"""Operator CLI for Ayin and Manasek import, inspection, and validation."""
 
 import argparse
 import asyncio
@@ -14,8 +14,13 @@ from app.core.ayin.importer import AyinImporter, default_seed_manifest
 from app.core.ayin.service import AyinExtractionService, AyinReadService
 from app.core.ayin.validator import AyinStructuralValidator
 from app.core.config import get_settings
-from app.db.session import create_database
+from app.db.session import Database, create_database
 from app.ops.logging import configure_logging
+from app.ritual.importer import ManasekImporter
+from app.ritual.models import SafetyValidationResult
+from app.ritual.safety import VALIDATOR_VERSION, RitualSafetyValidator
+from app.ritual.service import RitualReadService
+from app.ritual.validator import RitualStructuralValidator
 from app.storage.local import LocalObjectStore
 
 
@@ -48,6 +53,21 @@ def _parser() -> argparse.ArgumentParser:
     prefer.add_argument("run_id", type=UUID)
     prefer.add_argument("--selected-by", required=True)
     prefer.add_argument("--reason", required=True)
+
+    manasek = domains.add_parser("manasek")
+    ritual_commands = manasek.add_subparsers(dest="command", required=True)
+    ritual_import = ritual_commands.add_parser("import")
+    ritual_import.add_argument("file", type=Path)
+    ritual_inspect = ritual_commands.add_parser("inspect-document")
+    ritual_inspect.add_argument("id", type=UUID)
+    ritual_commands.add_parser("list-gates")
+    ritual_commands.add_parser("list-stages")
+    ritual_commands.add_parser("list-rituals")
+    ritual_show = ritual_commands.add_parser("show-ritual")
+    ritual_show.add_argument("id", type=UUID)
+    ritual_commands.add_parser("validate")
+    safety_check = ritual_commands.add_parser("safety-check")
+    safety_check.add_argument("ritual_id", type=UUID)
     return parser
 
 
@@ -65,6 +85,8 @@ async def _run(args: argparse.Namespace) -> int:
     database = create_database(settings)
     store = LocalObjectStore(settings.storage_root)
     try:
+        if args.domain == "manasek":
+            return await _run_manasek(args, database, store)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -109,6 +131,50 @@ async def _run(args: argparse.Namespace) -> int:
         return 0
     finally:
         await database.dispose()
+
+
+async def _run_manasek(
+    args: argparse.Namespace, database: Database, store: LocalObjectStore
+) -> int:
+    if args.command == "import":
+        result = await ManasekImporter(database, store).import_file(args.file)
+        print(_json(asdict(result)))
+        return 0
+    async with database.transaction() as session:
+        service = RitualReadService(session)
+        if args.command == "inspect-document":
+            documents = await service.documents()
+            output: Any = next((item for item in documents if item.id == args.id), None)
+            if output is None:
+                raise RuntimeError("ritual document not found")
+        elif args.command == "list-gates":
+            output = await service.gates()
+        elif args.command == "list-stages":
+            output = await service.stages()
+        elif args.command == "list-rituals":
+            output = await service.rituals()
+        elif args.command == "show-ritual":
+            output = await service.ritual(args.id)
+        elif args.command == "validate":
+            output = await RitualStructuralValidator(session, store).validate()
+        elif args.command == "safety-check":
+            ritual = await service.ritual(args.ritual_id)
+            output = await RitualSafetyValidator(session).validate_version(
+                ritual.version_id
+            )
+            session.add(
+                SafetyValidationResult(
+                    ritual_version_id=ritual.version_id,
+                    valid=output.valid,
+                    publishable=output.publishable,
+                    issues=[item.model_dump(mode="json") for item in output.issues],
+                    validator_version=VALIDATOR_VERSION,
+                )
+            )
+        else:
+            raise RuntimeError(f"unsupported Manasek command: {args.command}")
+    print(_json(output))
+    return 0 if not hasattr(output, "valid") or output.valid else 1
 
 
 def main() -> None:

@@ -1,0 +1,1 @@
+"""Ritual integration tests."""
