@@ -9,6 +9,7 @@ from app.lecture.domain import (
     LectureProjectStatus,
     LectureType,
     MasterStatus,
+    PublicationLanguage,
     ValidationDimension,
 )
 
@@ -79,10 +80,15 @@ class LectureBuildResult(BaseModel):
 
 
 class SemanticLectureMasterExport(BaseModel):
+    """Standalone, language-neutral contract for all four Phase 9 targets."""
+
     export_version: str
+    supported_languages: list[PublicationLanguage]
     master: dict[str, object]
     sections: list[dict[str, object]]
     claims: list[dict[str, object]]
+    evidence: list[dict[str, object]]
     citations: list[dict[str, object]]
     ritual_links: list[dict[str, object]]
+    terminology_references: list[dict[str, object]]
     validation: LectureValidationRead

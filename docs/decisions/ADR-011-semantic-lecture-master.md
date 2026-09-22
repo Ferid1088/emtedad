@@ -21,7 +21,9 @@ dialogue status, open-question preservation, and ritual boundaries.
 
 READY masters pin the package version and content hash and are database
 immutable. A revision creates a new master version. Phase 9 receives the
-standalone export and is responsible for language realization.
+standalone export and is responsible for language realization in Persian,
+German, English, and Arabic. Phase 8 does not finalize localized prose or
+German terminology choices.
 
 ## Consequences
 

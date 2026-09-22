@@ -11,7 +11,7 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: Phase 9 — Three Languages (pending owner review)
+- Active phase: Phase 9 — Four Languages (pending owner review)
 - Last completed checkpoint: Phase 8 - Semantic Lecture Master
   (2026-09-23)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
@@ -34,7 +34,7 @@ Only one phase may be `in_progress` at a time.
 | 6 | Ayin–External Dialogue | complete | Typed relations, classification, criticism and review |
 | 7 | Research Engine | complete | Ayin Spine, ResearchPlan and frozen ResearchPackage |
 | 8 | Lecture Master | complete | Cited Semantic Master and validators |
-| 9 | Three Languages | pending | FA/EN/AR localization with fidelity QA |
+| 9 | Four Languages | pending | FA/DE/EN/AR localization with fidelity QA |
 | 10 | Content Strategy and Publishing | pending | Series, coverage and publication packages |
 | 11 | Evaluation | pending | Gold sets, fidelity fixtures and benchmarks |
 
@@ -270,9 +270,9 @@ validation.
 
 Verified complete 2026-09-23. See `docs/audits/PHASE_8_COMPLETION.md`.
 
-## Phase 9 — Three Languages
+## Phase 9 — Four Languages
 
-Target scope: Persian, English, and Arabic localization; terminology QA;
+Target scope: Persian, German, English, and Arabic localization; terminology QA;
 cross-language fidelity; localized enrichment; shared concept, claim, and
 citation identities; publication states.
 

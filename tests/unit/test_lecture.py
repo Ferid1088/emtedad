@@ -2,7 +2,8 @@
 
 from uuid import uuid4
 
-from app.lecture.domain import ClaimEpistemicStatus, ClaimOrigin
+from app.lecture.domain import ClaimEpistemicStatus, ClaimOrigin, PublicationLanguage
+from app.lecture.schemas import SemanticLectureMasterExport
 from app.lecture.validator import (
     AyinFidelityValidator,
     CitationCoverageValidator,
@@ -55,3 +56,12 @@ def test_ritual_context_is_optional_and_non_evidentiary() -> None:
         "RITUAL_NOT_OPTIONAL",
         "RITUAL_AS_OTHER_EVIDENCE",
     }
+
+
+def test_semantic_master_handoff_declares_four_languages_without_scripts() -> None:
+    assert [item.value for item in PublicationLanguage] == ["fa", "de", "en", "ar"]
+    assert "supported_languages" in SemanticLectureMasterExport.model_fields
+    assert "evidence" in SemanticLectureMasterExport.model_fields
+    assert "terminology_references" in SemanticLectureMasterExport.model_fields
+    assert "persian_script" not in SemanticLectureMasterExport.model_fields
+    assert "german_script" not in SemanticLectureMasterExport.model_fields

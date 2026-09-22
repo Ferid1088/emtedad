@@ -3,10 +3,14 @@
 Date: 2026-09-23
 
 Phase 8 converts frozen ResearchPackages into structured, language-neutral
-Semantic Lecture Masters. No final Persian, English, or Arabic prose is
-generated. The architect does not invoke retrieval, external websites, or
+Semantic Lecture Masters. No final Persian, German, English, or Arabic prose
+is generated. The architect does not invoke retrieval, external websites, or
 arbitrary knowledge tables; it reads only the frozen package and its typed
 package associations.
+
+Every export declares the four Phase 9 targets (`fa`, `de`, `en`, `ar`) and
+hands off terminology references without silently finalizing difficult German
+equivalents.
 
 ## Pilot masters
 

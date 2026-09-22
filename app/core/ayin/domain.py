@@ -55,9 +55,10 @@ class OpenQuestionStatus(StrEnum):
 
 
 class LanguageCode(StrEnum):
-    """Languages supported by the initial terminology registry."""
+    """Publication and terminology languages supported by the platform."""
 
     FA = "fa"
+    DE = "de"
     EN = "en"
     AR = "ar"
 

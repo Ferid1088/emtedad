@@ -1,4 +1,4 @@
-# Pending Phase: Phase 9 — Three Languages
+# Pending Phase: Phase 9 — Four Languages
 
 ## Execution status
 
@@ -38,7 +38,8 @@ objects only after owner review. Do not add localization in this phase.
 
 ## Phase 8 and Phase 9 boundary
 
-- Persian, English, or Arabic final scripts, publishing, music, or TTS;
+- Persian, German, English, or Arabic final scripts, publishing, music, or
+  TTS;
 - automatic Canon promotion or generated Canon.
 
 ## Required invariants

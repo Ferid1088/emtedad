@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
 from app.lecture.domain import (
+    SUPPORTED_PUBLICATION_LANGUAGES,
     CitationKind,
     ClaimEpistemicStatus,
     ClaimOrigin,
@@ -191,11 +192,16 @@ class LectureMasterService:
             validation = self._validation_read(findings)
             result = SemanticLectureMasterExport(
                 export_version="1",
+                supported_languages=list(SUPPORTED_PUBLICATION_LANGUAGES),
                 master=payload["master"],
                 sections=payload["sections"],
                 claims=payload["claims"],
+                evidence=payload["evidence"],
                 citations=payload["citations"],
                 ritual_links=payload["ritual_links"],
+                terminology_references=self._terminology_references(
+                    payload["sections"]
+                ),
                 validation=validation,
             )
             content_hash = _hash(result.model_dump(mode="json"))
@@ -471,6 +477,25 @@ class LectureMasterService:
             "ritual_links": [self._row_dict(r) for r in rituals],
             "dialogue_relations": relations,
         }
+
+    @staticmethod
+    def _terminology_references(
+        sections: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        references: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for section in sections:
+            values = section.get("required_terminology", [])
+            if not isinstance(values, list):
+                continue
+            for value in values:
+                if not isinstance(value, dict):
+                    continue
+                term_id = str(value.get("term_id", value.get("stable_key", "")))
+                if term_id and term_id not in seen:
+                    references.append(value)
+                    seen.add(term_id)
+        return references
 
     @staticmethod
     def _row_dict(row: Any) -> dict[str, object]:

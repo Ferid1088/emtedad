@@ -30,6 +30,7 @@ class DistanceMetric(StrEnum):
 
 class QueryLanguage(StrEnum):
     FA = "fa"
+    DE = "de"
     EN = "en"
     AR = "ar"
 

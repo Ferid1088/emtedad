@@ -1,4 +1,4 @@
-"""Versioned terminology entities for Persian, English, and Arabic."""
+"""Versioned terminology entities for Persian, German, English, and Arabic."""
 
 from datetime import date, datetime
 from uuid import UUID, uuid4

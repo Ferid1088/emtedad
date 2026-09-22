@@ -2,7 +2,7 @@
 
 A production-oriented, versioned platform for preserving Ayin-e Emtedad,
 modeling Manasek, researching external knowledge, and eventually producing
-evidence-grounded Persian, English, and Arabic lectures.
+evidence-grounded Persian, German, English, and Arabic lectures.
 
 The repository contains the Phase 1 platform foundation, the Phase 2/2.1 Ayin
 knowledge core, the Phase 3 Manasek ritual domain, the Phase 4 external

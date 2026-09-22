@@ -3,6 +3,18 @@
 from enum import StrEnum
 
 
+class PublicationLanguage(StrEnum):
+    """Language targets handed from Phase 8 to Phase 9 localizers."""
+
+    FA = "fa"
+    DE = "de"
+    EN = "en"
+    AR = "ar"
+
+
+SUPPORTED_PUBLICATION_LANGUAGES = tuple(PublicationLanguage)
+
+
 class LectureType(StrEnum):
     FOUNDATION = "FOUNDATION"
     HUMAN_QUESTION = "HUMAN_QUESTION"

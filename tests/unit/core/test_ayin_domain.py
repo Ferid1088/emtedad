@@ -46,7 +46,7 @@ def test_open_question_lifecycle_is_explicit() -> None:
 
 
 def test_terminology_supports_languages_and_forbidden_equivalents() -> None:
-    assert {item.value for item in LanguageCode} == {"fa", "en", "ar"}
+    assert {item.value for item in LanguageCode} == {"fa", "de", "en", "ar"}
     assert TermFormType.FORBIDDEN_EQUIVALENT.value == "forbidden_equivalent"
 
 

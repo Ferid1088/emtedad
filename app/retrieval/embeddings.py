@@ -264,7 +264,7 @@ class EmbeddingService:
                     revision=self._provider.revision,
                     dimensions=self._provider.dimensions,
                     distance_metric=DistanceMetric.COSINE,
-                    language_capabilities=["fa", "en", "ar"],
+                    language_capabilities=["fa", "de", "en", "ar"],
                     parameters={"normalized": True, "prefixes": "e5"},
                     license="MIT",
                 )
