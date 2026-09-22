@@ -1,5 +1,6 @@
 """Phase 7 Research Engine contract tests."""
 
+import json
 from uuid import uuid4
 
 from app.research.domain import (
@@ -9,6 +10,7 @@ from app.research.domain import (
     SpineStatus,
 )
 from app.research.schemas import ResearchQuestionInput
+from app.research.service import _snapshot_id
 from app.research.validator import (
     PlanValidationInput,
     ResearchEngineValidator,
@@ -68,3 +70,16 @@ def test_question_contract_defaults_to_explicit_retrieval_text() -> None:
     )
     assert question.retrieval_text is None
     assert question.requires_counterevidence is False
+
+
+def test_frozen_snapshot_identifiers_are_json_safe() -> None:
+    identifier = uuid4()
+    assert json.dumps({"id": _snapshot_id(identifier)})
+
+
+def test_manasek_is_an_explicit_research_question_kind() -> None:
+    question = ResearchQuestionInput(
+        kind=ResearchQuestionKind.MANASEK,
+        question="What optional ritual context is relevant?",
+    )
+    assert question.kind is ResearchQuestionKind.MANASEK

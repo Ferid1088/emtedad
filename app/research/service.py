@@ -103,6 +103,12 @@ def _hash(value: object) -> str:
     ).hexdigest()
 
 
+def _snapshot_id(value: UUID) -> str:
+    """Encode UUID identifiers as JSON-safe strings in frozen snapshots."""
+
+    return str(value)
+
+
 class ResearchEngineService:
     """Owns versioned spine/plan construction and frozen package transactions."""
 
@@ -314,6 +320,20 @@ class ResearchEngineService:
             inputs = request.questions or self._default_questions(
                 project.human_question, spine
             )
+            if request.manasek_relevant and not any(
+                item.kind is ResearchQuestionKind.MANASEK for item in inputs
+            ):
+                inputs = [
+                    *inputs,
+                    ResearchQuestionInput(
+                        kind=ResearchQuestionKind.MANASEK,
+                        question=(
+                            "What optional Manasek context is relevant without "
+                            "serving as evidence for Ayin?"
+                        ),
+                        retrieval_text=project.human_question,
+                    ),
+                ]
             has_counter = any(
                 item.kind is ResearchQuestionKind.COUNTEREVIDENCE for item in inputs
             )
@@ -522,6 +542,7 @@ class ResearchEngineService:
                 or 1
             )
             external_chunks: dict[UUID, tuple[SearchResult, EvidenceSelectionRole]] = {}
+            ritual_chunk_ids: set[UUID] = set()
             snapshot: list[dict[str, object]] = []
             for question, response in responses:
                 role = (
@@ -533,13 +554,15 @@ class ResearchEngineService:
                     role = EvidenceSelectionRole.AYIN_GROUNDING
                 snapshot.append(
                     {
-                        "question_id": question.id,
+                        "question_id": _snapshot_id(question.id),
                         "kind": question.kind.value,
-                        "retrieval_run_id": response.retrieval_run_id,  # type: ignore[attr-defined]
+                        "retrieval_run_id": _snapshot_id(response.retrieval_run_id),  # type: ignore[attr-defined]
                         "results": [
                             {
-                                "chunk_id": result.chunk_id,
+                                "chunk_id": _snapshot_id(result.chunk_id),
                                 "rank": result.final_rank,
+                                "text": result.text,
+                                "language": result.language,
                                 "fusion_score": result.fusion_score,
                                 "reranker_score": result.reranker_score,
                                 "content_hash": result.chunk_content_hash,
@@ -552,9 +575,11 @@ class ResearchEngineService:
                 for result in response.results:  # type: ignore[attr-defined]
                     if result.provenance.lane is RetrievalLane.EXTERNAL:
                         external_chunks.setdefault(result.chunk_id, (result, role))
+                    elif result.provenance.lane is RetrievalLane.MANASEK:
+                        ritual_chunk_ids.add(result.chunk_id)
             retrieval_snapshot = {
-                "chunking_run_id": chunking_run_id,
-                "embedding_model_id": embedding_model_id,
+                "chunking_run_id": _snapshot_id(chunking_run_id),
+                "embedding_model_id": _snapshot_id(embedding_model_id),
                 "queries": snapshot,
             }
             content_hash = _hash(
@@ -596,7 +621,7 @@ class ResearchEngineService:
                         canon_version_id=item.canon_version_id,
                     )
                 )
-            for item in await session.scalars(
+            for concept_link in await session.scalars(
                 select(AyinSpineConcept).where(
                     AyinSpineConcept.ayin_spine_id == spine.id
                 )
@@ -604,11 +629,11 @@ class ResearchEngineService:
                 session.add(
                     ResearchPackageAyinConcept(
                         package_id=package.id,
-                        concept_version_id=item.concept_version_id,
-                        canon_version_id=item.canon_version_id,
+                        concept_version_id=concept_link.concept_version_id,
+                        canon_version_id=concept_link.canon_version_id,
                     )
                 )
-            for item in await session.scalars(
+            for principle_link in await session.scalars(
                 select(AyinSpinePrinciple).where(
                     AyinSpinePrinciple.ayin_spine_id == spine.id
                 )
@@ -616,11 +641,11 @@ class ResearchEngineService:
                 session.add(
                     ResearchPackageAyinPrinciple(
                         package_id=package.id,
-                        principle_version_id=item.principle_version_id,
-                        canon_version_id=item.canon_version_id,
+                        principle_version_id=principle_link.principle_version_id,
+                        canon_version_id=principle_link.canon_version_id,
                     )
                 )
-            for item in await session.scalars(
+            for distinction_link in await session.scalars(
                 select(AyinSpineDistinction).where(
                     AyinSpineDistinction.ayin_spine_id == spine.id
                 )
@@ -628,11 +653,11 @@ class ResearchEngineService:
                 session.add(
                     ResearchPackageAyinDistinction(
                         package_id=package.id,
-                        distinction_version_id=item.distinction_version_id,
-                        canon_version_id=item.canon_version_id,
+                        distinction_version_id=distinction_link.distinction_version_id,
+                        canon_version_id=distinction_link.canon_version_id,
                     )
                 )
-            for item in await session.scalars(
+            for question_link in await session.scalars(
                 select(AyinSpineOpenQuestion).where(
                     AyinSpineOpenQuestion.ayin_spine_id == spine.id
                 )
@@ -640,8 +665,8 @@ class ResearchEngineService:
                 session.add(
                     ResearchPackageAyinOpenQuestion(
                         package_id=package.id,
-                        open_question_version_id=item.open_question_version_id,
-                        canon_version_id=item.canon_version_id,
+                        open_question_version_id=question_link.open_question_version_id,
+                        canon_version_id=question_link.canon_version_id,
                     )
                 )
             for result, role in external_chunks.values():
@@ -713,20 +738,6 @@ class ResearchEngineService:
                             package_id=package.id, person_id=person_id
                         )
                     )
-                ritual_rows = await session.scalars(
-                    select(ChunkRitualVersion).where(
-                        ChunkRitualVersion.chunk_id.in_(chunk_ids)
-                    )
-                )
-                if request.include_manasek:
-                    for ritual_row in ritual_rows:
-                        session.add(
-                            ResearchPackageRitualVersion(
-                                package_id=package.id,
-                                ritual_version_id=ritual_row.ritual_version_id,
-                                selection_role=EvidenceSelectionRole.RITUAL_CONTEXT,
-                            )
-                        )
                 relation_rows = await session.execute(
                     select(DialogueRelation, DialogueProposal, DialogueExternalTarget)
                     .join(
@@ -740,14 +751,43 @@ class ResearchEngineService:
                     )
                     .where(DialogueExternalTarget.chunk_id.in_(chunk_ids))
                 )
+                dialogue_snapshot: list[dict[str, object]] = []
                 for relation, _proposal, _target in relation_rows:
                     role = self._dialogue_role(relation.relation_type.value)
+                    dialogue_snapshot.append(
+                        {
+                            "relation_id": str(relation.id),
+                            "relation_type": relation.relation_type.value,
+                            "scope": relation.scope.value,
+                            "explanation": relation.explanation,
+                            "review_status": relation.review_status.value,
+                            "selection_role": role.value,
+                        }
+                    )
                     session.add(
                         ResearchPackageDialogueRelation(
                             package_id=package.id,
                             relation_id=relation.id,
                             review_status=relation.review_status.value,
                             selection_role=role,
+                        )
+                    )
+                package.retrieval_snapshot = {
+                    **package.retrieval_snapshot,
+                    "dialogue_relations": dialogue_snapshot,
+                }
+            if ritual_chunk_ids and request.include_manasek:
+                ritual_rows = await session.scalars(
+                    select(ChunkRitualVersion).where(
+                        ChunkRitualVersion.chunk_id.in_(ritual_chunk_ids)
+                    )
+                )
+                for ritual_row in ritual_rows:
+                    session.add(
+                        ResearchPackageRitualVersion(
+                            package_id=package.id,
+                            ritual_version_id=ritual_row.ritual_version_id,
+                            selection_role=EvidenceSelectionRole.RITUAL_CONTEXT,
                         )
                     )
             package.status = PackageStatus.FROZEN
