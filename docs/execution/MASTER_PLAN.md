@@ -11,12 +11,12 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: None; Phase 7 is pending repository-owner review
+- Active phase: Phase 8 — Lecture Master (pending owner review)
 - Last completed checkpoint: Phase 6 - Ayin–External Dialogue
   (2026-09-22)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
-- Open blocker: None remaining for Phase 6. Phase 7 requires explicit approval
+- Open blocker: None remaining for Phase 7. Phase 8 requires explicit approval
   of its prepared plan. Rights, deployment, backup, privacy, and editorial
   governance remain recorded later-phase/production review items.
 
@@ -251,7 +251,7 @@ Verified result (2026-09-22):
   claims were upgraded and no Ayin/Manasek record was modified.
 - Structural validators all passed. Clean/repeat/reversible migrations,
   Alembic drift, Ruff, strict mypy, Docker build, and the full 116-test suite
-  passed. No Phase 7 or lecture workflow was added.
+  passed. No lecture workflow was added.
 
 Completion evidence: `docs/audits/PHASE_6_COMPLETION.md`.
 
@@ -259,6 +259,8 @@ Completion evidence: `docs/audits/PHASE_6_COMPLETION.md`.
 
 Target scope: Ayin Spine, ResearchPlan, lane-aware retrieval orchestration, and
 immutable/versioned ResearchPackage snapshots.
+
+Verified complete 2026-09-23. See `docs/audits/PHASE_7_COMPLETION.md`.
 
 ## Phase 8 — Lecture Master
 

@@ -6,10 +6,10 @@ evidence-grounded Persian, English, and Arabic lectures.
 
 The repository contains the Phase 1 platform foundation, the Phase 2/2.1 Ayin
 knowledge core, the Phase 3 Manasek ritual domain, the Phase 4 external
-knowledge ingestion domain, Phase 5 hybrid retrieval, and the Phase 6
-Ayin–external dialogue layer. Ayin and Manasek remain Working sources;
-external material remains separate research evidence. ResearchPackages,
-lectures, translations, and publishing are not implemented.
+knowledge ingestion domain, Phase 5 hybrid retrieval, the Phase 6
+Ayin–external dialogue layer, and the Phase 7 Ayin Research Engine. Ayin and
+Manasek remain Working sources; external material remains separate research
+evidence. Lecture generation, translations, and publishing are not implemented.
 
 ## Authority and current source status
 
@@ -64,8 +64,9 @@ Ayin/terminology tables and `ops.object_assets`. Phase 3 owns `ritual`. Phase 4
 owns the provenance-preserving `knowledge` source, segment, extraction, entity,
 claim, resolution, media, and review tables. Phase 5 owns immutable chunks,
 typed provenance, lexical search, embeddings, lane-aware retrieval runs, and
-evaluation records in `retrieval`. No `content` tables or approximate vector
-indexes exist.
+evaluation records in `retrieval`. Phase 7 owns version-pinned Ayin Spines,
+ResearchPlans, and frozen ResearchPackages in `content`. Lecture and
+publication tables do not yet exist.
 
 Source and extraction identities are intentionally separate:
 
@@ -338,6 +339,7 @@ app/
   ops/              Structured logging and immutable asset metadata
   ritual/           Manasek import, structure, safety, services, and validator
   dialogue/         Typed Ayin/external relations, classifier, review, validator
+  research/         Ayin Spine, ResearchPlan, retrieval orchestration, packages
   storage/          Immutable-object storage port and local adapter
 alembic/             Baseline migration and environment
 tests/
@@ -360,7 +362,8 @@ docs/                Specifications, architecture, ADRs, audits, and plans
   runs and preserves parser-specific passage sets independently.
 - Phase 3 models Manasek structure and safety without Canon approval or a
   ritual execution engine.
-- Later phases add the Research Engine, Semantic Masters, multilingual
+- Phase 7 adds the versioned Ayin Research Engine and frozen ResearchPackages;
+  later phases add Semantic Masters, multilingual
   localization, publishing, and evaluation in that order.
 - YouTube ingestion, embeddings, lecture generation, generated localization,
   ResearchPackages, Canon revision impact analysis, and publishing commands

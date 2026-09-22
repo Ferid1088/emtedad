@@ -26,3 +26,4 @@ belong to the editorial versioning workflow.
 ## Accepted records
 
 - [ADR-009: Ayin–External Dialogue Taxonomy and Epistemic Boundaries](ADR-009-ayin-external-dialogue-taxonomy-and-epistemic-boundaries.md)
+- [ADR-010: Ayin Research Engine and Frozen ResearchPackages](ADR-010-ayin-research-engine.md)

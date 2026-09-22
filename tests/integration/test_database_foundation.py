@@ -174,7 +174,11 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
     assert ("knowledge", "dialogue_relations") in domain_tables
     assert ("knowledge", "dialogue_proposal_runs") in domain_tables
     assert ("knowledge", "dialogue_review_decisions") in domain_tables
-    assert not any(schema == "content" for schema, _ in domain_tables)
+    assert ("content", "research_projects") in domain_tables
+    assert ("content", "ayin_spines") in domain_tables
+    assert ("content", "research_plans") in domain_tables
+    assert ("content", "research_packages") in domain_tables
+    assert not any("lecture" in table_name for _, table_name in domain_tables)
     assert review_status_default is not None
     assert "PROPOSED" in str(review_status_default[0])
     assert classifier_key_unique == (0,)

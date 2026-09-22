@@ -42,6 +42,13 @@ from app.knowledge.resolution_service import ResolutionService
 from app.knowledge.service import KnowledgeReadService
 from app.knowledge.validator import KnowledgeStructuralValidator
 from app.ops.logging import configure_logging
+from app.research.schemas import (
+    AyinSpineBuildRequest,
+    ResearchPackageBuildRequest,
+    ResearchPlanCreate,
+    ResearchProjectCreate,
+)
+from app.research.service import ResearchEngineService
 from app.retrieval.chunking import ChunkBuilder
 from app.retrieval.domain import QueryLanguage, RetrievalLane
 from app.retrieval.embeddings import (
@@ -206,6 +213,39 @@ def _parser() -> argparse.ArgumentParser:
         choices=[item.value for item in RelationScope],
     )
     review_dialogue.add_argument("--explanation")
+
+    research = domains.add_parser("research")
+    research_commands = research.add_subparsers(dest="command", required=True)
+    create_research = research_commands.add_parser("create")
+    create_research.add_argument("question")
+    create_research.add_argument("--created-by", default="operator")
+    build_spine = research_commands.add_parser("build-spine")
+    build_spine.add_argument("project_id", type=UUID)
+    build_spine.add_argument("--primary-concept", required=True)
+    build_spine.add_argument("--secondary-concept", action="append", default=[])
+    build_spine.add_argument("--principle", action="append", default=[])
+    build_spine.add_argument("--distinction", action="append", default=[])
+    build_spine.add_argument("--open-question", action="append", default=[])
+    build_spine.add_argument("--passage-id", action="append", type=UUID, default=[])
+    build_spine.add_argument("--canon-version-id", type=UUID)
+    build_spine.add_argument("--canonical-question")
+    show_spine = research_commands.add_parser("show-spine")
+    show_spine.add_argument("spine_id", type=UUID)
+    make_plan = research_commands.add_parser("plan")
+    make_plan.add_argument("spine_id", type=UUID)
+    make_plan.add_argument("--manasek-relevant", action="store_true")
+    make_plan.add_argument("--manasek-reason")
+    show_plan = research_commands.add_parser("show-plan")
+    show_plan.add_argument("plan_id", type=UUID)
+    build_package = research_commands.add_parser("build-package")
+    build_package.add_argument("plan_id", type=UUID)
+    build_package.add_argument("--chunking-run-id", type=UUID)
+    build_package.add_argument("--embedding-model-id", type=UUID)
+    build_package.add_argument("--include-manasek", action="store_true")
+    inspect_package = research_commands.add_parser("inspect-package")
+    inspect_package.add_argument("package_id", type=UUID)
+    research_commands.add_parser("list-packages")
+    research_commands.add_parser("validate")
     return parser
 
 
@@ -239,6 +279,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_retrieval(args, database, settings.storage_root)
         if args.domain == "dialogue":
             return await _run_dialogue(args, database, settings.storage_root)
+        if args.domain == "research":
+            return await _run_research(args, database, settings.storage_root)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -283,6 +325,68 @@ async def _run(args: argparse.Namespace) -> int:
         return 0
     finally:
         await database.dispose()
+
+
+async def _run_research(
+    args: argparse.Namespace, database: Database, storage_root: Path
+) -> int:
+    service = ResearchEngineService(
+        database,
+        SentenceTransformerEmbeddingProvider(cache_folder=storage_root / "models"),
+    )
+    if args.command == "create":
+        output: Any = await service.create_project(
+            ResearchProjectCreate(
+                human_question=args.question, created_by=args.created_by
+            )
+        )
+    elif args.command == "build-spine":
+        output = await service.build_spine(
+            AyinSpineBuildRequest(
+                project_id=args.project_id,
+                primary_concept=args.primary_concept,
+                secondary_concepts=args.secondary_concept,
+                principle_ids=args.principle,
+                distinction_ids=args.distinction,
+                open_question_ids=args.open_question,
+                passage_ids=args.passage_id,
+                canon_version_id=args.canon_version_id,
+                canonical_question=args.canonical_question,
+            )
+        )
+    elif args.command == "show-spine":
+        output = await service.spine(args.spine_id)
+    elif args.command == "plan":
+        output = await service.create_plan(
+            ResearchPlanCreate(
+                spine_id=args.spine_id,
+                manasek_relevant=args.manasek_relevant,
+                manasek_reason=args.manasek_reason,
+            )
+        )
+    elif args.command == "show-plan":
+        output = await service.plan(args.plan_id)
+    elif args.command == "build-package":
+        output = await service.build_package(
+            ResearchPackageBuildRequest(
+                plan_id=args.plan_id,
+                chunking_run_id=args.chunking_run_id,
+                embedding_model_id=args.embedding_model_id,
+                include_manasek=args.include_manasek,
+            )
+        )
+    elif args.command == "inspect-package":
+        output = await service.package(args.package_id)
+    elif args.command == "list-packages":
+        output = await service.packages()
+    elif args.command == "validate":
+        output = await service.validate()
+        print(_json(output))
+        return 0 if output.valid else 1
+    else:
+        raise RuntimeError(f"unsupported research command: {args.command}")
+    print(_json(output))
+    return 0
 
 
 async def _run_retrieval(

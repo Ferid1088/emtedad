@@ -1,0 +1,79 @@
+"""Controlled states and evidence roles for reproducible research packages."""
+
+from enum import StrEnum
+
+
+class ResearchProjectStatus(StrEnum):
+    DRAFT = "DRAFT"
+    READY = "READY"
+    ARCHIVED = "ARCHIVED"
+
+
+class SpineStatus(StrEnum):
+    DRAFT = "DRAFT"
+    VALIDATED = "VALIDATED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class SpineConceptRole(StrEnum):
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+
+
+class ResearchQuestionKind(StrEnum):
+    AYIN = "AYIN"
+    EMPIRICAL = "EMPIRICAL"
+    PHILOSOPHICAL = "PHILOSOPHICAL"
+    EXTERNAL_CONCEPT = "EXTERNAL_CONCEPT"
+    COUNTEREVIDENCE = "COUNTEREVIDENCE"
+    MANASEK = "MANASEK"
+
+
+class ResearchQuestionStatus(StrEnum):
+    OPEN = "OPEN"
+    ANSWERED = "ANSWERED"
+    UNRESOLVED = "UNRESOLVED"
+    DEFERRED = "DEFERRED"
+
+
+class ResearchPlanStatus(StrEnum):
+    DRAFT = "DRAFT"
+    READY = "READY"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class PackageStatus(StrEnum):
+    BUILDING = "BUILDING"
+    FROZEN = "FROZEN"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class PackageEvidenceKind(StrEnum):
+    AYIN_PASSAGE = "AYIN_PASSAGE"
+    AYIN_CONCEPT = "AYIN_CONCEPT"
+    AYIN_PRINCIPLE = "AYIN_PRINCIPLE"
+    AYIN_DISTINCTION = "AYIN_DISTINCTION"
+    AYIN_OPEN_QUESTION = "AYIN_OPEN_QUESTION"
+    EXTERNAL_CHUNK = "EXTERNAL_CHUNK"
+    EXTERNAL_CLAIM = "EXTERNAL_CLAIM"
+    EXTERNAL_WORK = "EXTERNAL_WORK"
+    EXTERNAL_PERSON = "EXTERNAL_PERSON"
+    DIALOGUE_RELATION = "DIALOGUE_RELATION"
+    RITUAL_VERSION = "RITUAL_VERSION"
+
+
+class PackageIssueSeverity(StrEnum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+class EvidenceSelectionRole(StrEnum):
+    AYIN_GROUNDING = "AYIN_GROUNDING"
+    EXTERNAL_EVIDENCE = "EXTERNAL_EVIDENCE"
+    COUNTEREVIDENCE = "COUNTEREVIDENCE"
+    ALTERNATIVE_EXPLANATION = "ALTERNATIVE_EXPLANATION"
+    CONCEPTUAL_PARALLEL = "CONCEPTUAL_PARALLEL"
+    TENSION = "TENSION"
+    UNRESOLVED = "UNRESOLVED"
+    RITUAL_CONTEXT = "RITUAL_CONTEXT"

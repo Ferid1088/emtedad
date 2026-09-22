@@ -15,6 +15,7 @@ from app.dialogue import models as dialogue_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
 from app.ops.assets import models as asset_models  # noqa: F401
 from app.retrieval import models as retrieval_models  # noqa: F401
+from app.research import models as research_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 
 config = context.config
