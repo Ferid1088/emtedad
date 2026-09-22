@@ -11,12 +11,12 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: Phase 8 — Lecture Master (pending owner review)
-- Last completed checkpoint: Phase 6 - Ayin–External Dialogue
-  (2026-09-22)
+- Active phase: Phase 9 — Three Languages (pending owner review)
+- Last completed checkpoint: Phase 8 - Semantic Lecture Master
+  (2026-09-23)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
-- Open blocker: None remaining for Phase 7. Phase 8 requires explicit approval
+- Open blocker: None remaining for Phase 8. Phase 9 requires explicit approval
   of its prepared plan. Rights, deployment, backup, privacy, and editorial
   governance remain recorded later-phase/production review items.
 
@@ -32,8 +32,8 @@ Only one phase may be `in_progress` at a time.
 | 4 | External Knowledge Ingestion | complete | Provenance-preserving adapters, YouTube first |
 | 5 | Retrieval | complete | Multilingual, lane-specific hybrid retrieval |
 | 6 | Ayin–External Dialogue | complete | Typed relations, classification, criticism and review |
-| 7 | Research Engine | pending | Ayin Spine, ResearchPlan and frozen ResearchPackage |
-| 8 | Lecture Master | pending | Cited Semantic Master and validators |
+| 7 | Research Engine | complete | Ayin Spine, ResearchPlan and frozen ResearchPackage |
+| 8 | Lecture Master | complete | Cited Semantic Master and validators |
 | 9 | Three Languages | pending | FA/EN/AR localization with fidelity QA |
 | 10 | Content Strategy and Publishing | pending | Series, coverage and publication packages |
 | 11 | Evaluation | pending | Gold sets, fidelity fixtures and benchmarks |
@@ -267,6 +267,8 @@ Verified complete 2026-09-23. See `docs/audits/PHASE_7_COMPLETION.md`.
 Target scope: lecture types, argument grammar, Semantic Master, statement-level
 claim/citation graph, Ayin fidelity, epistemic, citation, and counterargument
 validation.
+
+Verified complete 2026-09-23. See `docs/audits/PHASE_8_COMPLETION.md`.
 
 ## Phase 9 — Three Languages
 

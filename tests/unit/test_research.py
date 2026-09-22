@@ -18,7 +18,7 @@ from app.research.validator import (
 )
 
 
-def test_research_taxonomy_is_explicit_and_phase_eight_is_absent() -> None:
+def test_research_taxonomy_is_explicit_and_phase_eight_is_present() -> None:
     assert {item.value for item in EvidenceSelectionRole} >= {
         "AYIN_GROUNDING",
         "EXTERNAL_EVIDENCE",
@@ -29,7 +29,7 @@ def test_research_taxonomy_is_explicit_and_phase_eight_is_absent() -> None:
     }
     assert PackageStatus.FROZEN.value == "FROZEN"
     assert SpineStatus.VALIDATED.value == "VALIDATED"
-    assert not hasattr(__import__("app", fromlist=["lecture"]), "lecture")
+    assert hasattr(__import__("app", fromlist=["lecture"]), "lecture")
 
 
 def test_spine_validator_requires_pinned_ayin_context() -> None:

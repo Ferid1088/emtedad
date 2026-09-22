@@ -1,15 +1,16 @@
-# Pending Phase: Phase 8 — Lecture Master
+# Pending Phase: Phase 9 — Three Languages
 
 ## Execution status
 
-Phase 7 is complete as of 2026-09-23 and committed after verification. Phase 8
-is the next phase and is not implemented here.
+Phase 7 and Phase 8 are complete as of 2026-09-23 and committed after
+verification. Phase 9 is the next phase and is not implemented here.
 
 Completion evidence:
 
 - Phase 5: `docs/audits/PHASE_5_COMPLETION.md`
 - Phase 6: `docs/audits/PHASE_6_COMPLETION.md`
 - Phase 7: `docs/audits/PHASE_7_COMPLETION.md`
+- Phase 8: `docs/audits/PHASE_8_COMPLETION.md`
 
 ## Completed Phase 7 scope
 
@@ -20,14 +21,24 @@ Completion evidence:
 
 Completion evidence: `docs/audits/PHASE_7_COMPLETION.md`.
 
+## Completed Phase 8 scope
+
+- frozen ResearchPackage-pinned lecture projects and Semantic Master versions;
+- typed section, claim, dependency, evidence, citation, and ritual-link graph;
+- deterministic Ayin fidelity, epistemic, citation, dialogue, ritual, and
+  package-traceability validators;
+- immutable READY masters and standalone Phase 9 handoff exports.
+
+Completion evidence: `docs/audits/PHASE_8_COMPLETION.md`.
+
 ## Next-phase goal
 
-Implement the Semantic Master and lecture argument substrate only after owner
-review. Do not generate lectures in this phase.
+Implement language realization from standalone SemanticLectureMasterExport
+objects only after owner review. Do not add localization in this phase.
 
-## Phase 7 out of scope
+## Phase 8 and Phase 9 boundary
 
-- lecture generation, localization, publishing, music, or TTS;
+- Persian, English, or Arabic final scripts, publishing, music, or TTS;
 - automatic Canon promotion or generated Canon.
 
 ## Required invariants

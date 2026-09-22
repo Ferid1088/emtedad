@@ -501,7 +501,7 @@ def test_dialogue_cli_supports_targeted_proposal_filter_and_counterevidence() ->
     assert counter.ayin_open_question == str(_id(9))
 
 
-def test_dialogue_routes_exist_without_phase7_or_lecture_routes(
+def test_dialogue_routes_exist_with_phase8_lecture_routes(
     test_settings: Settings,
 ) -> None:
     from app.main import create_app
@@ -516,4 +516,4 @@ def test_dialogue_routes_exist_without_phase7_or_lecture_routes(
         "/dialogue/propose",
         "/dialogue/relations/{relation_id}/review",
     } <= paths
-    assert not any("research-package" in path or "lecture" in path for path in paths)
+    assert "/lectures" in paths

@@ -65,8 +65,9 @@ owns the provenance-preserving `knowledge` source, segment, extraction, entity,
 claim, resolution, media, and review tables. Phase 5 owns immutable chunks,
 typed provenance, lexical search, embeddings, lane-aware retrieval runs, and
 evaluation records in `retrieval`. Phase 7 owns version-pinned Ayin Spines,
-ResearchPlans, and frozen ResearchPackages in `content`. Lecture and
-publication tables do not yet exist.
+ResearchPlans, and frozen ResearchPackages in `content`. Phase 8 owns
+structured, language-neutral Semantic Lecture Masters in `content`; language
+realization and publication remain future phases.
 
 Source and extraction identities are intentionally separate:
 

@@ -27,3 +27,4 @@ belong to the editorial versioning workflow.
 
 - [ADR-009: Ayin–External Dialogue Taxonomy and Epistemic Boundaries](ADR-009-ayin-external-dialogue-taxonomy-and-epistemic-boundaries.md)
 - [ADR-010: Ayin Research Engine and Frozen ResearchPackages](ADR-010-ayin-research-engine.md)
+- [ADR-011: Semantic Lecture Master and ResearchPackage Writer Isolation](ADR-011-semantic-lecture-master.md)

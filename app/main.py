@@ -14,6 +14,7 @@ from app.api.routes.ayin import router as ayin_router
 from app.api.routes.dialogue import router as dialogue_router
 from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
+from app.api.routes.lecture import router as lecture_router
 from app.api.routes.research import router as research_router
 from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.ritual import router as ritual_router
@@ -82,6 +83,7 @@ def create_app(
     app.include_router(ayin_router)
     app.include_router(ritual_router)
     app.include_router(knowledge_router)
+    app.include_router(lecture_router)
     app.include_router(retrieval_router)
     app.include_router(research_router)
     app.include_router(dialogue_router)

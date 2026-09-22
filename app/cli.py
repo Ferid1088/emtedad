@@ -41,6 +41,9 @@ from app.knowledge.resolution import (
 from app.knowledge.resolution_service import ResolutionService
 from app.knowledge.service import KnowledgeReadService
 from app.knowledge.validator import KnowledgeStructuralValidator
+from app.lecture.domain import LectureType
+from app.lecture.schemas import LectureProjectCreate
+from app.lecture.service import LectureMasterService
 from app.ops.logging import configure_logging
 from app.research.schemas import (
     AyinSpineBuildRequest,
@@ -246,6 +249,28 @@ def _parser() -> argparse.ArgumentParser:
     inspect_package.add_argument("package_id", type=UUID)
     research_commands.add_parser("list-packages")
     research_commands.add_parser("validate")
+
+    lecture = domains.add_parser("lecture")
+    lecture_commands = lecture.add_subparsers(dest="command", required=True)
+    create_lecture = lecture_commands.add_parser("create")
+    create_lecture.add_argument("--research-package", type=UUID, required=True)
+    create_lecture.add_argument(
+        "--lecture-type", choices=[item.value for item in LectureType], required=True
+    )
+    create_lecture.add_argument("--title", required=True)
+    create_lecture.add_argument("--duration", type=int)
+    create_lecture.add_argument("--audience")
+    create_lecture.add_argument("--created-by", default="operator")
+    architect_lecture = lecture_commands.add_parser("architect")
+    architect_lecture.add_argument("lecture_id", type=UUID)
+    inspect_lecture = lecture_commands.add_parser("inspect")
+    inspect_lecture.add_argument("lecture_id", type=UUID)
+    validate_lecture = lecture_commands.add_parser("validate")
+    validate_lecture.add_argument("master_id", type=UUID)
+    freeze_lecture = lecture_commands.add_parser("freeze")
+    freeze_lecture.add_argument("master_id", type=UUID)
+    export_lecture = lecture_commands.add_parser("export")
+    export_lecture.add_argument("master_id", type=UUID)
     return parser
 
 
@@ -281,6 +306,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_dialogue(args, database, settings.storage_root)
         if args.domain == "research":
             return await _run_research(args, database, settings.storage_root)
+        if args.domain == "lecture":
+            return await _run_lecture(args, database)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -385,6 +412,35 @@ async def _run_research(
         return 0 if output.valid else 1
     else:
         raise RuntimeError(f"unsupported research command: {args.command}")
+    print(_json(output))
+    return 0
+
+
+async def _run_lecture(args: argparse.Namespace, database: Database) -> int:
+    service = LectureMasterService(database)
+    if args.command == "create":
+        output: Any = await service.create_project(
+            LectureProjectCreate(
+                research_package_id=args.research_package,
+                lecture_type=LectureType(args.lecture_type),
+                working_title=args.title,
+                target_duration_seconds=args.duration,
+                target_audience=args.audience,
+                created_by=args.created_by,
+            )
+        )
+    elif args.command == "architect":
+        output = await service.architect(args.lecture_id)
+    elif args.command == "inspect":
+        output = await service.master(args.lecture_id)
+    elif args.command == "validate":
+        output = await service.validate(args.master_id)
+    elif args.command == "freeze":
+        output = await service.freeze(args.master_id)
+    elif args.command == "export":
+        output = await service.export(args.master_id)
+    else:
+        raise RuntimeError(f"unsupported lecture command: {args.command}")
     print(_json(output))
     return 0
 
