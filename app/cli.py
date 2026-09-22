@@ -15,6 +15,19 @@ from app.core.ayin.service import AyinExtractionService, AyinReadService
 from app.core.ayin.validator import AyinStructuralValidator
 from app.core.config import get_settings
 from app.db.session import Database, create_database
+from app.dialogue.classifier import EvidenceRoleClassifier
+from app.dialogue.domain import (
+    AyinTargetKind,
+    RelationScope,
+    RelationType,
+    ReviewAction,
+)
+from app.dialogue.schemas import (
+    CounterevidenceRequest,
+    ProposeRequest,
+    ReviewRequest,
+)
+from app.dialogue.service import DialogueService
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.codex import CodexCliProvider
@@ -142,7 +155,66 @@ def _parser() -> argparse.ArgumentParser:
     validate_retrieval = retrieval_commands.add_parser("validate")
     validate_retrieval.add_argument("chunking_run_id", type=UUID)
     validate_retrieval.add_argument("--embedding-model-id", type=UUID)
+
+    dialogue = domains.add_parser("dialogue")
+    dialogue_commands = dialogue.add_subparsers(dest="command", required=True)
+    propose_dialogue = dialogue_commands.add_parser("propose")
+    _add_ayin_target_arguments(propose_dialogue)
+    propose_dialogue.add_argument(
+        "--language", choices=[item.value for item in QueryLanguage], default="fa"
+    )
+    propose_dialogue.add_argument("--chunking-run-id", type=UUID)
+    propose_dialogue.add_argument("--embedding-model-id", type=UUID)
+    propose_dialogue.add_argument("--model", default="configured-default")
+    propose_dialogue.add_argument("--max-candidates", type=int, default=5)
+    inspect_dialogue = dialogue_commands.add_parser("inspect")
+    inspect_dialogue.add_argument("relation_id", type=UUID)
+    list_dialogue = dialogue_commands.add_parser("list")
+    list_dialogue.add_argument(
+        "--relation-type",
+        type=str.upper,
+        choices=[item.value for item in RelationType],
+    )
+    dialogue_commands.add_parser("list-review")
+    dialogue_commands.add_parser("validate")
+    counterevidence = dialogue_commands.add_parser("counterevidence")
+    _add_ayin_target_arguments(counterevidence)
+    counterevidence.add_argument(
+        "--language", choices=[item.value for item in QueryLanguage], default="fa"
+    )
+    counterevidence.add_argument("--chunking-run-id", type=UUID)
+    counterevidence.add_argument("--embedding-model-id", type=UUID)
+    counterevidence.add_argument("--limit", type=int, default=10)
+    review_dialogue = dialogue_commands.add_parser("review")
+    review_dialogue.add_argument("relation_id", type=UUID)
+    review_dialogue.add_argument(
+        "--action",
+        type=str.upper,
+        choices=[item.value for item in ReviewAction],
+        required=True,
+    )
+    review_dialogue.add_argument("--reviewer", required=True)
+    review_dialogue.add_argument("--notes", required=True)
+    review_dialogue.add_argument(
+        "--relation-type",
+        type=str.upper,
+        choices=[item.value for item in RelationType],
+    )
+    review_dialogue.add_argument(
+        "--scope",
+        type=str.upper,
+        choices=[item.value for item in RelationScope],
+    )
+    review_dialogue.add_argument("--explanation")
     return parser
+
+
+def _add_ayin_target_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--ayin-concept")
+    group.add_argument("--ayin-principle")
+    group.add_argument("--ayin-distinction")
+    group.add_argument("--ayin-open-question")
 
 
 def _json(value: Any) -> str:
@@ -165,6 +237,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_knowledge(args, database, store)
         if args.domain == "retrieval":
             return await _run_retrieval(args, database, settings.storage_root)
+        if args.domain == "dialogue":
+            return await _run_dialogue(args, database, settings.storage_root)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -256,6 +330,87 @@ async def _run_retrieval(
         return 0 if result.valid else 1
     else:
         raise RuntimeError(f"unsupported retrieval command: {args.command}")
+    print(_json(output))
+    return 0
+
+
+def _dialogue_target(args: argparse.Namespace) -> tuple[AyinTargetKind, str]:
+    for attribute, kind in (
+        ("ayin_concept", AyinTargetKind.CONCEPT_VERSION),
+        ("ayin_principle", AyinTargetKind.PRINCIPLE_VERSION),
+        ("ayin_distinction", AyinTargetKind.DISTINCTION_VERSION),
+        ("ayin_open_question", AyinTargetKind.OPEN_QUESTION_VERSION),
+    ):
+        value = getattr(args, attribute, None)
+        if value:
+            return kind, value
+    raise RuntimeError("an Ayin target is required")
+
+
+async def _run_dialogue(
+    args: argparse.Namespace, database: Database, storage_root: Path
+) -> int:
+    model = getattr(args, "model", "configured-default")
+    service = DialogueService(
+        database,
+        SentenceTransformerEmbeddingProvider(cache_folder=storage_root / "models"),
+        EvidenceRoleClassifier(CodexCliProvider(), model=model),
+    )
+    if args.command == "propose":
+        kind, identifier = _dialogue_target(args)
+        output: Any = await service.propose(
+            ProposeRequest(
+                ayin_target_kind=kind,
+                ayin_identifier=identifier,
+                language=QueryLanguage(args.language),
+                chunking_run_id=args.chunking_run_id,
+                embedding_model_id=args.embedding_model_id,
+                model=args.model,
+                max_candidates=args.max_candidates,
+            )
+        )
+    elif args.command == "counterevidence":
+        kind, identifier = _dialogue_target(args)
+        output = await service.counterevidence(
+            CounterevidenceRequest(
+                ayin_target_kind=kind,
+                ayin_identifier=identifier,
+                language=QueryLanguage(args.language),
+                chunking_run_id=args.chunking_run_id,
+                embedding_model_id=args.embedding_model_id,
+                limit=args.limit,
+            )
+        )
+    elif args.command == "inspect":
+        output = await service.relation(args.relation_id)
+    elif args.command == "list":
+        output = await service.relations(
+            relation_type=RelationType(args.relation_type)
+            if args.relation_type
+            else None
+        )
+    elif args.command == "list-review":
+        output = await service.review_queue()
+    elif args.command == "validate":
+        output = await service.validate()
+        print(_json(output))
+        return 0 if output.valid else 1
+    elif args.command == "review":
+        output = await service.review(
+            args.relation_id,
+            ReviewRequest(
+                action=ReviewAction(args.action),
+                reviewer=args.reviewer,
+                notes=args.notes,
+                relation_type=RelationType(args.relation_type)
+                if args.relation_type
+                else None,
+                scope=RelationScope(args.scope) if args.scope else None,
+                explanation=args.explanation,
+            ),
+        )
+    else:
+        raise RuntimeError(f"unsupported dialogue command: {args.command}")
     print(_json(output))
     return 0
 

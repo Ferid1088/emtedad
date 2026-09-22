@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.api.routes.ayin import router as ayin_router
+from app.api.routes.dialogue import router as dialogue_router
 from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
 from app.api.routes.retrieval import router as retrieval_router
@@ -81,6 +82,7 @@ def create_app(
     app.include_router(ritual_router)
     app.include_router(knowledge_router)
     app.include_router(retrieval_router)
+    app.include_router(dialogue_router)
 
     @app.middleware("http")
     async def request_context(

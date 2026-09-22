@@ -11,12 +11,12 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: None; Phase 6 is pending repository-owner review
-- Last completed checkpoint: Phase 5 - Retrieval
-  (2026-09-19)
+- Active phase: None; Phase 7 is pending repository-owner review
+- Last completed checkpoint: Phase 6 - Ayin–External Dialogue
+  (2026-09-22)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
-- Open blocker: None remaining for Phase 5. Phase 6 requires explicit approval
+- Open blocker: None remaining for Phase 6. Phase 7 requires explicit approval
   of its prepared plan. Rights, deployment, backup, privacy, and editorial
   governance remain recorded later-phase/production review items.
 
@@ -31,7 +31,7 @@ Only one phase may be `in_progress` at a time.
 | 3 | Manasek | complete | Versioned ritual model and safety validation |
 | 4 | External Knowledge Ingestion | complete | Provenance-preserving adapters, YouTube first |
 | 5 | Retrieval | complete | Multilingual, lane-specific hybrid retrieval |
-| 6 | Ayin–External Dialogue | pending | Typed relations, classification, criticism and review |
+| 6 | Ayin–External Dialogue | complete | Typed relations, classification, criticism and review |
 | 7 | Research Engine | pending | Ayin Spine, ResearchPlan and frozen ResearchPackage |
 | 8 | Lecture Master | pending | Cited Semantic Master and validators |
 | 9 | Three Languages | pending | FA/EN/AR localization with fidelity QA |
@@ -232,6 +232,28 @@ Completion evidence: `docs/audits/PHASE_5_COMPLETION.md`.
 
 Target scope: relation taxonomy, epistemic evidence classification, proposed
 relation review, conflicts, counterevidence, and uncertainty.
+
+Verified result (2026-09-22):
+
+- Added typed, version-pinned Ayin/external dialogue targets and evidence,
+  immutable machine proposals, append-only human review decisions, review flags,
+  and deterministic proposal-run/pair-level cache provenance through Alembic
+  revision `26a7bca28432`.
+- Added the explicit relation/scope taxonomy with first-class negative,
+  non-equivalence, and unresolved relations. No generic `SUPPORTS_AYIN` edge
+  exists.
+- Added structured `EvidenceRoleClassifier`, Ayin testability classification,
+  deterministic `DialogueEpistemicValidator`, targeted Phase 5 retrieval,
+  counterevidence search, API/CLI review surfaces, and dependency staleness
+  reporting.
+- Ran a six-target live pilot over the current external corpus: 18 candidates,
+  14 conservative proposed relations, all still `PROPOSED`; zero external
+  claims were upgraded and no Ayin/Manasek record was modified.
+- Structural validators all passed. Clean/repeat/reversible migrations,
+  Alembic drift, Ruff, strict mypy, Docker build, and the full 116-test suite
+  passed. No Phase 7 or lecture workflow was added.
+
+Completion evidence: `docs/audits/PHASE_6_COMPLETION.md`.
 
 ## Phase 7 — Research Engine
 

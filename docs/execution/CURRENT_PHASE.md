@@ -1,31 +1,32 @@
-# Pending Phase: Phase 6 — Ayin–External Dialogue
+# Pending Phase: Phase 7 — Research Engine
 
 ## Execution status
 
-Phase 5 is complete as of 2026-09-19. Phase 6 is prepared for repository-owner
-review but is not active. Do not implement Phase 6 until the owner explicitly
-approves this plan.
+Phase 6 is complete as of 2026-09-22 and committed after verification. Phase 7
+is prepared for repository-owner review but is not active. Do not implement
+Phase 7 until the owner explicitly approves its plan.
 
-Completion evidence for Phase 5: `docs/audits/PHASE_5_COMPLETION.md`.
+Completion evidence:
 
-## Goal
+- Phase 5: `docs/audits/PHASE_5_COMPLETION.md`
+- Phase 6: `docs/audits/PHASE_6_COMPLETION.md`
 
-Model an explicitly reviewed dialogue between Ayin and external knowledge while
-preserving authority, epistemic status, counterevidence, and uncertainty.
+## Next-phase goal
 
-## Proposed scope
+Implement the versioned Research Engine that consumes reviewed dialogue data
+without changing Ayin or Manasek authority.
 
-- typed Ayin-to-external proposed relations and review workflow;
-- evidence-role classification, conflicts, alternatives, and counterevidence;
-- explicit uncertainty and provenance for every proposed interpretation;
-- validators preventing external sources from redefining Ayin;
-- versioned classifications, API/CLI boundaries, migrations, and evaluation.
+## Phase 7 proposed scope
 
-## Out of scope
+- Ayin Spine snapshots;
+- targeted ResearchPlan and lane-aware retrieval orchestration;
+- immutable, provenance-complete ResearchPackage snapshots;
+- explicit review and version dependency behavior.
 
-- ResearchPlan, ResearchPackage, and Ayin Spine (Phase 7);
+## Phase 7 out of scope
+
 - lecture generation, localization, publishing, music, or TTS;
-- automatic Canon promotion, automatic claim verification, or generated Canon.
+- automatic Canon promotion or generated Canon.
 
 ## Required invariants
 
@@ -36,9 +37,9 @@ preserving authority, epistemic status, counterevidence, and uncertainty.
 - Every relation preserves typed source provenance, uncertainty, and review
   state; no generic owner IDs are permitted.
 
-## Acceptance gate
+## Phase 6 acceptance result
 
-Phase 6 requires explicit owner approval, an accepted ADR, reversible and
-drift-free migrations, serious classification/review tests, domain validators,
-Ruff, strict mypy, and the full suite. Phase 7 must not begin as part of Phase
-6.
+Phase 6 delivered an accepted ADR, reversible and drift-free migration,
+classification/review tests, domain validators, Ruff, strict mypy, the full
+116-test suite, a live retrieval pilot, manual QA, and the completion audit.
+Phase 7 has not begun.

@@ -290,6 +290,7 @@ class AyinConceptVersion(Base):
     __tablename__ = "ayin_concept_versions"
     __table_args__ = (
         UniqueConstraint("concept_id", "canon_version_id", "version_number"),
+        UniqueConstraint("id", "canon_version_id"),
         ForeignKeyConstraint(
             ["source_passage_id", "canon_version_id"],
             [f"{CORE}.canon_passages.id", f"{CORE}.canon_passages.canon_version_id"],
@@ -335,6 +336,7 @@ class AyinPrincipleVersion(Base):
     __tablename__ = "ayin_principle_versions"
     __table_args__ = (
         UniqueConstraint("principle_id", "canon_version_id", "version_number"),
+        UniqueConstraint("id", "canon_version_id"),
         ForeignKeyConstraint(
             ["source_passage_id", "canon_version_id"],
             [f"{CORE}.canon_passages.id", f"{CORE}.canon_passages.canon_version_id"],
@@ -381,6 +383,7 @@ class AyinDistinctionVersion(Base):
     __tablename__ = "ayin_distinction_versions"
     __table_args__ = (
         UniqueConstraint("distinction_id", "canon_version_id", "version_number"),
+        UniqueConstraint("id", "canon_version_id"),
         ForeignKeyConstraint(
             ["source_passage_id", "canon_version_id"],
             [f"{CORE}.canon_passages.id", f"{CORE}.canon_passages.canon_version_id"],
@@ -478,6 +481,7 @@ class AyinOpenQuestionVersion(Base):
     __tablename__ = "ayin_open_question_versions"
     __table_args__ = (
         UniqueConstraint("open_question_id", "canon_version_id", "version_number"),
+        UniqueConstraint("id", "canon_version_id"),
         ForeignKeyConstraint(
             ["source_passage_id", "canon_version_id"],
             [f"{CORE}.canon_passages.id", f"{CORE}.canon_passages.canon_version_id"],

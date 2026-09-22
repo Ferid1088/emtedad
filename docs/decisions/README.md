@@ -22,3 +22,7 @@ deployment, domain boundaries, retrieval behavior, or reproducibility.
 
 Do not use ADRs to rewrite approved Ayin or Manasek content. Those changes
 belong to the editorial versioning workflow.
+
+## Accepted records
+
+- [ADR-009: Ayin–External Dialogue Taxonomy and Epistemic Boundaries](ADR-009-ayin-external-dialogue-taxonomy-and-epistemic-boundaries.md)

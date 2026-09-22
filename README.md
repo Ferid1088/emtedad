@@ -5,10 +5,11 @@ modeling Manasek, researching external knowledge, and eventually producing
 evidence-grounded Persian, English, and Arabic lectures.
 
 The repository contains the Phase 1 platform foundation, the Phase 2/2.1 Ayin
-knowledge core, the Phase 3 Manasek ritual domain, and the Phase 4 external
-knowledge ingestion domain. Ayin and Manasek remain Working sources; external
-material remains separate research evidence. Retrieval and generated lectures
-are not implemented.
+knowledge core, the Phase 3 Manasek ritual domain, the Phase 4 external
+knowledge ingestion domain, Phase 5 hybrid retrieval, and the Phase 6
+Ayin–external dialogue layer. Ayin and Manasek remain Working sources;
+external material remains separate research evidence. ResearchPackages,
+lectures, translations, and publishing are not implemented.
 
 ## Authority and current source status
 
@@ -176,6 +177,39 @@ Phase 4 read endpoints are:
   `/knowledge/works`
 - `GET /knowledge/review-queue`
 
+Phase 5 retrieval and Phase 6 dialogue endpoints are:
+
+- `POST /retrieval/search`
+- `GET /dialogue/relations` and `GET /dialogue/relations/{id}`
+- `GET /dialogue/ayin/{concept-id}/relations`
+- `GET /dialogue/review-queue`
+- `POST /dialogue/propose` and `POST /dialogue/counterevidence`
+- `POST /dialogue/relations/{id}/review`
+
+Dialogue relations are typed and scoped. The system does not have a generic
+`SUPPORTS_AYIN` relation: empirical relevance, empirical subclaim support,
+conceptual parallel, illustration, compatibility, tension, challenge,
+alternative explanation, counterexample, non-equivalence, and unresolved
+relations remain distinct. Every machine proposal is `PROPOSED` until explicit
+review. External material cannot redefine an Ayin object or upgrade an
+external claim to `SUPPORTED` merely because it resembles the claim.
+
+Targeted dialogue commands reuse Phase 5 retrieval and preserve exact Ayin and
+external provenance:
+
+```bash
+uv run python -m app.cli dialogue propose --ayin-concept pattern
+uv run python -m app.cli dialogue counterevidence --ayin-concept pattern
+uv run python -m app.cli dialogue list --relation-type not_equivalent_to
+uv run python -m app.cli dialogue inspect RELATION_UUID
+uv run python -m app.cli dialogue list-review
+uv run python -m app.cli dialogue validate
+```
+
+See [ADR-009](docs/decisions/ADR-009-ayin-external-dialogue-taxonomy-and-epistemic-boundaries.md)
+and the [Phase 6 completion audit](docs/audits/PHASE_6_COMPLETION.md) for the
+epistemic boundaries, review model, cache/version behavior, and pilot evidence.
+
 The generic YouTube adapter accepts a URL or video ID. Structured extraction
 uses an authenticated local Codex CLI session and caches successful windows:
 
@@ -252,7 +286,7 @@ The Dockerfile excludes source PDFs, tests, local storage, Git data, and secrets
 from its build context.
 
 ```bash
-docker build -t emtedad-platform:phase3 .
+docker build -t emtedad-platform:phase6 .
 ```
 
 Deployment topology and production object storage remain open review items; the
@@ -296,13 +330,14 @@ the developer database.
 
 ```text
 app/
-  api/routes/       Thin system, Ayin, and Manasek read routes
+  api/routes/       Thin system, Ayin, Manasek, and dialogue routes
   core/ayin/        Ayin domain, importer, services, and validator
   core/terminology/ Multilingual term registry models
   core/             Typed configuration and explicit exceptions
   db/               Metadata, async sessions, and readiness checks
   ops/              Structured logging and immutable asset metadata
   ritual/           Manasek import, structure, safety, services, and validator
+  dialogue/         Typed Ayin/external relations, classifier, review, validator
   storage/          Immutable-object storage port and local adapter
 alembic/             Baseline migration and environment
 tests/
@@ -325,12 +360,11 @@ docs/                Specifications, architecture, ADRs, audits, and plans
   runs and preserves parser-specific passage sets independently.
 - Phase 3 models Manasek structure and safety without Canon approval or a
   ritual execution engine.
-- Later phases add external ingestion, retrieval, dialogue, research, Semantic
-  Masters, multilingual localization, publishing, and evaluation in that
-  order.
-- YouTube ingestion, embeddings, RAG, lecture generation, generated
-  localization, Canon revision impact analysis, and publishing commands do not
-  exist yet. The README will document them only after their owning phases pass.
+- Later phases add the Research Engine, Semantic Masters, multilingual
+  localization, publishing, and evaluation in that order.
+- YouTube ingestion, embeddings, lecture generation, generated localization,
+  ResearchPackages, Canon revision impact analysis, and publishing commands
+  remain bounded by their owning future phases.
 
 See `docs/execution/MASTER_PLAN.md` for program status and
 `docs/execution/CURRENT_PHASE.md` for the active approved phase.

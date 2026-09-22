@@ -576,6 +576,7 @@ class ResolutionCandidate(Base):
 class ExternalClaim(Base):
     __tablename__ = "external_claims"
     __table_args__ = (
+        UniqueConstraint("id", "source_version_id", "source_segment_id"),
         CheckConstraint(
             "extraction_confidence >= 0 AND extraction_confidence <= 1",
             name="valid_confidence",

@@ -176,7 +176,7 @@ class EntityRetriever:
             if conditions:
                 chunk_ids = list(
                     await session.scalars(
-                        select(ChunkExternalEntity.chunk_id)
+                        select(ChunkExternalEntity.chunk_id, Chunk.ordinal)
                         .join(Chunk, Chunk.id == ChunkExternalEntity.chunk_id)
                         .where(
                             Chunk.chunking_run_id == chunking_run_id,

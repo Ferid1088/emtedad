@@ -1,10 +1,13 @@
 """Deterministic unit coverage for Phase 5 retrieval primitives."""
 
+from types import SimpleNamespace
+from typing import cast
 from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.retrieval import router
 from app.cli import _parser
@@ -12,7 +15,7 @@ from app.core.ayin.domain import CorpusZone
 from app.retrieval.domain import QueryLanguage, RetrievalLane, RetrievalSourceKind
 from app.retrieval.evaluation import ranking_metrics
 from app.retrieval.normalization import normalize_search_text, search_tokens
-from app.retrieval.retrievers import Candidate, FusionService
+from app.retrieval.retrievers import Candidate, EntityRetriever, FusionService
 from app.retrieval.schemas import RetrievalProvenance, SearchResponse, SearchResult
 from app.retrieval.service import HybridRetrievalService, _integer_parameter
 
@@ -54,6 +57,38 @@ def test_lane_interleaving_preserves_explicit_authority_order() -> None:
     }
     output = HybridRetrievalService._interleave(by_lane, lanes)
     assert [item.chunk_id for item in output] == [_id(1), _id(2), _id(3), _id(4)]
+
+
+@pytest.mark.asyncio
+async def test_external_entity_query_orders_distinct_rows_legally() -> None:
+    statements: list[object] = []
+
+    class FakeSession:
+        async def scalars(self, statement: object) -> list[object]:
+            statements.append(statement)
+            if len(statements) == 1:
+                return [
+                    SimpleNamespace(
+                        normalized_label="pattern",
+                        person_id=None,
+                        work_id=None,
+                        organization_id=None,
+                        concept_id=_id(8),
+                    )
+                ]
+            return [_id(9)]
+
+    results = await EntityRetriever().search(
+        cast(AsyncSession, FakeSession()),
+        "pattern",
+        chunking_run_id=_id(1),
+        lane=RetrievalLane.EXTERNAL,
+        limit=5,
+    )
+    sql = str(statements[1])
+    select_clause = sql.split("FROM", 1)[0]
+    assert "chunks.ordinal" in select_clause
+    assert [item.chunk_id for item in results] == [_id(9)]
 
 
 def test_ranking_metrics_support_graded_gold_judgments() -> None:

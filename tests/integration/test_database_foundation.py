@@ -138,6 +138,20 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
             "WHERE table_schema = ANY(%s)",
             (list(SCHEMA_NAMES),),
         ).fetchall()
+        review_status_default = connection.execute(
+            "SELECT column_default FROM information_schema.columns "
+            "WHERE table_schema = 'knowledge' "
+            "AND table_name = 'dialogue_relations' "
+            "AND column_name = 'review_status'"
+        ).fetchone()
+        classifier_key_unique = connection.execute(
+            "SELECT count(*) FROM information_schema.table_constraints "
+            "WHERE constraint_schema = 'knowledge' "
+            "AND table_name = 'dialogue_proposal_run_candidates' "
+            "AND constraint_type = 'UNIQUE' "
+            "AND constraint_name = "
+            "'uq_dialogue_proposal_run_candidates_classifier_cache_key'"
+        ).fetchone()
 
     assert version_row is not None
     version = int(version_row[0])
@@ -157,7 +171,13 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
     assert ("retrieval", "chunks") in domain_tables
     assert ("retrieval", "chunk_embeddings") in domain_tables
     assert ("retrieval", "evaluation_runs") in domain_tables
+    assert ("knowledge", "dialogue_relations") in domain_tables
+    assert ("knowledge", "dialogue_proposal_runs") in domain_tables
+    assert ("knowledge", "dialogue_review_decisions") in domain_tables
     assert not any(schema == "content" for schema, _ in domain_tables)
+    assert review_status_default is not None
+    assert "PROPOSED" in str(review_status_default[0])
+    assert classifier_key_unique == (0,)
 
     command.downgrade(config, "base")
     assert _schema_names(disposable_database_url) == set()
