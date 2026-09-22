@@ -4,8 +4,8 @@ Date: 2026-09-23
 
 This checkpoint exercised the Phase 7 services against the existing
 development corpus: one `AYIN_WORKING` version, one `MANASEK_WORKING` version,
-131 retrieval chunks (108 Ayin, 86 Manasek, 70 external counts are lane
-membership totals), one external source version, and 14 Phase 6 dialogue
+131 active retrieval chunks (53 Ayin, 43 Manasek, 35 external), one external
+source version, and 14 Phase 6 dialogue
 relations. No fixture rows were inserted and no Canon rows were created.
 
 ## Authority pre/post check
