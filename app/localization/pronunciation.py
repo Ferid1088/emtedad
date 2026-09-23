@@ -8,7 +8,7 @@ from app.lecture.domain import PublicationLanguage
 @dataclass(frozen=True)
 class PronunciationPreparation:
     display_text: str
-    tts_text: str
+    voice_text: str
     lexicon_version: int | None
 
 
@@ -24,13 +24,13 @@ class PersianPronunciationAnnotator:
         add_short_vowels: bool = True,
         provider_profile: str | None = None,
     ) -> PronunciationPreparation:
-        tts_text = display_text
+        voice_text = display_text
         for entry in lexicon:
             written = entry.get("written_form")
             pronunciation = entry.get("preferred_pronunciation")
             if isinstance(written, str) and isinstance(pronunciation, str) and written:
                 if add_short_vowels or entry.get("criticality") == "CRITICAL":
-                    tts_text = tts_text.replace(written, pronunciation)
+                    voice_text = voice_text.replace(written, pronunciation)
                 elif provider_profile and isinstance(
                     entry.get("provider_representation"), dict
                 ):
@@ -38,8 +38,8 @@ class PersianPronunciationAnnotator:
                     profile = profile_value if isinstance(profile_value, dict) else {}
                     value = profile.get(provider_profile)
                     if isinstance(value, str):
-                        tts_text = tts_text.replace(written, value)
-        return PronunciationPreparation(display_text, tts_text, lexicon_version)
+                        voice_text = voice_text.replace(written, value)
+        return PronunciationPreparation(display_text, voice_text, lexicon_version)
 
 
 class ArabicDiacritizer:
@@ -53,7 +53,7 @@ class ArabicDiacritizer:
         lexicon_version: int | None = None,
         fully_vocalized: bool = False,
     ) -> PronunciationPreparation:
-        tts_text = display_text
+        voice_text = display_text
         for entry in lexicon:
             written = entry.get("written_form")
             pronunciation = entry.get("preferred_pronunciation")
@@ -63,8 +63,8 @@ class ArabicDiacritizer:
                 and written
                 and (fully_vocalized or entry.get("criticality") == "CRITICAL")
             ):
-                tts_text = tts_text.replace(written, pronunciation)
-        return PronunciationPreparation(display_text, tts_text, lexicon_version)
+                voice_text = voice_text.replace(written, pronunciation)
+        return PronunciationPreparation(display_text, voice_text, lexicon_version)
 
 
 def prepare_pronunciation(

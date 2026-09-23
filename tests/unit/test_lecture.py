@@ -87,7 +87,7 @@ def test_semantic_localization_requires_claim_alignment() -> None:
 def test_critical_pronunciation_requires_approved_lexicon_entry() -> None:
     findings = PronunciationValidator().validate(
         PublicationLanguage.DE,
-        [{"tts_text": "Bon"}],
+        [{"voice_text": "Bon"}],
         [
             {
                 "written_form": "Bon",
@@ -110,6 +110,6 @@ def test_pronunciation_preparation_preserves_display_text() -> None:
         fully_vocalized=True,
     )
     assert fa.display_text == "بُن"
-    assert fa.tts_text == "بُنِ"
+    assert fa.voice_text == "بُنِ"
     assert ar.display_text == "امتداد"
-    assert ar.tts_text == "اِمْتِداد"
+    assert ar.voice_text == "اِمْتِداد"

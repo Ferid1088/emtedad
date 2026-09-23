@@ -57,16 +57,19 @@ class PronunciationValidator:
         findings: list[LocalizationFinding] = []
         if language in {PublicationLanguage.FA, PublicationLanguage.AR}:
             for statement in statements:
-                tts_text = statement.get("tts_text")
-                if not isinstance(tts_text, str) or not tts_text.strip():
+                voice_text = statement.get("voice_text")
+                if not isinstance(voice_text, str) or not voice_text.strip():
                     findings.append(
                         LocalizationFinding(
-                            "MISSING_TTS_TEXT", "Arabic/Persian speech text is required"
+                            "MISSING_VOICE_TEXT",
+                            "Arabic/Persian voice text is required",
                         )
                     )
-                elif not all(unicodedata.category(char) != "Cs" for char in tts_text):
+                elif not all(unicodedata.category(char) != "Cs" for char in voice_text):
                     findings.append(
-                        LocalizationFinding("INVALID_UNICODE", "surrogate in tts_text")
+                        LocalizationFinding(
+                            "INVALID_UNICODE", "surrogate in voice_text"
+                        )
                     )
         for term in critical_terms:
             if term.get("criticality") == PronunciationCriticality.CRITICAL.value and (

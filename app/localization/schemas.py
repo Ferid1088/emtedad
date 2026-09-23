@@ -1,4 +1,4 @@
-"""Boundary schemas for display/TTS localization records."""
+"""Boundary schemas for display and future voice-service text."""
 
 from uuid import UUID
 
@@ -16,7 +16,7 @@ class LocalizationStatementInput(BaseModel):
     master_claim_id: UUID
     sequence: int = Field(ge=0)
     display_text: str = Field(min_length=1)
-    tts_text: str | None = None
+    voice_text: str | None = None
     epistemic_status: str
     certainty: str
 

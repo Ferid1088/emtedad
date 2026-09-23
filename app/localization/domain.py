@@ -6,8 +6,8 @@ from enum import StrEnum
 class LocalizationStatus(StrEnum):
     DRAFT = "DRAFT"
     SEMANTICALLY_APPROVED = "SEMANTICALLY_APPROVED"
-    NOT_READY_FOR_TTS = "NOT_READY_FOR_TTS"
-    READY_FOR_TTS = "READY_FOR_TTS"
+    NOT_READY_FOR_VOICE = "NOT_READY_FOR_VOICE"
+    READY_FOR_VOICE = "READY_FOR_VOICE"
     APPROVED = "APPROVED"
     FAILED = "FAILED"
 
@@ -35,9 +35,3 @@ class PronunciationLexiconStatus(StrEnum):
     PROPOSED = "PROPOSED"
     APPROVED = "APPROVED"
     DEPRECATED = "DEPRECATED"
-
-
-class AudioQAStatus(StrEnum):
-    PASSED = "PASSED"
-    REVIEW = "REVIEW"
-    FAILED = "FAILED"

@@ -12,7 +12,6 @@ from app.core.ayin.models import CORE
 from app.db.base import Base, PostgresSchema
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import (
-    AudioQAStatus,
     LocalizationStatus,
     PronunciationCriticality,
     PronunciationLexiconStatus,
@@ -109,7 +108,8 @@ class LocalizationStatement(Base):
     )
     sequence: Mapped[int] = mapped_column(Integer)
     display_text: Mapped[str] = mapped_column(Text)
-    tts_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Keep the physical legacy column while exposing the voice_text domain name.
+    voice_text: Mapped[str | None] = mapped_column("tts_text", Text, nullable=True)
     claim_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
 
 
@@ -168,22 +168,3 @@ class LocalizationValidationFinding(Base):
     code: Mapped[str] = mapped_column(String(128))
     message: Mapped[str] = mapped_column(Text)
     blocking: Mapped[bool] = mapped_column()
-
-
-class AudioPronunciationQA(Base):
-    __tablename__ = "audio_pronunciation_qa"
-    __table_args__ = {"schema": CONTENT}
-
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    localization_version_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CONTENT}.localization_versions.id", ondelete="RESTRICT")
-    )
-    status: Mapped[AudioQAStatus] = mapped_column(
-        _local_enum(AudioQAStatus, "audio_qa_status")
-    )
-    provider: Mapped[str] = mapped_column(String(255))
-    audio_asset_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    findings: Mapped[list[dict[str, object]]] = mapped_column(JSONB, default=list)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )

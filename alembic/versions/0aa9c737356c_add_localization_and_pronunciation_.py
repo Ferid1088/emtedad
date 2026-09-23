@@ -117,7 +117,7 @@ def downgrade() -> None:
     op.drop_table('localization_validation_findings', schema='content')
     op.drop_table('localization_validation_runs', schema='content')
     op.drop_table('localization_statements', schema='content')
-    op.drop_table('audio_pronunciation_qa', schema='content')
+    op.execute("DROP TABLE IF EXISTS content.audio_pronunciation_qa")
     op.drop_table('localization_versions', schema='content')
     op.drop_table('localization_projects', schema='content')
     op.drop_table('pronunciation_lexicon_entries', schema='content')
