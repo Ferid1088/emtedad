@@ -16,10 +16,10 @@
     <button class="button" type="submit">{{ "Neues Projekt mit diesem Thema" if editorial_projects else "Thema verwenden" }}</button>
   </form>
   {% if editorial_projects %}
-  <h3>Bisherige Projekte</h3>
+  <h3>Bisherige Texte / Projekte</h3>
   <ul>
-    {% for project in editorial_projects %}
-    <li><a href="/workspace/{{ project.id }}">{{ project.title }}</a> · {{ project.status }} · {{ project.created_at.strftime("%d.%m.%Y") }}</li>
+  {% for project in editorial_projects %}
+    <li><a href="/texts/{{ project.id }}">{{ project.title }}</a> · {{ project.created_at.strftime("%d.%m.%Y") }} · <a href="/workspace/{{ project.id }}">Öffnen im Studio</a></li>
     {% endfor %}
   </ul>
   {% else %}<p class="muted">Noch kein Textprojekt für dieses Thema.</p>{% endif %}

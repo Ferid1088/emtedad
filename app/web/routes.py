@@ -1,5 +1,6 @@
 """German-first owner routes for sources, knowledge, and topic discovery."""
 
+import json
 import logging
 from pathlib import Path
 from typing import cast
@@ -25,6 +26,14 @@ from app.content_strategy.models import (
 from app.content_strategy.multilingual_service import MultilingualEditorialService
 from app.content_strategy.persian_service import PersianEditorialService
 from app.content_strategy.strategy_service import TopicStrategyService
+from app.content_strategy.text_library import (
+    TRACK_STATUS_LABELS,
+    archive_project,
+    duplicate_project,
+    library_filter_options,
+    load_library_items,
+    restore_project,
+)
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
@@ -586,8 +595,19 @@ async def strategy_topic_detail(request: Request, node_id: UUID) -> HTMLResponse
         node = await session.get(TopicStrategyNode, node_id)
         if node is None or node.node_type != "TOPIC":
             return HTMLResponse("Strategiethema nicht gefunden", status_code=404)
+        projects = list(
+            await session.scalars(
+                select(EditorialProject)
+                .where(EditorialProject.strategy_node_id == node.id)
+                .order_by(EditorialProject.created_at.desc())
+            )
+        )
     return await _render(
-        request, "strategy_topic_detail.html", title=node.title, node=node
+        request,
+        "strategy_topic_detail.html",
+        title=node.title,
+        node=node,
+        editorial_projects=projects,
     )
 
 
@@ -641,6 +661,150 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
         drafts=drafts,
         tracks=tracks,
         masters=masters,
+    )
+
+
+@router.get("/texts", response_class=HTMLResponse)
+async def text_library(
+    request: Request,
+    q: str | None = None,
+    status: str = "ACTIVE",
+    origin: str | None = None,
+    language: str | None = None,
+    branch: str | None = None,
+    sort: str = "updated",
+) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        items = await load_library_items(
+            session,
+            query=q,
+            status=status,
+            origin=origin,
+            language=language,
+            branch=branch,
+            sort=sort,
+        )
+        all_items = await load_library_items(session, status=None)
+    return await _render(
+        request,
+        "texts.html",
+        title="Texte",
+        items=items,
+        filters=library_filter_options(all_items),
+        q=q or "",
+        selected_status=status,
+        selected_origin=origin or "",
+        selected_language=language or "",
+        selected_branch=branch or "",
+        selected_sort=sort,
+    )
+
+
+@router.get("/texts/{project_id}", response_class=HTMLResponse)
+async def text_detail(request: Request, project_id: UUID) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        items = await load_library_items(session, status=None)
+        item = next(
+            (candidate for candidate in items if candidate.project.id == project_id),
+            None,
+        )
+        if item is None:
+            return HTMLResponse("Text nicht gefunden", status_code=404)
+        track_history = list(
+            await session.scalars(
+                select(EditorialLanguageTrack)
+                .where(EditorialLanguageTrack.editorial_project_id == project_id)
+                .order_by(
+                    EditorialLanguageTrack.language,
+                    EditorialLanguageTrack.version_number.desc(),
+                )
+            )
+        )
+    return await _render(
+        request,
+        "text_detail.html",
+        title=item.project.title,
+        item=item,
+        project=item.project,
+        drafts=item.drafts,
+        tracks=item.tracks,
+        track_history=track_history,
+        track_status_labels=TRACK_STATUS_LABELS,
+    )
+
+
+@router.post("/texts/{project_id}/duplicate")
+async def duplicate_text(request: Request, project_id: UUID) -> RedirectResponse:
+    async with _database(request).transaction() as session:
+        project = await duplicate_project(session, project_id)
+    return RedirectResponse(f"/workspace/{project.id}", status_code=303)
+
+
+@router.post("/texts/{project_id}/archive")
+async def archive_text(request: Request, project_id: UUID) -> RedirectResponse:
+    async with _database(request).transaction() as session:
+        await archive_project(session, project_id)
+    return RedirectResponse("/texts", status_code=303)
+
+
+@router.post("/texts/{project_id}/restore")
+async def restore_text(request: Request, project_id: UUID) -> RedirectResponse:
+    async with _database(request).transaction() as session:
+        await restore_project(session, project_id)
+    return RedirectResponse("/texts?status=ACTIVE", status_code=303)
+
+
+@router.get("/texts/{project_id}/export")
+async def export_text(request: Request, project_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        items = await load_library_items(session, status=None)
+        item = next(
+            (candidate for candidate in items if candidate.project.id == project_id),
+            None,
+        )
+        if item is None:
+            return HTMLResponse("Text nicht gefunden", status_code=404)
+        payload: dict[str, object] = {
+            "project_id": str(item.project.id),
+            "title": item.project.title,
+            "human_question": item.project.human_question,
+            "origin": item.origin_key,
+            "strategy_node_id": str(item.strategy_node.id)
+            if item.strategy_node
+            else None,
+            "content_topic_id": str(item.topic.id) if item.topic else None,
+            "target_duration_minutes": item.project.target_duration_minutes,
+            "status": item.status_key,
+            "languages": {
+                language: {
+                    "display_text": track.display_text,
+                    "voice_ready_text": track.voice_ready_text,
+                    "elevenlabs_performance_text": track.elevenlabs_performance_text,
+                    "status": track.status,
+                    "version": track.version_number,
+                    "word_count": track.actual_word_count,
+                    "estimated_duration_seconds": track.estimated_duration_seconds,
+                    "provenance": track.provenance,
+                }
+                for language, track in item.tracks.items()
+            },
+            "persian_versions": [
+                {
+                    "id": str(draft.id),
+                    "version": draft.version_number,
+                    "status": draft.status,
+                    "text": draft.text,
+                    "created_at": draft.created_at.isoformat(),
+                }
+                for draft in item.drafts
+            ],
+        }
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="text-{project_id}.json"'
+        },
     )
 
 

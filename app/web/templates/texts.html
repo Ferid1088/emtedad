@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="muted">Editorial Text Library</p><h1>Texte</h1></div><a class="button secondary" href="/studio">Studio öffnen</a></div>
+<section class="card">
+  <form method="get" action="/texts" class="filters">
+    <label>Suche<input type="search" name="q" value="{{ q }}" placeholder="Titel, Frage oder Anweisung"></label>
+    <label>Status<select name="status"><option value="ACTIVE" {% if selected_status == "ACTIVE" %}selected{% endif %}>Aktive Texte</option><option value="PERSIAN_APPROVED" {% if selected_status == "PERSIAN_APPROVED" %}selected{% endif %}>Persisch freigegeben</option><option value="TRANSLATIONS" {% if selected_status == "TRANSLATIONS" %}selected{% endif %}>Übersetzungen offen</option><option value="VOICE_READY" {% if selected_status == "VOICE_READY" %}selected{% endif %}>Voice Ready</option><option value="ARCHIVED" {% if selected_status == "ARCHIVED" %}selected{% endif %}>Archiviert</option></select></label>
+    <label>Herkunft<select name="origin"><option value="">Alle</option><option value="STRATEGY" {% if selected_origin == "STRATEGY" %}selected{% endif %}>Themenbaum</option><option value="AI_SUGGESTED" {% if selected_origin == "AI_SUGGESTED" %}selected{% endif %}>KI-Vorschlag</option><option value="USER_CREATED" {% if selected_origin == "USER_CREATED" %}selected{% endif %}>Eigenes Thema</option></select></label>
+    <label>Sprache<select name="language"><option value="">Alle</option>{% for lang in ["fa", "de", "en", "ar"] %}<option value="{{ lang }}" {% if selected_language == lang %}selected{% endif %}>{{ lang|upper }}</option>{% endfor %}</select></label>
+    <label>Sortierung<select name="sort"><option value="updated" {% if selected_sort == "updated" %}selected{% endif %}>Zuletzt bearbeitet</option><option value="newest" {% if selected_sort == "newest" %}selected{% endif %}>Neueste</option><option value="oldest" {% if selected_sort == "oldest" %}selected{% endif %}>Älteste</option><option value="title" {% if selected_sort == "title" %}selected{% endif %}>Titel</option></select></label>
+    <button class="button" type="submit">Filtern</button>
+  </form>
+</section>
+<section class="topic-grid" aria-label="Gespeicherte Texte">
+{% for item in items %}
+  <article class="card topic-card">
+    <div class="topic-card-head"><span class="badge">{{ item.origin_label }}</span><span class="badge">{{ item.status_label }}</span></div>
+    <h2><a href="/texts/{{ item.project.id }}">{{ item.project.title }}</a></h2>
+    <p>{{ item.project.human_question }}</p>
+    {% if item.topic %}<p class="muted">Thema: {{ item.topic.title }}</p>{% endif %}
+    {% if item.branch_title %}<p class="muted">Ast: {{ item.branch_title }}</p>{% endif %}
+    <p class="muted">{% if item.project.target_duration_minutes %}{{ item.project.target_duration_minutes }} Min. · {% endif %}aktualisiert {{ item.updated_at.strftime("%d.%m.%Y") }}</p>
+    <div class="button-row" aria-label="Sprachstatus"><span class="badge">FA {% if item.approved_persian %}✓{% else %}—{% endif %}</span>{% for lang in ["de", "en", "ar"] %}<span class="badge">{{ lang|upper }} {% if item.tracks.get(lang) %}✓{% else %}—{% endif %}</span>{% endfor %}<span class="badge">Voice {% if item.voice_ready_languages %}{{ item.voice_ready_languages|length }}/4{% else %}—{% endif %}</span></div>
+    <div class="button-row"><a class="button" href="/texts/{{ item.project.id }}">Öffnen</a><form method="post" action="/texts/{{ item.project.id }}/duplicate"><button class="button secondary" type="submit">Duplizieren</button></form><a class="button secondary" href="/texts/{{ item.project.id }}/export">Exportieren</a>{% if item.status_key == "ARCHIVED" %}<form method="post" action="/texts/{{ item.project.id }}/restore"><button class="linkbutton" type="submit">Wiederherstellen</button></form>{% else %}<form method="post" action="/texts/{{ item.project.id }}/archive"><button class="linkbutton" type="submit">Archivieren</button></form>{% endif %}</div>
+  </article>
+{% else %}<section class="card"><p class="muted">Keine Texte für diese Auswahl gefunden.</p></section>{% endfor %}
+</section>
+{% endblock %}
