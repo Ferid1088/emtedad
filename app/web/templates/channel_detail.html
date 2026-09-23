@@ -1,1 +1,71 @@
-{% extends "base.html" %}{% block content %}<div class="pagehead"><div><p class="muted">YouTube-Kanal</p><h1>{{ channel.name }}</h1><p><a href="{{ channel.channel_url }}">{{ channel.channel_url }}</a></p><small>{% if channel.last_successful_check_at %}Zuletzt erfolgreich geprüft: {{ channel.last_successful_check_at }}{% else %}Noch nicht geprüft.{% endif %}</small></div><form method="post" action="/channels/{{ channel.id }}/check"><button class="button" type="submit">Neue Videos prüfen</button></form></div>{% if results %}<section class="card"><h2>Import-Ergebnis</h2>{% for result in results %}<p>{{ '✓' if result.success else '✗' }} {{ result.message }}</p>{% endfor %}</section>{% endif %}<form method="post" action="/channels/{{ channel.id }}/import"><section class="card"><h2>Neue Videos</h2>{% for candidate in grouped.get('NEW', []) %}<label class="candidate"><input type="checkbox" name="candidate_ids" value="{{ candidate.id }}"> <span>{{ candidate.title }}{% if candidate.published_at %}<small>{{ candidate.published_at }}</small>{% endif %}</span><a href="https://www.youtube.com/watch?v={{ candidate.youtube_video_id }}" target="_blank" rel="noopener">YouTube</a><button class="linkbutton" type="submit" name="ignore_candidate" value="{{ candidate.id }}">Ignorieren</button></label>{% else %}<p class="muted">Keine neuen Videos gefunden.</p>{% endfor %}{% if grouped.get('NEW') %}<button class="button" type="submit">Ausgewählte hinzufügen</button>{% endif %}</section></form><div class="columns"><section class="card"><h2>Importiert</h2>{% for item in grouped.get('IMPORTED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Noch keine importierten Kandidaten.</p>{% endfor %}</section><section class="card"><h2>Ignoriert</h2>{% for item in grouped.get('IGNORED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Keine ignorierten Videos.</p>{% endfor %}</section></div><section class="card"><h2>Fehlgeschlagen</h2>{% for item in grouped.get('FAILED', []) %}<p class="warning">{{ item.title }} — kann erneut ausgewählt werden.</p>{% else %}<p class="muted">Keine fehlgeschlagenen Importe.</p>{% endfor %}</section>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="muted">YouTube-Kanal</p>
+    <h1>{{ channel.name }}</h1>
+    <p><a href="{{ channel.channel_url }}">{{ channel.channel_url }}</a></p>
+    <small>{% if channel.last_successful_check_at %}Zuletzt erfolgreich geprüft: {{ channel.last_successful_check_at }}{% else %}Noch nicht geprüft.{% endif %}</small>
+  </div>
+  <form method="post" action="/channels/{{ channel.id }}/check">
+    <button class="button" type="submit">Neue Videos prüfen</button>
+  </form>
+</div>
+
+{% if results %}
+<section class="card"><h2>Import-Ergebnis</h2>{% for result in results %}<p>{{ '✓' if result.success else '✗' }} {{ result.message }}</p>{% endfor %}</section>
+{% endif %}
+
+<form method="post" action="/channels/{{ channel.id }}/import" id="candidate-import-form">
+  <section class="card">
+    <div class="pagehead">
+      <div>
+        <h2>Neue Videos</h2>
+        <label class="select-all"><input id="select-all-candidates" type="checkbox"{% if not grouped.get('NEW') %} disabled{% endif %}> Alle auswählen</label>
+        <small id="selected-candidate-count" aria-live="polite">0 von {{ grouped.get('NEW', [])|length }} ausgewählt</small>
+      </div>
+    </div>
+    {% for candidate in grouped.get('NEW', []) %}
+    <label class="candidate">
+      <input class="candidate-checkbox" type="checkbox" name="candidate_ids" value="{{ candidate.id }}">
+      <span>{{ candidate.title }}{% if candidate.published_at %}<small>{{ candidate.published_at }}</small>{% endif %}</span>
+      <a href="https://www.youtube.com/watch?v={{ candidate.youtube_video_id }}" target="_blank" rel="noopener">YouTube</a>
+      <button class="linkbutton" type="submit" name="ignore_candidate" value="{{ candidate.id }}">Ignorieren</button>
+    </label>
+    {% else %}<p class="muted">Keine neuen Videos gefunden.</p>{% endfor %}
+    <button id="import-selected-candidates" class="button" type="submit" disabled>Ausgewählte hinzufügen</button>
+  </section>
+</form>
+
+<div class="columns">
+  <section class="card"><h2>Importiert</h2>{% for item in grouped.get('IMPORTED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Noch keine importierten Kandidaten.</p>{% endfor %}</section>
+  <section class="card"><h2>Ignoriert</h2>{% for item in grouped.get('IGNORED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Keine ignorierten Videos.</p>{% endfor %}</section>
+</div>
+<section class="card"><h2>Fehlgeschlagen</h2>{% for item in grouped.get('FAILED', []) %}<p class="warning">{{ item.title }} — kann erneut ausgewählt werden.</p>{% else %}<p class="muted">Keine fehlgeschlagenen Importe.</p>{% endfor %}</section>
+
+<script>
+(() => {
+  const master = document.getElementById("select-all-candidates");
+  const boxes = Array.from(document.querySelectorAll(".candidate-checkbox"));
+  const counter = document.getElementById("selected-candidate-count");
+  const importButton = document.getElementById("import-selected-candidates");
+  const total = boxes.length;
+  const update = () => {
+    const selected = boxes.filter((box) => box.checked).length;
+    counter.textContent = `${selected} von ${total} ausgewählt`;
+    importButton.disabled = selected === 0;
+    importButton.textContent = selected > 0
+      ? `${selected} ausgewählte hinzufügen`
+      : "Ausgewählte hinzufügen";
+    master.checked = total > 0 && selected === total;
+    master.indeterminate = selected > 0 && selected < total;
+  };
+  master.addEventListener("change", () => {
+    boxes.forEach((box) => { box.checked = master.checked; });
+    update();
+  });
+  boxes.forEach((box) => box.addEventListener("change", update));
+  update();
+})();
+</script>
+{% endblock %}
