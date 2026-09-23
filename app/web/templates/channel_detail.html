@@ -11,6 +11,9 @@
     <button class="button" type="submit">Neue Videos prüfen</button>
   </form>
 </div>
+<form method="post" action="/channels/{{ channel.id }}/delete" onsubmit="return confirm('Kanal wirklich löschen? Bereits importierte Quellen und Wissensdaten bleiben erhalten.');">
+  <button class="button destructive" style="background:#a52c2c" type="submit">Kanal löschen</button>
+</form>
 
 {% if results %}
 <section class="card"><h2>Import-Ergebnis</h2>{% for result in results %}<p>{{ '✓' if result.success else '✗' }} {{ result.message }}</p>{% endfor %}</section>

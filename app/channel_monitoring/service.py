@@ -202,6 +202,17 @@ class ChannelDiscoveryService:
             candidate.status = CandidateStatus.IGNORED
             return True
 
+    async def delete_channel(self, channel_id: UUID) -> bool:
+        """Remove monitoring metadata while leaving knowledge sources untouched."""
+
+        async with self.database.transaction() as session:
+            channel = await session.get(MonitoredChannel, channel_id)
+            if channel is None:
+                return False
+            await session.delete(channel)
+            await session.flush()
+            return True
+
     async def active_channels(self) -> list[MonitoredChannel]:
         async with self.database.transaction() as session:
             return list(

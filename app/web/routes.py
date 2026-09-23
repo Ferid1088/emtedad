@@ -481,6 +481,16 @@ async def ignore_channel_candidate(
     return RedirectResponse(f"/channels/{channel_id}", status_code=303)
 
 
+@router.post("/channels/{channel_id}/delete")
+async def delete_channel(request: Request, channel_id: UUID) -> Response:
+    deleted = await ChannelDiscoveryService(_database(request)).delete_channel(
+        channel_id
+    )
+    if not deleted:
+        return HTMLResponse("Kanal nicht gefunden", status_code=404)
+    return RedirectResponse("/channels", status_code=303)
+
+
 @router.post("/channels/check-all", response_class=HTMLResponse)
 async def check_all_channels(request: Request) -> HTMLResponse:
     service = ChannelDiscoveryService(_database(request))
