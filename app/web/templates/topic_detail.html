@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="muted">Thema</p>
+    <h1>{{ topic.title }}</h1>
+  </div>
+  <a class="button secondary" href="/topics">Zurück zu den Themen</a>
+</div>
+
+<section class="card">
+  <h2>Leitfrage und Beschreibung</h2>
+  <p>{{ topic.human_question or "Keine Leitfrage hinterlegt." }}</p>
+  {% if topic.description %}<p>{{ topic.description }}</p>{% endif %}
+</section>
+
+<div class="columns">
+  <section class="card">
+    <h2>Status</h2>
+    <dl>
+      <dt>Herkunft</dt>
+      <dd>{{ topic.origin or "Nicht angegeben" }}</dd>
+      <dt>Planungsstatus</dt>
+      <dd>{{ topic.status or "Nicht angegeben" }}</dd>
+      <dt>Vortragswinkel</dt>
+      <dd>{{ topic.lecture_angle or "Nicht angegeben" }}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Ayin-Bezug</h2>
+    <p><strong>Primäres Konzept:</strong> {{ topic.primary_concept_key or "Nicht angegeben" }}</p>
+    {% if topic.concepts %}<p>{{ topic.concepts|join(" · ") }}</p>{% else %}<p class="muted">Keine weiteren Konzepte hinterlegt.</p>{% endif %}
+    {% if topic.distinctions %}<p><strong>Unterscheidungen:</strong> {{ topic.distinctions|join(" · ") }}</p>{% else %}<p class="muted">Keine Unterscheidungen hinterlegt.</p>{% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Material und Überschneidung</h2>
+  {% if topic.sources %}<h3>Quellen</h3><ul>{% for source in topic.sources %}<li>{{ source.title }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine relevanten Quellen hinterlegt.</p>{% endif %}
+  {% if topic.works %}<h3>Werke</h3><ul>{% for work in topic.works %}<li>{{ work.canonical_title if work.canonical_title is defined else work }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine Werke hinterlegt.</p>{% endif %}
+  {% if topic.people %}<h3>Personen</h3><ul>{% for person in topic.people %}<li>{{ person.canonical_name if person.canonical_name is defined else person }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine Personen hinterlegt.</p>{% endif %}
+  {% if topic.overlap_score is defined %}<p><strong>Überschneidung:</strong> {{ (topic.overlap_score * 100)|round|int }}%</p>{% else %}<p class="muted">Noch keine Überschneidungsanalyse hinterlegt.</p>{% endif %}
+</section>
+
+{% if topic.warnings %}<section class="card"><h2>Hinweise</h2>{% for warning in topic.warnings %}<p class="warning">{{ warning }}</p>{% endfor %}</section>{% endif %}
+<p class="muted">Recherche starten ist in dieser Phase bewusst deaktiviert.</p>
+{% endblock %}
