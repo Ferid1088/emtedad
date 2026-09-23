@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="muted">Festes Strategiethema</p><h1>{{ node.title }}</h1></div><a class="button secondary" href="/strategy">Zurück zum Themenbaum</a></div>
+<section class="card"><h2>Leitfrage</h2><p>{{ node.human_question }}</p><p>{{ node.rationale }}</p><p>{{ "Bereits verwendet: " ~ node.generation_count ~ "×" if node.generation_count else "Noch nicht verwendet" }}</p></section>
+<section class="card"><h2>Ayin-Grundlage</h2><p>Dieses Thema ist an die versionierte Ayin-Struktur gebunden.</p><pre>{{ node.grounding|tojson(indent=2) }}</pre></section>
+<section class="card"><h2>Thema verwenden</h2><form method="post" action="/strategy/topics/{{ node.id }}/use"><label>Eigene Anweisung<textarea name="owner_prompt" placeholder="Optional: Stil, Schwerpunkt oder Struktur"></textarea></label><label>Zieldauer (Minuten)<input name="target_duration_minutes" type="number" min="5" max="180" step="5"></label><button class="button" type="submit">{{ "Noch einmal verwenden" if node.generation_count else "Thema verwenden" }}</button></form></section>
+{% endblock %}

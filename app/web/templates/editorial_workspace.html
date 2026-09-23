@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="muted">Studio · Research Workspace</p><h1>{{ project.title }}</h1></div><a class="button secondary" href="/strategy">Zum Themenbaum</a></div>
+<section class="card"><h2>Leitfrage</h2><p>{{ project.human_question }}</p><p>Status: {{ project.status }}</p>{% if project.target_duration_minutes %}<p>Zieldauer: {{ project.target_duration_minutes }} Minuten</p>{% endif %}{% if project.owner_prompt %}<h3>Eigene Anweisung</h3><p>{{ project.owner_prompt }}</p>{% endif %}</section>
+<section class="card"><h2>Recherche</h2><p>Dieser Arbeitsbereich ist angelegt. Recherche wird als nächster expliziter Schritt gestartet.</p><ul><li>Ayin / Emtedad: bereit</li><li>Manasek: optional, nicht automatisch aktiviert</li><li>Lokale Wissensbasis: bereit</li><li>Internet: nur mit expliziter, provenance-vollständiger Recherche</li><li>LLM-Hintergrund: niemals Beleg für Fakten</li></ul><button class="button" disabled>Recherche starten (nächster Schritt)</button></section>
+{% endblock %}

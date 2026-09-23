@@ -14,7 +14,12 @@ from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_strategy.domain import TopicOrigin
-from app.content_strategy.models import ContentTopic
+from app.content_strategy.models import (
+    ContentTopic,
+    EditorialProject,
+    TopicStrategyNode,
+)
+from app.content_strategy.strategy_service import TopicStrategyService
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
@@ -376,6 +381,86 @@ async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
                 f"/topics/{topic_id}?analysis=error", status_code=303
             )
     return RedirectResponse(f"/topics/{topic_id}?analysis=updated", status_code=303)
+
+
+@router.get("/strategy", response_class=HTMLResponse)
+async def strategy_tree(request: Request) -> HTMLResponse:
+    service = TopicStrategyService(_database(request))
+    strategy, nodes = await service.current()
+    if strategy is None:
+        await service.generate()
+        strategy, nodes = await service.current()
+    assert strategy is not None
+    children: dict[UUID | None, list[TopicStrategyNode]] = {}
+    for node in nodes:
+        children.setdefault(node.parent_id, []).append(node)
+    metrics = await service.metrics(strategy.id)
+    return await _render(
+        request,
+        "strategy_tree.html",
+        title="Themenbaum",
+        strategy=strategy,
+        root=next((node for node in nodes if node.node_type == "ROOT"), None),
+        children=children,
+        metrics=metrics,
+    )
+
+
+@router.post("/strategy/generate")
+async def generate_strategy(request: Request) -> RedirectResponse:
+    await TopicStrategyService(_database(request)).generate()
+    return RedirectResponse("/strategy", status_code=303)
+
+
+@router.post("/strategy/{strategy_id}/approve")
+async def approve_strategy(request: Request, strategy_id: UUID) -> RedirectResponse:
+    await TopicStrategyService(_database(request)).approve(strategy_id)
+    return RedirectResponse("/strategy", status_code=303)
+
+
+@router.get("/strategy/topics/{node_id}", response_class=HTMLResponse)
+async def strategy_topic_detail(request: Request, node_id: UUID) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        node = await session.get(TopicStrategyNode, node_id)
+        if node is None or node.node_type != "TOPIC":
+            return HTMLResponse("Strategiethema nicht gefunden", status_code=404)
+    return await _render(
+        request, "strategy_topic_detail.html", title=node.title, node=node
+    )
+
+
+@router.post("/strategy/topics/{node_id}/use")
+async def use_strategy_topic(request: Request, node_id: UUID) -> RedirectResponse:
+    form = await request.form()
+    prompt = str(form.get("owner_prompt", "")).strip() or None
+    raw_duration = str(form.get("target_duration_minutes", "")).strip()
+    duration = int(raw_duration) if raw_duration.isdigit() else None
+    project_id = await TopicStrategyService(_database(request)).use_topic(
+        node_id, owner_prompt=prompt, target_duration_minutes=duration
+    )
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
+@router.get("/workspace/{project_id}", response_class=HTMLResponse)
+async def editorial_workspace(request: Request, project_id: UUID) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        project = await session.get(EditorialProject, project_id)
+        if project is None:
+            return HTMLResponse("Arbeitsbereich nicht gefunden", status_code=404)
+    return await _render(
+        request, "editorial_workspace.html", title=project.title, project=project
+    )
+
+
+@router.get("/studio", response_class=HTMLResponse)
+async def studio(request: Request) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        projects = list(
+            await session.scalars(
+                select(EditorialProject).order_by(EditorialProject.created_at.desc())
+            )
+        )
+    return await _render(request, "studio.html", title="Studio", projects=projects)
 
 
 @router.get("/channels", response_class=HTMLResponse)

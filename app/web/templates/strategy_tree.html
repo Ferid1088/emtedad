@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% macro render_node(node) -%}
+<li class="strategy-node {% if node.generation_count > 0 %}used{% endif %}">
+  <details {% if node.node_type != "TOPIC" %}open{% endif %}>
+    <summary aria-label="{{ node.title }}">
+      <span>{{ node.title }}</span>
+      {% if node.node_type == "TOPIC" %}<small>{{ "bereits verwendet · " ~ node.generation_count ~ "×" if node.generation_count else "unbenutzt" }}</small>{% endif %}
+    </summary>
+    {% if node.node_type == "TOPIC" %}<p>{{ node.human_question }}</p><a class="button secondary" href="/strategy/topics/{{ node.id }}">Details</a>{% endif %}
+    {% if children.get(node.id) %}<ul>{% for child in children.get(node.id, []) %}{{ render_node(child) }}{% endfor %}</ul>{% endif %}
+  </details>
+</li>
+{%- endmacro %}
+{% block content %}
+<div class="pagehead"><div><p class="muted">Strategie</p><h1>Emtedad Themenbaum</h1></div><form method="post" action="/strategy/{{ strategy.id }}/approve"><button class="button" {% if strategy.status == "APPROVED" %}disabled{% endif %}>{{ "Freigegeben" if strategy.status == "APPROVED" else "Strategie freigeben" }}</button></form></div>
+<section class="card"><p>Version {{ strategy.version_number }} · {{ strategy.status }}</p><label>Baum durchsuchen<input id="strategy-search" type="search" placeholder="Konzept oder Frage"></label><p>{{ metrics.total }} feste Themen · {{ metrics.used }} verwendet · {{ metrics.unused }} unbenutzt · {{ ((metrics.used / metrics.total * 100) if metrics.total else 0)|round|int }}% Abdeckung</p></section>
+<section class="card strategy-tree"><ul>{% if root %}{{ render_node(root) }}{% else %}<li class="muted">Noch kein Strategiebaum vorhanden.</li>{% endif %}</ul></section>
+<script>document.getElementById('strategy-search').addEventListener('input', function(e) { const q=e.target.value.toLowerCase(); document.querySelectorAll('.strategy-node').forEach(function(n) { n.hidden = !!q && !n.textContent.toLowerCase().includes(q); }); });</script>
+{% endblock %}

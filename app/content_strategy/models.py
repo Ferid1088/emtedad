@@ -3,7 +3,15 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -82,6 +90,100 @@ class ContentTopic(Base):
     semantic_hash: Mapped[str] = mapped_column(String(64))
     analysis_json: Mapped[dict[str, object] | None] = mapped_column(
         JSONB, nullable=True
+    )
+
+
+class TopicStrategy(Base):
+    """Versioned fixed Emtedad topic tree, separate from dynamic topics."""
+
+    __tablename__ = "topic_strategies"
+    __table_args__ = (UniqueConstraint("version_number"), {"schema": CONTENT})
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    version_number: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(32), default="DRAFT")
+    source_hash: Mapped[str] = mapped_column(String(64))
+    grounding: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class TopicStrategyNode(Base):
+    """Root, branch, or fixed leaf in one strategy version."""
+
+    __tablename__ = "topic_strategy_nodes"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "stable_key"),
+        {"schema": CONTENT},
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    strategy_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.topic_strategies.id", ondelete="CASCADE"), index=True
+    )
+    parent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.topic_strategy_nodes.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    node_type: Mapped[str] = mapped_column(String(16))
+    stable_key: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(512))
+    human_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rationale: Mapped[str] = mapped_column(Text)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    grounding: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    generation_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class EditorialProject(Base):
+    """Production workspace shell; research remains an explicit next action."""
+
+    __tablename__ = "editorial_projects"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    strategy_node_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.topic_strategy_nodes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    content_topic_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_topics.id", ondelete="RESTRICT"), nullable=True
+    )
+    research_project_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.research_projects.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(512))
+    human_question: Mapped[str] = mapped_column(Text)
+    owner_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_duration_minutes: Mapped[int | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="RESEARCH_PENDING")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class TopicUseHistory(Base):
+    """Immutable use record; a fixed topic remains selectable after use."""
+
+    __tablename__ = "topic_use_history"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    strategy_node_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.topic_strategy_nodes.id", ondelete="RESTRICT")
+    )
+    editorial_project_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.editorial_projects.id", ondelete="RESTRICT")
+    )
+    owner_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_duration_minutes: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
     )
 
 

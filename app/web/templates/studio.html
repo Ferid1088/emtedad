@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="muted">Produktion</p><h1>Studio</h1></div><a class="button secondary" href="/strategy">Themenbaum</a></div>
+<section class="card"><h2>Arbeitsbereiche</h2>{% for project in projects %}<p><a href="/workspace/{{ project.id }}">{{ project.title }}</a> · {{ project.status }}</p>{% else %}<p class="muted">Noch keine Arbeitsbereiche.</p>{% endfor %}</section>
+{% endblock %}
