@@ -18,6 +18,14 @@ class TopicOrigin(StrEnum):
     LEGACY = "LEGACY"
 
 
+class TopicWorkspaceStatus(StrEnum):
+    NEW = "NEW"
+    LATER = "LATER"
+    IN_PROGRESS = "IN_PROGRESS"
+    ARCHIVED = "ARCHIVED"
+    COMPLETED = "COMPLETED"
+
+
 class LifeDomain(StrEnum):
     SELF = "self"
     FAMILY = "family"

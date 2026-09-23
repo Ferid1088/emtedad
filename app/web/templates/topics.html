@@ -1,1 +1,37 @@
-{% extends "base.html" %}{% block content %}<h1>Themen</h1><div class="columns"><section class="card"><h2>KI-Vorschläge</h2><p class="muted">Vorschläge werden aus Ayin-Struktur, gesammeltem Wissen und dem bestehenden Themengraphen begründet.</p><form method="post" action="/topics/suggestions"><button class="button" type="submit">Themen entdecken</button></form>{% for suggestion in suggestions or [] %}<article class="suggestion"><h3>{{ suggestion.title }}</h3><p><strong>{{ suggestion.human_question }}</strong></p><p>{{ suggestion.rationale }}</p><small>Ayin: {{ suggestion.concepts|join(' · ') }} · {{ suggestion.source_count }} Quellen · Überschneidung {{ (suggestion.overlap_score * 100)|round|int }}%</small><form method="post" action="/topics/save"><input type="hidden" name="title" value="{{ suggestion.title }}"><input type="hidden" name="question" value="{{ suggestion.human_question }}"><input type="hidden" name="origin" value="AI_SUGGESTED"><button class="linkbutton" type="submit">Auswählen</button></form></article>{% endfor %}</section><section class="card"><h2>Eigenes Thema</h2><form method="post" action="/topics/analyze"><label>Titel<input name="title" required></label><label>Frage oder Beschreibung<textarea name="question" required></textarea></label><button class="button" type="submit">Thema analysieren</button></form>{% if analysis %}<div class="analysis"><h3>{{ analysis.title }}</h3><p>{{ analysis.question }}</p><p>{{ analysis.source_count }} Quellen · {{ analysis.claim_count }} Claims</p>{% for warning in analysis.warnings %}<p class="warning">{{ warning }}</p>{% endfor %}<form method="post" action="/topics/save"><input type="hidden" name="title" value="{{ analysis.title }}"><input type="hidden" name="question" value="{{ analysis.question }}"><button class="button" type="submit">Thema speichern</button></form></div>{% endif %}</section></div><h2>Gespeicherte Themen</h2>{% for topic in topics %}<p><a href="/topics/{{ topic.id }}">{{ topic.title }}</a> · {{ topic.origin }} · {{ topic.status }}</p>{% else %}<p class="muted">Noch keine Themen.</p>{% endfor %}{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div><p class="muted">Dynamische Themen entdecken</p><h1>Themen</h1></div>
+  <a class="button secondary" href="/strategy">Themenbaum öffnen</a>
+</div>
+<section class="card">
+  <h2>Neue Themen entdecken</h2>
+  <p class="muted">Neue Vorschläge bleiben getrennt vom festen Emtedad-Themenbaum und ersetzen keine früheren Vorschläge.</p>
+  <form method="post" action="/topics/suggestions">
+    <label>Anzahl<input name="requested_count" type="number" min="1" max="50" value="5"></label>
+    <div class="button-row" aria-label="Schnellauswahl">{% for count in [3, 5, 10, 20] %}<button class="button secondary" type="submit" name="requested_count" value="{{ count }}">{{ count }}</button>{% endfor %}</div>
+    <label>Was interessiert dich momentan?<textarea name="owner_instruction" rows="2" placeholder="Zum Beispiel: Mehr Themen über Beziehungen und das Dazwischen"></textarea></label>
+    <button class="button" type="submit">Neue Themen generieren</button>
+  </form>
+</section>
+<nav class="tabs" aria-label="Themenstatus">{% for key, label in [("NEW", "Neu"), ("LATER", "Für später"), ("IN_PROGRESS", "In Arbeit"), ("ARCHIVED", "Archiv")] %}<a class="tab {% if selected_status == key %}active{% endif %}" href="/topics?status={{ key }}">{{ label }} <span>{{ counts.get(key, 0) }}</span></a>{% endfor %}</nav>
+<section class="topic-grid">
+{% for topic in topics %}
+  {% set analysis = topic.analysis_json or {} %}
+  <article class="card topic-card">
+    <div class="topic-card-head"><span class="badge">{% if topic.origin.value == "AI_SUGGESTED" %}KI-Vorschlag{% elif topic.origin.value == "USER_CREATED" %}Eigenes Thema{% else %}Historisches Thema{% endif %}</span><span class="badge">{% if selected_status == "LATER" %}Für später{% elif selected_status == "IN_PROGRESS" %}In Arbeit{% elif selected_status == "ARCHIVED" %}Archiviert{% else %}Neu{% endif %}</span></div>
+    <h2><a href="/topics/{{ topic.id }}">{{ topic.title }}</a></h2>
+    <p><strong>{{ topic.human_question }}</strong></p>
+    {% if analysis.get("concepts") %}<p class="muted">Ayin: {% for concept in analysis.get("concepts", [])[:3] %}{{ concept.get("stable_key") }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+    <p>{{ analysis.get("rationale", "Eine analysierte Frage für den nächsten redaktionellen Schritt.") }}</p>
+    <p class="muted">Material: {{ analysis.get("source_count", 0) }} Quellen · {{ analysis.get("claim_count", 0) }} Claims · Überschneidung: {{ ((analysis.get("overlap_score", 0) * 100)|round|int) }}%</p>
+    <div class="button-row">{% if selected_status != "IN_PROGRESS" and selected_status != "ARCHIVED" %}<form method="post" action="/topics/{{ topic.id }}/use"><button class="button" type="submit">Verwenden</button></form>{% endif %}{% if selected_status == "NEW" %}<form method="post" action="/topics/{{ topic.id }}/later"><button class="linkbutton" type="submit">Für später</button></form><form method="post" action="/topics/{{ topic.id }}/archive"><button class="linkbutton" type="submit">Archivieren</button></form>{% elif selected_status == "LATER" %}<form method="post" action="/topics/{{ topic.id }}/archive"><button class="linkbutton" type="submit">Archivieren</button></form>{% elif selected_status == "ARCHIVED" %}<form method="post" action="/topics/{{ topic.id }}/restore"><button class="button secondary" type="submit">Wiederherstellen</button></form>{% endif %}</div>
+  </article>
+{% else %}<section class="card"><p class="muted">In diesem Bereich gibt es noch keine Themen.</p></section>{% endfor %}
+</section>
+<section class="card">
+  <h2>Eigenes Thema</h2>
+  <form method="post" action="/topics/analyze"><label>Titel<input name="title" required></label><label>Frage / Beschreibung<textarea name="question" required></textarea></label><button class="button" type="submit">Thema analysieren</button></form>
+  {% if analysis %}<div class="analysis"><h3>{{ analysis.title }}</h3><p>{{ analysis.question }}</p><p>{{ analysis.source_count }} Quellen · {{ analysis.claim_count }} Claims · Überschneidung {{ (analysis.overlap_score * 100)|round|int }}%</p>{% for warning in analysis.warnings %}<p class="warning">{{ warning }}</p>{% endfor %}<form method="post" action="/topics/save"><input type="hidden" name="title" value="{{ analysis.title }}"><input type="hidden" name="question" value="{{ analysis.question }}"><input type="hidden" name="workspace_status" value="LATER"><button class="button" type="submit">Für später speichern</button></form></div>{% endif %}
+</section>
+{% endblock %}

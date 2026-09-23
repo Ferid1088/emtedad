@@ -22,6 +22,7 @@ from app.content_strategy.domain import (
     RepetitionDecision,
     TopicOrigin,
     TopicRelationType,
+    TopicWorkspaceStatus,
 )
 from app.db.base import Base, PostgresSchema
 from app.ops.assets.models import utc_now
@@ -90,6 +91,31 @@ class ContentTopic(Base):
     semantic_hash: Mapped[str] = mapped_column(String(64))
     analysis_json: Mapped[dict[str, object] | None] = mapped_column(
         JSONB, nullable=True
+    )
+    workspace_status: Mapped[TopicWorkspaceStatus] = mapped_column(
+        String(32), default=TopicWorkspaceStatus.NEW
+    )
+    suggestion_batch_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.topic_suggestion_batches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class TopicSuggestionBatch(Base):
+    """One owner-triggered, reproducible dynamic-topic discovery run."""
+
+    __tablename__ = "topic_suggestion_batches"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    requested_count: Mapped[int] = mapped_column(Integer)
+    owner_instruction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generator: Mapped[str] = mapped_column(String(128), default="deterministic-v1")
+    prompt_version: Mapped[str] = mapped_column(
+        String(64), default="topic-discovery-v2"
+    )
+    corpus_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
     )
 
 

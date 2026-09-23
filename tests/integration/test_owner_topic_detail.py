@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import delete, select
 
-from app.content_strategy.models import ContentTopic, EditorialProject
+from app.content_strategy.models import (
+    ContentTopic,
+    EditorialProject,
+    TopicSuggestionBatch,
+)
 from app.core.config import Environment, Settings
 from app.db.session import Database
 from app.main import create_app
@@ -219,4 +223,83 @@ def test_dynamic_topics_enter_the_canonical_editorial_workflow() -> None:
             )
 
     asyncio.run(verify_and_cleanup())
+    asyncio.run(database.dispose())
+
+
+@pytest.mark.integration
+def test_topic_discovery_batches_and_workspace_actions() -> None:
+    database_url = os.environ.get("EMTEDAD_DATABASE_URL")
+    if not database_url:
+        pytest.skip("EMTEDAD_DATABASE_URL is required")
+    database = Database(database_url)
+    settings = Settings(
+        _env_file=None,
+        environment=Environment.TEST,
+        database_url=SecretStr(database_url),
+        storage_root=Path("/tmp/emtedad-owner-web-test"),
+    )
+    batch_id: UUID | None = None
+    topic_ids: list[UUID] = []
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/topics/suggestions",
+            data={"requested_count": "3", "owner_instruction": "Beziehungen"},
+        )
+        assert response.status_code == 200
+        assert "Neue Themen generieren" in response.text
+        assert "AI_SUGGESTED" not in response.text
+
+    async def inspect_batch() -> None:
+        nonlocal batch_id, topic_ids
+        async with database.transaction() as session:
+            batch = await session.scalar(
+                select(TopicSuggestionBatch).order_by(
+                    TopicSuggestionBatch.created_at.desc()
+                )
+            )
+            assert batch is not None
+            batch_id = batch.id
+            topics = list(
+                await session.scalars(
+                    select(ContentTopic).where(
+                        ContentTopic.suggestion_batch_id == batch.id
+                    )
+                )
+            )
+            assert len(topics) == 3
+            topic_ids = [topic.id for topic in topics]
+
+    asyncio.run(inspect_batch())
+    assert topic_ids
+    with TestClient(create_app(settings)) as client:
+        assert (
+            client.post(
+                f"/topics/{topic_ids[0]}/later", follow_redirects=False
+            ).status_code
+            == 303
+        )
+        assert (
+            client.post(
+                f"/topics/{topic_ids[0]}/archive", follow_redirects=False
+            ).status_code
+            == 303
+        )
+        assert (
+            client.post(
+                f"/topics/{topic_ids[0]}/restore", follow_redirects=False
+            ).status_code
+            == 303
+        )
+
+    async def cleanup() -> None:
+        async with database.transaction() as session:
+            await session.execute(
+                delete(ContentTopic).where(ContentTopic.id.in_(topic_ids))
+            )
+            if batch_id is not None:
+                batch = await session.get(TopicSuggestionBatch, batch_id)
+                if batch is not None:
+                    await session.delete(batch)
+
+    asyncio.run(cleanup())
     asyncio.run(database.dispose())

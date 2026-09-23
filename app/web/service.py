@@ -3,7 +3,7 @@
 import hashlib
 import re
 from dataclasses import dataclass
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +38,10 @@ class TopicSuggestion:
     suggestion_type: str
     concepts: tuple[str, ...]
     source_count: int
+    claim_count: int
     works: tuple[str, ...]
+    people: tuple[str, ...]
+    distinctions: tuple[str, ...]
     provenance: tuple[str, ...]
     overlap_score: float
 
@@ -52,16 +55,37 @@ def validate_youtube_url(value: str) -> str:
 class TopicSuggestionService:
     """Create grounded, deterministic suggestions from the current corpus."""
 
-    async def suggestions(self, session: AsyncSession) -> list[TopicSuggestion]:
+    async def suggestions(
+        self,
+        session: AsyncSession,
+        *,
+        requested_count: int = 5,
+        owner_instruction: str | None = None,
+    ) -> list[TopicSuggestion]:
+        if not 1 <= requested_count <= 50:
+            raise ValueError("requested suggestion count must be between 1 and 50")
         concepts = list(
             await session.scalars(select(AyinConcept).order_by(AyinConcept.stable_key))
         )
         concept_names = tuple(concept.stable_key for concept in concepts[:8])
         source_count = await session.scalar(select(func.count(Source.id))) or 0
+        claim_count = await session.scalar(select(func.count(ExternalClaim.id))) or 0
         works = tuple(
             row.canonical_title
             for row in await session.scalars(
                 select(Work).order_by(Work.canonical_title).limit(5)
+            )
+        )
+        people = tuple(
+            row.canonical_name
+            for row in await session.scalars(
+                select(Person).order_by(Person.canonical_name).limit(5)
+            )
+        )
+        distinctions = tuple(
+            row.stable_key
+            for row in await session.scalars(
+                select(AyinDistinction).order_by(AyinDistinction.stable_key).limit(5)
             )
         )
         topics = list(await session.scalars(select(ContentTopic)))
@@ -94,9 +118,97 @@ class TopicSuggestionService:
                 "ohne sie zu ersetzen?",
                 "DIALOGUE",
             ),
+            (
+                "Wenn Bedingungen sichtbar werden",
+                (
+                    "Welche Bedingungen formen meine Antwort, ohne sie vollständig "
+                    "festzulegen?"
+                ),
+                "APPLICATION",
+            ),
+            (
+                "Erkennen und Verändern",
+                (
+                    "Was braucht es zwischen dem Erkennen eines Musters und einer "
+                    "anderen Antwort?"
+                ),
+                "DISTINCTION",
+            ),
+            (
+                "Die Einzigartigkeit des Anderen",
+                (
+                    "Wie verändert sich eine Beziehung, wenn der Andere nicht auf "
+                    "meine Geschichte reduziert wird?"
+                ),
+                "DIALOGUE",
+            ),
+            (
+                "Kontinuität ohne Wiederholung",
+                (
+                    "Wie kann etwas aus der Vergangenheit weiterwirken, ohne sich "
+                    "identisch zu wiederholen?"
+                ),
+                "FOUNDATION",
+            ),
+            (
+                "Ein kleiner Spielraum",
+                (
+                    "Woran lässt sich erkennen, dass in einer begrenzten Situation "
+                    "noch ein Majal offen ist?"
+                ),
+                "OPEN_QUESTION",
+            ),
+            (
+                "Leiden und Lebendigkeit",
+                (
+                    "Wie können Schmerz und Lebendigkeit gleichzeitig wahr sein, "
+                    "ohne einander zu verleugnen?"
+                ),
+                "HUMAN_QUESTION",
+            ),
         ]
+        expansion_forms = (
+            ("im Alltag", "Was zeigt {concept} im Alltag, wenn wir genauer hinsehen?"),
+            (
+                "in Beziehungen",
+                "Welche Frage zu {concept} wird in Beziehungen sichtbar?",
+            ),
+            (
+                "und Verantwortung",
+                "Was bedeutet {concept} für Verantwortung unter Bedingungen?",
+            ),
+        )
+        for concept in concept_names:
+            for suffix, question_form in expansion_forms:
+                prompts.append(
+                    (
+                        f"{concept}: {suffix}",
+                        question_form.format(concept=concept),
+                        "HUMAN_QUESTION",
+                    )
+                )
+        while len(prompts) < requested_count:
+            index = len(prompts) + 1
+            prompts.append(
+                (
+                    f"Eine weitere Frage zur Fortsetzung {index}",
+                    f"Welche bisher ungeklärte Frage über Kontinuität und Veränderung "
+                    f"verdient eine eigene Betrachtung ({index})?",
+                    "OPEN_QUESTION",
+                )
+            )
         output: list[TopicSuggestion] = []
+        instruction_tokens = self._tokens(owner_instruction or "")
         for title, question, kind in prompts:
+            if instruction_tokens and not instruction_tokens & self._tokens(
+                f"{title} {question}"
+            ):
+                rationale = (
+                    "Dieses Thema folgt dem gewünschten Schwerpunkt und verbindet "
+                    "eine konkrete Ayin-Unterscheidung mit einer prüfbaren Lebensfrage."
+                )
+            else:
+                rationale = self._rationale(title, question, kind)
             overlap = max(
                 (self._overlap(question, topic.human_question) for topic in topics),
                 default=0.0,
@@ -105,20 +217,33 @@ class TopicSuggestionService:
                 TopicSuggestion(
                     title=title,
                     human_question=question,
-                    rationale=(
-                        "Der Vorschlag verbindet Ayin-Struktur mit dem aktuell "
-                        "gesammelten Wissensbestand; er behauptet keine neuen Fakten."
-                    ),
+                    rationale=rationale,
                     suggestion_type=kind,
                     concepts=concept_names[:4],
                     source_count=int(source_count),
+                    claim_count=int(claim_count),
                     works=works,
+                    people=people,
+                    distinctions=distinctions,
                     provenance=tuple(str(item.id) for item in topics[:3])
                     + ("ayin:structured-concepts", "knowledge:source-count"),
                     overlap_score=round(overlap, 3),
                 )
             )
-        return output
+        return output[:requested_count]
+
+    @staticmethod
+    def _rationale(title: str, question: str, kind: str) -> str:
+        return (
+            f"Dieses Thema nimmt die Frage «{question}» als konkrete "
+            f"{kind.lower()}-Perspektive "
+            "auf und verbindet sie mit vorhandenen Ayin-Unterscheidungen und dem "
+            "gesammelten Material, ohne externe Aussagen zu Ayin umzudeuten."
+        )
+
+    @staticmethod
+    def _tokens(text: str) -> set[str]:
+        return {token.lower() for token in re.findall(r"\w+", text) if len(token) > 3}
 
     @staticmethod
     def _overlap(left: str, right: str) -> float:
@@ -399,6 +524,8 @@ async def save_topic(
     question: str,
     origin: TopicOrigin,
     analysis: dict[str, object] | None = None,
+    suggestion_batch_id: UUID | None = None,
+    workspace_status: str = "NEW",
 ) -> ContentTopic:
     """Persist a selected topic only; research is deliberately not started."""
 
@@ -416,6 +543,8 @@ async def save_topic(
         origin=origin,
         semantic_hash=hashlib.sha256(question.encode()).hexdigest(),
         analysis_json=analysis,
+        suggestion_batch_id=suggestion_batch_id,
+        workspace_status=workspace_status,
     )
     session.add(topic)
     await session.flush()

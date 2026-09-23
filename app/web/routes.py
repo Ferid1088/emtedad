@@ -13,13 +13,14 @@ from sqlalchemy import func, select
 from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.channel_monitoring.service import ChannelDiscoveryService
-from app.content_strategy.domain import TopicOrigin
+from app.content_strategy.domain import TopicOrigin, TopicWorkspaceStatus
 from app.content_strategy.models import (
     ContentTopic,
     EditorialLanguageTrack,
     EditorialProject,
     PersianDraft,
     TopicStrategyNode,
+    TopicSuggestionBatch,
 )
 from app.content_strategy.multilingual_service import MultilingualEditorialService
 from app.content_strategy.persian_service import PersianEditorialService
@@ -47,6 +48,7 @@ from app.topic_discovery import (
     topic_detail_view,
     validate_youtube_url,
 )
+from app.web.service import TopicSuggestion
 
 router = APIRouter(tags=["owner-web"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -270,10 +272,21 @@ async def knowledge(request: Request, section: str = "sources") -> HTMLResponse:
 
 @router.get("/topics", response_class=HTMLResponse)
 async def topics(request: Request) -> HTMLResponse:
+    selected_status = str(request.query_params.get("status", "NEW")).upper()
+    allowed_statuses = {item.value for item in TopicWorkspaceStatus}
+    if selected_status not in allowed_statuses:
+        selected_status = TopicWorkspaceStatus.NEW.value
     async with _database(request).transaction() as session:
         rows = list(
             await session.scalars(select(ContentTopic).order_by(ContentTopic.id.desc()))
         )
+        counts: dict[str, int] = {status: 0 for status in allowed_statuses}
+        for topic in rows:
+            key = str(topic.workspace_status)
+            counts[key] = counts.get(key, 0) + 1
+        rows = [
+            topic for topic in rows if str(topic.workspace_status) == selected_status
+        ]
     return await _render(
         request,
         "topics.html",
@@ -282,24 +295,96 @@ async def topics(request: Request) -> HTMLResponse:
         suggestions=None,
         analysis=None,
         error=None,
+        selected_status=selected_status,
+        counts=counts,
     )
 
 
 @router.post("/topics/suggestions", response_class=HTMLResponse)
 async def topic_suggestions(request: Request) -> HTMLResponse:
+    form = await request.form()
+    raw_count = str(form.get("requested_count", "5")).strip()
+    requested_count = int(raw_count) if raw_count.isdigit() else 5
+    instruction = str(form.get("owner_instruction", "")).strip() or None
     async with _database(request).transaction() as session:
-        suggestions = await TopicSuggestionService().suggestions(session)
-        rows = list(
-            await session.scalars(select(ContentTopic).order_by(ContentTopic.id.desc()))
+        batch = TopicSuggestionBatch(
+            requested_count=requested_count,
+            owner_instruction=instruction,
+            corpus_snapshot={
+                "source_count": int(
+                    await session.scalar(select(func.count(Source.id))) or 0
+                ),
+                "topic_count": int(
+                    await session.scalar(select(func.count(ContentTopic.id))) or 0
+                ),
+            },
         )
+        session.add(batch)
+        await session.flush()
+        suggestions = await TopicSuggestionService().suggestions(
+            session,
+            requested_count=min(requested_count * 4, 50),
+            owner_instruction=instruction,
+        )
+        existing_topics = list(await session.scalars(select(ContentTopic)))
+        existing = {
+            " ".join(f"{topic.title} {topic.human_question}".lower().split())
+            for topic in existing_topics
+        }
+        accepted_suggestions: list[TopicSuggestion] = []
+        for suggestion in suggestions:
+            if len(accepted_suggestions) >= requested_count:
+                break
+            identity = " ".join(
+                f"{suggestion.title} {suggestion.human_question}".lower().split()
+            )
+            if identity in existing:
+                continue
+            if any(
+                TopicSuggestionService._overlap(
+                    suggestion.human_question, topic.human_question
+                )
+                >= 0.92
+                for topic in existing_topics
+            ):
+                continue
+            analysis = await TopicAnalysisService().analyze(
+                session, suggestion.human_question
+            )
+            analysis["rationale"] = suggestion.rationale
+            analysis["suggestion_type"] = suggestion.suggestion_type
+            await save_topic(
+                session,
+                title=suggestion.title,
+                question=suggestion.human_question,
+                origin=TopicOrigin.AI_SUGGESTED,
+                analysis=analysis,
+                suggestion_batch_id=batch.id,
+            )
+            existing.add(identity)
+            accepted_suggestions.append(suggestion)
+        rows = list(
+            await session.scalars(
+                select(ContentTopic)
+                .where(ContentTopic.workspace_status == TopicWorkspaceStatus.NEW)
+                .order_by(ContentTopic.id.desc())
+            )
+        )
+        all_topics = list(await session.scalars(select(ContentTopic)))
+        counts = {status.value: 0 for status in TopicWorkspaceStatus}
+        for topic in all_topics:
+            key = str(topic.workspace_status)
+            counts[key] = counts.get(key, 0) + 1
     return await _render(
         request,
         "topics.html",
         title="Themen",
         topics=rows,
-        suggestions=suggestions,
+        suggestions=accepted_suggestions,
         analysis=None,
         error=None,
+        selected_status=TopicWorkspaceStatus.NEW.value,
+        counts=counts,
     )
 
 
@@ -323,6 +408,8 @@ async def analyze_topic(request: Request) -> HTMLResponse:
         suggestions=None,
         analysis=analysis,
         error=None,
+        selected_status=TopicWorkspaceStatus.NEW.value,
+        counts={},
     )
 
 
@@ -336,12 +423,53 @@ async def save_topic_route(request: Request) -> RedirectResponse:
         if form.get("origin") == TopicOrigin.AI_SUGGESTED.value
         else TopicOrigin.USER_CREATED
     )
+    raw_status = str(form.get("workspace_status", "NEW")).upper()
+    workspace_status = (
+        raw_status
+        if raw_status in {item.value for item in TopicWorkspaceStatus}
+        else "NEW"
+    )
     async with _database(request).transaction() as session:
         analysis = await TopicAnalysisService().analyze(session, question)
         topic = await save_topic(
-            session, title=title, question=question, origin=origin, analysis=analysis
+            session,
+            title=title,
+            question=question,
+            origin=origin,
+            analysis=analysis,
+            workspace_status=workspace_status,
         )
     return RedirectResponse(f"/topics/{topic.id}", status_code=303)
+
+
+@router.post("/topics/{topic_id}/later")
+async def defer_topic(request: Request, topic_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        topic = await session.get(ContentTopic, topic_id)
+        if topic is None:
+            return HTMLResponse("Thema nicht gefunden", status_code=404)
+        topic.workspace_status = TopicWorkspaceStatus.LATER
+    return RedirectResponse("/topics?status=LATER", status_code=303)
+
+
+@router.post("/topics/{topic_id}/archive")
+async def archive_topic(request: Request, topic_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        topic = await session.get(ContentTopic, topic_id)
+        if topic is None:
+            return HTMLResponse("Thema nicht gefunden", status_code=404)
+        topic.workspace_status = TopicWorkspaceStatus.ARCHIVED
+    return RedirectResponse("/topics?status=ARCHIVED", status_code=303)
+
+
+@router.post("/topics/{topic_id}/restore")
+async def restore_topic(request: Request, topic_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        topic = await session.get(ContentTopic, topic_id)
+        if topic is None:
+            return HTMLResponse("Thema nicht gefunden", status_code=404)
+        topic.workspace_status = TopicWorkspaceStatus.NEW
+    return RedirectResponse("/topics?status=NEW", status_code=303)
 
 
 @router.get("/topics/{topic_id}", response_class=HTMLResponse)
@@ -387,6 +515,10 @@ async def use_content_topic(request: Request, topic_id: UUID) -> RedirectRespons
         )
     except ValueError:
         return RedirectResponse(f"/topics/{topic_id}?production=error", status_code=303)
+    async with _database(request).transaction() as session:
+        topic = await session.get(ContentTopic, topic_id)
+        if topic is not None:
+            topic.workspace_status = TopicWorkspaceStatus.IN_PROGRESS
     return RedirectResponse(f"/workspace/{project_id}", status_code=303)
 
 
