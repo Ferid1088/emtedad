@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import PronunciationCriticality
+from app.localization.pronunciation import pronunciation_preserves_text
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,19 @@ class PronunciationValidator:
                     findings.append(
                         LocalizationFinding(
                             "INVALID_UNICODE", "surrogate in voice_text"
+                        )
+                    )
+                display_text = statement.get("display_text")
+                if (
+                    isinstance(display_text, str)
+                    and isinstance(voice_text, str)
+                    and not pronunciation_preserves_text(display_text, voice_text)
+                ):
+                    findings.append(
+                        LocalizationFinding(
+                            "VOICE_TEXT_SEMANTIC_DRIFT",
+                            "voice_text changes lexical content instead of "
+                            "pronunciation marks",
                         )
                     )
         for term in critical_terms:

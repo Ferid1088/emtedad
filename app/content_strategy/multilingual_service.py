@@ -13,6 +13,13 @@ from app.knowledge.llm.base import StructuredExtractionRequest
 from app.knowledge.llm.codex import CodexCliProvider
 from app.lecture.domain import PublicationLanguage
 from app.localization.models import PronunciationLexiconEntry
+from app.localization.performance import (
+    ElevenLabsCapabilityProfile,
+    NativeLanguageOptimizer,
+    NativeLanguageReviewer,
+    PerformanceDirector,
+)
+from app.localization.prompts import native_realization_instruction
 from app.localization.pronunciation import prepare_pronunciation
 
 
@@ -63,12 +70,11 @@ class MultilingualEditorialService:
                             prompt_version="phase-12-fa-source-v1",
                             model="configured-default",
                             instructions=(
-                                "Translate the approved Persian lecture into natural "
-                                "spoken "
-                                f"{language}. Use the Persian text as the direct "
-                                "source, "
-                                "preserve uncertainty and Ayin terms, "
-                                "do not add facts, and return only the translated text."
+                                native_realization_instruction(
+                                    PublicationLanguage(language)
+                                )
+                                + "\n\nUse the approved Persian text as the "
+                                "semantic source of truth, while rewriting natively."
                             ),
                             input_text=source_text,
                             output_model=_Translation,
@@ -151,4 +157,76 @@ class MultilingualEditorialService:
             )
             track.voice_ready_text = prepared.voice_text
             track.status = "READY_FOR_VOICE"
+            return track.id
+
+    async def prepare_performance(
+        self,
+        track_id: UUID,
+        *,
+        expected_project_id: UUID | None = None,
+        tags_by_paragraph: dict[int, str] | None = None,
+    ) -> UUID:
+        """Prepare inspectable ElevenLabs input without calling the provider."""
+
+        async with self.database.transaction() as session:
+            track = await session.get(EditorialLanguageTrack, track_id)
+            if track is None:
+                raise ValueError("language track not found")
+            if (
+                expected_project_id is not None
+                and track.editorial_project_id != expected_project_id
+            ):
+                raise ValueError("language track does not belong to this project")
+            if not track.voice_ready_text:
+                raise ValueError(
+                    "voice-ready text is required before performance preparation"
+                )
+            native_review = NativeLanguageReviewer().review(
+                PublicationLanguage(track.language), track.display_text
+            )
+            if not native_review.passed:
+                raise ValueError(
+                    "native-language review is required before performance preparation"
+                )
+            # The optimizer is an explicit boundary.  The default implementation
+            # is identity-preserving; model-backed rewrites must create a new
+            # translation version rather than mutate owner-approved text.
+            optimized_text = NativeLanguageOptimizer().optimize(
+                PublicationLanguage(track.language), track.display_text
+            )
+            if optimized_text != track.display_text:
+                raise ValueError(
+                    "native optimization requires a new translation version"
+                )
+            final_native_review = NativeLanguageReviewer().review(
+                PublicationLanguage(track.language), optimized_text
+            )
+            if not final_native_review.passed:
+                raise ValueError(
+                    "final native-language review is required before "
+                    "performance preparation"
+                )
+            preparation = PerformanceDirector().prepare(
+                PublicationLanguage(track.language),
+                track.voice_ready_text,
+                tags_by_paragraph=tags_by_paragraph,
+                profile=ElevenLabsCapabilityProfile.eleven_v3(),
+            )
+            blocking = [finding for finding in preparation.findings if finding.blocking]
+            if blocking:
+                raise ValueError(
+                    "performance preparation failed: "
+                    + "; ".join(item.code for item in blocking)
+                )
+            track.elevenlabs_performance_text = preparation.elevenlabs_performance_text
+            track.status = "PERFORMANCE_READY"
+            provenance = dict(track.provenance or {})
+            provenance["performance_profile"] = {
+                "provider": preparation.profile.provider,
+                "model_id": preparation.profile.model_id,
+                "supports_ssml": preparation.profile.supports_ssml,
+                "tags": list(preparation.profile.supported_tags),
+                "audio_generated": False,
+            }
+            track.provenance = provenance
             return track.id

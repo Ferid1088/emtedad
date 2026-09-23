@@ -711,6 +711,16 @@ async def prepare_track_voice(
     return RedirectResponse(f"/workspace/{project_id}", status_code=303)
 
 
+@router.post("/workspace/{project_id}/tracks/{track_id}/performance")
+async def prepare_track_performance(
+    request: Request, project_id: UUID, track_id: UUID
+) -> RedirectResponse:
+    await MultilingualEditorialService(_database(request)).prepare_performance(
+        track_id, expected_project_id=project_id
+    )
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
 @router.get("/studio", response_class=HTMLResponse)
 async def studio(request: Request) -> HTMLResponse:
     async with _database(request).transaction() as session:

@@ -290,6 +290,10 @@ class EditorialLanguageTrack(Base):
     version_number: Mapped[int] = mapped_column(Integer)
     display_text: Mapped[str] = mapped_column(Text)
     voice_ready_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Provider-specific text is kept separate from publication and
+    # pronunciation text.  It may contain ElevenLabs performance tags, but
+    # no provider is called by this application in Phase 12.
+    elevenlabs_performance_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="TRANSLATED")
     semantic_validation_status: Mapped[str] = mapped_column(
         String(32), default="NOT_VALIDATED"
