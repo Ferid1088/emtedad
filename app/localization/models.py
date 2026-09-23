@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.ayin.domain import LanguageCode
 from app.core.ayin.models import CORE
+from app.core.terminology.models import Term  # noqa: F401  # register FK target
 from app.db.base import Base, PostgresSchema
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import (
