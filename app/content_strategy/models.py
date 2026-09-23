@@ -68,7 +68,7 @@ class ContentTopic(Base):
     stable_key: Mapped[str] = mapped_column(String(255), unique=True)
     title: Mapped[str] = mapped_column(String(512))
     human_question: Mapped[str] = mapped_column(Text)
-    primary_concept_key: Mapped[str] = mapped_column(String(255))
+    primary_concept_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     life_domain: Mapped[str] = mapped_column(String(64))
     lecture_angle: Mapped[LectureAngle] = mapped_column(
         _enum(LectureAngle, "lecture_angle")
@@ -80,6 +80,9 @@ class ContentTopic(Base):
         _enum(TopicOrigin, "topic_origin"), default=TopicOrigin.USER_CREATED
     )
     semantic_hash: Mapped[str] = mapped_column(String(64))
+    analysis_json: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
 
 class ContentTopicRelation(Base):

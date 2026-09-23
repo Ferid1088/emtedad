@@ -5,6 +5,7 @@ from app.web.service import (
     TopicSuggestionService,
     dashboard_counts,
     save_topic,
+    topic_detail_view,
     validate_youtube_url,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "TopicSuggestionService",
     "dashboard_counts",
     "save_topic",
+    "topic_detail_view",
     "validate_youtube_url",
 ]

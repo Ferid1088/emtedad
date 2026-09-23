@@ -33,6 +33,7 @@ from app.topic_discovery import (
     TopicSuggestionService,
     dashboard_counts,
     save_topic,
+    topic_detail_view,
     validate_youtube_url,
 )
 
@@ -324,7 +325,10 @@ async def save_topic_route(request: Request) -> RedirectResponse:
         else TopicOrigin.USER_CREATED
     )
     async with _database(request).transaction() as session:
-        topic = await save_topic(session, title=title, question=question, origin=origin)
+        analysis = await TopicAnalysisService().analyze(session, question)
+        topic = await save_topic(
+            session, title=title, question=question, origin=origin, analysis=analysis
+        )
     return RedirectResponse(f"/topics/{topic.id}", status_code=303)
 
 
@@ -334,7 +338,23 @@ async def topic_detail(request: Request, topic_id: UUID) -> HTMLResponse:
         topic = await session.get(ContentTopic, topic_id)
         if topic is None:
             return HTMLResponse("Thema nicht gefunden", status_code=404)
-    return await _render(request, "topic_detail.html", title=topic.title, topic=topic)
+    detail = topic_detail_view(topic)
+    return await _render(
+        request, "topic_detail.html", title=topic.title, topic=topic, **detail
+    )
+
+
+@router.post("/topics/{topic_id}/analyze", response_class=HTMLResponse)
+async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        topic = await session.get(ContentTopic, topic_id)
+        if topic is None:
+            return HTMLResponse("Thema nicht gefunden", status_code=404)
+        analysis = await TopicAnalysisService().analyze(session, topic.human_question)
+        topic.analysis_json = analysis
+        primary = analysis.get("primary_concept_key")
+        topic.primary_concept_key = primary if isinstance(primary, str) else None
+    return RedirectResponse(f"/topics/{topic_id}", status_code=303)
 
 
 @router.get("/channels", response_class=HTMLResponse)
