@@ -76,11 +76,13 @@ def parse_youtube_channel_locator(locator: str) -> str:
         "m.youtube.com",
     }:
         raise ValueError("invalid YouTube channel URL")
-    parts = parsed.path.strip("/").split("/")
-    if len(parts) == 2 and parts[0] in {"channel", "c"} and parts[1]:
-        return candidate.rstrip("/")
-    if len(parts) == 1 and parts[0].startswith("@") and len(parts[0]) > 1:
-        return candidate.rstrip("/")
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) >= 2 and parts[0] == "channel" and parts[1]:
+        return f"https://www.youtube.com/channel/{parts[1]}"
+    if len(parts) >= 2 and parts[0] == "c" and parts[1]:
+        return f"https://www.youtube.com/c/{parts[1]}"
+    if parts and parts[0].startswith("@") and len(parts[0]) > 1:
+        return f"https://www.youtube.com/{parts[0]}"
     raise ValueError("invalid YouTube channel URL")
 
 
