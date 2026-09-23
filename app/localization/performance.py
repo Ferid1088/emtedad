@@ -81,6 +81,7 @@ class NativeLanguageReviewer:
         "retrieved passage",
         "The selected Ayin Working source",
     )
+    _GERMAN_FORMAL_ADDRESS = re.compile(r"\b(?:Sie|Ihnen|Ihr|Ihre|Ihrem|Ihren|Ihres)\b")
 
     def review(self, language: PublicationLanguage, text: str) -> NativeReview:
         findings: list[NativeReviewFinding] = []
@@ -91,6 +92,15 @@ class NativeLanguageReviewer:
                 NativeReviewFinding(
                     "INTERNAL_SCAFFOLDING",
                     "Internal research scaffolding is visible in the text.",
+                )
+            )
+        if language is PublicationLanguage.DE and self._GERMAN_FORMAL_ADDRESS.search(
+            text
+        ):
+            findings.append(
+                NativeReviewFinding(
+                    "GERMAN_FORMAL_ADDRESS",
+                    "Ayin narration uses formal German address; use du/dich/dir/dein.",
                 )
             )
         if re.search(r"(\b\w+\b)(?:\s+\1){3,}", text, re.IGNORECASE):

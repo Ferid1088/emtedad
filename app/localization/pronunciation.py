@@ -46,7 +46,10 @@ def pronunciation_preserves_text(display_text: str, voice_text: str) -> bool:
 # leaving ordinary Persian prose untouched.
 _PERSIAN_CORE_PRONUNCIATIONS = {
     "امتداد": "اِمتِداد",
-    "مَجال": "مَجال",
+    "بُن": "بُن",
+    "بن": "بُن",
+    "جان": "جَان",
+    "مجال": "مَجال",
     "میان": "مِیان",
     "تهیگاه": "تَهیگاه",
     "مناسک": "مَناسِک",
@@ -58,6 +61,12 @@ _PERSIAN_EZAFE_PHRASES = {
 }
 _ARABIC_CORE_PRONUNCIATIONS = {
     "امتداد": "اِمْتِداد",
+    "بُن": "بُن",
+    "بن": "بُن",
+    "جان": "جَان",
+    "مجال": "مَجال",
+    "میان": "مِیان",
+    "تهیگاه": "تَهیگاه",
     "مناسک": "مَناسِک",
     "مناسك": "مَناسِك",
 }
@@ -122,13 +131,14 @@ class ArabicDiacritizer:
         *,
         lexicon_version: int | None = None,
         fully_vocalized: bool = False,
+        provider_profile: str | None = None,
     ) -> PronunciationPreparation:
         voice_text = display_text
         for written, pronunciation in _ARABIC_CORE_PRONUNCIATIONS.items():
             voice_text = voice_text.replace(written, pronunciation)
         for entry in lexicon:
             written_value = entry.get("written_form")
-            pronunciation_value = _entry_pronunciation(entry, None)
+            pronunciation_value = _entry_pronunciation(entry, provider_profile)
             if (
                 isinstance(written_value, str)
                 and isinstance(pronunciation_value, str)
@@ -158,7 +168,10 @@ def prepare_pronunciation(
         )
     if language is PublicationLanguage.AR:
         return ArabicDiacritizer().annotate(
-            display_text, lexicon, lexicon_version=lexicon_version
+            display_text,
+            lexicon,
+            lexicon_version=lexicon_version,
+            provider_profile=provider_profile,
         )
     return PronunciationPreparation(display_text, display_text, lexicon_version)
 

@@ -21,6 +21,10 @@ from app.localization.performance import (
 )
 from app.localization.prompts import native_realization_instruction
 from app.localization.pronunciation import prepare_pronunciation
+from app.localization.validators import (
+    PronunciationValidator,
+    ProtectedTerminologyValidator,
+)
 
 
 class _Translation(BaseModel):
@@ -133,6 +137,25 @@ class MultilingualEditorialService:
                     "semantic validation is required before voice preparation"
                 )
             language = PublicationLanguage(track.language)
+            native_review = NativeLanguageReviewer().review(
+                language, track.display_text
+            )
+            if not native_review.passed:
+                raise ValueError(
+                    "native-language review is required before voice preparation"
+                )
+            source_draft = await session.get(
+                PersianDraft, track.source_persian_draft_id
+            )
+            if source_draft is None:
+                raise ValueError("source Persian version not found")
+            terminology_findings = ProtectedTerminologyValidator().validate(
+                language, source_draft.text, track.display_text
+            )
+            if any(item.blocking for item in terminology_findings):
+                raise ValueError(
+                    "protected Ayin terminology is missing from the native text"
+                )
             lexicon_rows = list(
                 await session.scalars(
                     select(PronunciationLexiconEntry).where(
@@ -154,9 +177,40 @@ class MultilingualEditorialService:
                 track.display_text,
                 lexicon,
                 lexicon_version=1,
+                provider_profile="elevenlabs_v3",
             )
+            pronunciation_findings = (
+                PronunciationValidator().validate_voice_preparation(
+                    language, track.display_text, prepared.voice_text
+                )
+            )
+            if any(item.blocking for item in pronunciation_findings):
+                raise ValueError(
+                    "language-specific pronunciation preparation is incomplete"
+                )
             track.voice_ready_text = prepared.voice_text
-            track.status = "READY_FOR_VOICE"
+            performance = PerformanceDirector().prepare(
+                language,
+                prepared.voice_text,
+                profile=ElevenLabsCapabilityProfile.eleven_v3(),
+            )
+            blocking = [item for item in performance.findings if item.blocking]
+            if blocking:
+                raise ValueError(
+                    "ElevenLabs performance preparation failed: "
+                    + "; ".join(item.code for item in blocking)
+                )
+            track.elevenlabs_performance_text = performance.elevenlabs_performance_text
+            track.status = "PERFORMANCE_READY"
+            provenance = dict(track.provenance or {})
+            provenance["native_quality_status"] = "NATIVE_QUALITY_PASSED"
+            provenance["performance_profile"] = {
+                "provider": performance.profile.provider,
+                "model_id": performance.profile.model_id,
+                "supports_ssml": performance.profile.supports_ssml,
+                "audio_generated": False,
+            }
+            track.provenance = provenance
             return track.id
 
     async def prepare_performance(

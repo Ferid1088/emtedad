@@ -1,5 +1,6 @@
 """Native-language realization instructions shared by localization paths."""
 
+from app.core.terminology.canonical import canonical_terms_for_prompt
 from app.lecture.domain import PublicationLanguage
 
 
@@ -28,6 +29,12 @@ For German, write original educated spoken German without bureaucratic
 nominalization. For English, write original thoughtful spoken English. For
 Arabic, write natural high-register spoken Modern Standard Arabic without
 literal Persian syntax or forced archaism.
+
+Protected Ayin terms are canonical technical terms. Preserve these forms and
+do not replace them with approximate target-language concepts:
+{canonical_terms_for_prompt(language.value)}.
+For German direct address use informal «du», never formal «Sie», unless a
+genuine source quotation requires otherwise.
 
 Do not over-explain every distinction as repeated "X is not Y" formulas; use
 precision where needed, then return to human experience. Do not add facts,

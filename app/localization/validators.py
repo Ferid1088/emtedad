@@ -3,6 +3,7 @@
 import unicodedata
 from dataclasses import dataclass
 
+from app.core.terminology.canonical import CANONICAL_AYIN_TERMS
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import PronunciationCriticality
 from app.localization.pronunciation import pronunciation_preserves_text
@@ -98,6 +99,79 @@ class PronunciationValidator:
                 )
         return findings
 
+    def validate_voice_preparation(
+        self,
+        language: PublicationLanguage,
+        display_text: str,
+        voice_text: str,
+    ) -> list[LocalizationFinding]:
+        """Require useful marks when a high-risk term is actually present."""
+
+        if language not in {PublicationLanguage.FA, PublicationLanguage.AR}:
+            return []
+        risky_terms = {
+            "امتداد",
+            "بُن",
+            "بن",
+            "جان",
+            "مجال",
+            "میان",
+            "تهیگاه",
+            "مناسک",
+            "مناسك",
+        }
+        present = [term for term in risky_terms if term in display_text]
+        if not present:
+            return []
+        if display_text == voice_text and not any(
+            mark in voice_text for mark in "ًٌٍَُِّْ"
+        ):
+            return [
+                LocalizationFinding(
+                    "PRONUNCIATION_PREPARATION_MISSING",
+                    (
+                        "Risk terms need selective pronunciation marks: "
+                        f"{', '.join(sorted(present))}"
+                    ),
+                )
+            ]
+        if language is PublicationLanguage.FA:
+            for phrase, marked_prefix in (
+                ("آیین امتداد", "آیینِ"),
+                ("راه زندگی", "راهِ"),
+                ("کتاب من", "کتابِ"),
+            ):
+                if phrase in display_text and marked_prefix not in voice_text:
+                    return [
+                        LocalizationFinding(
+                            "EZAFE_MISSING",
+                            (
+                                f"The Persian compound '{phrase}' requires "
+                                "an explicit Ezafe mark."
+                            ),
+                        )
+                    ]
+            if not any(mark in voice_text for mark in "َُِّ"):
+                return [
+                    LocalizationFinding(
+                        "PERSIAN_DIACRITICS_MISSING",
+                        (
+                            "Persian risk terms require selective short-vowel "
+                            "or Shadda support."
+                        ),
+                    )
+                ]
+        if language is PublicationLanguage.AR and not any(
+            mark in voice_text for mark in "ًٌٍَُِّْ"
+        ):
+            return [
+                LocalizationFinding(
+                    "ARABIC_TASHKIL_MISSING",
+                    "Arabic risk terms require selective Tashkil support.",
+                )
+            ]
+        return []
+
 
 class LocalizationQualityGate:
     """Compose semantic, terminology, and pronunciation gates."""
@@ -112,3 +186,46 @@ class LocalizationQualityGate:
         return SemanticFidelityValidator().validate(
             master_claims, statements
         ) + PronunciationValidator().validate(language, statements, critical_terms)
+
+
+class ProtectedTerminologyValidator:
+    """Ensure protected Ayin terms are retained in native realizations."""
+
+    def validate(
+        self,
+        language: PublicationLanguage,
+        source_persian: str,
+        localized_text: str,
+    ) -> list[LocalizationFinding]:
+        findings: list[LocalizationFinding] = []
+        for term in CANONICAL_AYIN_TERMS:
+            source_without_marks = "".join(
+                char for char in source_persian if char not in "ًٌٍَُِّْ"
+            )
+            term_without_marks = "".join(
+                char for char in term.persian_form if char not in "ًٌٍَُِّْ"
+            )
+            if (
+                term.persian_form not in source_persian
+                and term_without_marks not in source_without_marks
+            ):
+                continue
+            expected = term.language_rendering.get(language.value)
+            if expected is None:
+                findings.append(
+                    LocalizationFinding(
+                        "CANONICAL_TRANSLITERATION_REVIEW",
+                        (
+                            f"No reviewed {language.value} rendering exists for "
+                            f"{term.canonical_id}."
+                        ),
+                    )
+                )
+            elif expected not in localized_text:
+                findings.append(
+                    LocalizationFinding(
+                        "PROTECTED_AYIN_TERM_MISSING",
+                        f"{term.canonical_id} must remain as {expected}.",
+                    )
+                )
+        return findings
