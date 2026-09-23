@@ -7,5 +7,21 @@
 <div class="columns"><section class="card"><h2>Ayin-Bezug</h2>{% if primary_concept %}<p><strong>Primäres Konzept:</strong> {{ primary_concept.stable_key }}</p><p>{{ primary_concept.definition }}</p>{% else %}<p class="muted">Keine belastbare Zuordnung gefunden.</p>{% endif %}<h3>Sekundäre Konzepte</h3>{% if concepts|length > 1 %}<ul>{% for concept in concepts[1:] %}<li>{{ concept.stable_key }}{% if concept.definition %}: {{ concept.definition }}{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine weiteren Konzepte gefunden.</p>{% endif %}<h3>Unterscheidungen</h3>{% if distinctions %}<ul>{% for item in distinctions %}<li><strong>{{ item.stable_key }}</strong>: {{ item.explanation }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine passenden Unterscheidungen gefunden.</p>{% endif %}<h3>Offene Fragen</h3>{% if open_questions %}<ul>{% for item in open_questions %}<li>{{ item.question }}{% if item.context %}<br><span class="muted">{{ item.context }}</span>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine passenden offenen Fragen gefunden.</p>{% endif %}</section>
 <section class="card"><h2>Material</h2><p>{{ source_count }} Quellen · {{ claim_count }} Claims</p><h3>Quellen</h3>{% if sources %}<ul>{% for source in sources %}<li><a href="/sources/{{ source.id }}">{{ source.title }}</a></li>{% endfor %}</ul>{% else %}<p class="muted">Keine relevanten Quellen gefunden.</p>{% endif %}<h3>Werke</h3>{% if works %}<ul>{% for work in works %}<li>{{ work.title }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine relevanten Werke gefunden.</p>{% endif %}<h3>Personen</h3>{% if people %}<ul>{% for person in people %}<li>{{ person.name }}</li>{% endfor %}</ul>{% else %}<p class="muted">Keine relevanten Personen gefunden.</p>{% endif %}{% if claims %}<h3>Claims</h3><ul>{% for claim in claims %}<li>{{ claim.text }} <span class="muted">({{ claim.verification_status }})</span></li>{% endfor %}</ul>{% endif %}</section></div>
 <section class="card"><h2>Überschneidung</h2>{% if similar_topics %}<ul>{% for item in similar_topics %}<li>{{ item.title }} — {{ (item.score * 100)|round|int }}%</li>{% endfor %}</ul>{% else %}<p class="muted">Keine starke Überschneidung gefunden.</p>{% endif %}</section>
-{% endif %}{% if warnings %}<section class="card"><h2>Hinweise</h2>{% for warning in warnings %}<p class="warning">{{ warning }}</p>{% endfor %}</section>{% endif %}<p class="muted">Recherche starten ist in dieser Phase bewusst deaktiviert.</p>
+{% endif %}{% if warnings %}<section class="card"><h2>Hinweise</h2>{% for warning in warnings %}<p class="warning">{{ warning }}</p>{% endfor %}</section>{% endif %}
+<section class="card">
+  <h2>Mit diesem Thema weiterarbeiten</h2>
+  {% if overlap_score >= 0.8 %}<p class="warning">Dieses Thema überschneidet sich stark mit bestehenden Themen. Du kannst es trotzdem verwenden.</p>{% endif %}
+  <p class="muted">Dieses analysierte Thema kann in denselben redaktionellen Produktionsablauf wie ein Thema aus dem Themenbaum übernommen werden.</p>
+  <form method="post" action="/topics/{{ topic.id }}/use">
+    <button class="button" type="submit">{{ "Neues Projekt mit diesem Thema" if editorial_projects else "Thema verwenden" }}</button>
+  </form>
+  {% if editorial_projects %}
+  <h3>Bisherige Projekte</h3>
+  <ul>
+    {% for project in editorial_projects %}
+    <li><a href="/workspace/{{ project.id }}">{{ project.title }}</a> · {{ project.status }} · {{ project.created_at.strftime("%d.%m.%Y") }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Noch kein Textprojekt für dieses Thema.</p>{% endif %}
+</section>
 {% endblock %}

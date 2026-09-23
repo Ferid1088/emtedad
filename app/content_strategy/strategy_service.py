@@ -6,8 +6,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content_strategy.models import (
+    ContentTopic,
     EditorialProject,
     TopicStrategy,
     TopicStrategyNode,
@@ -178,23 +180,14 @@ class TopicStrategyService:
             node = await session.get(TopicStrategyNode, node_id)
             if node is None or node.node_type != "TOPIC":
                 raise ValueError("strategy topic not found")
-            project = EditorialProject(
-                strategy_node_id=node.id,
+            project = await self._create_project(
+                session,
                 title=node.title,
                 human_question=node.human_question or node.title,
+                strategy_node_id=node.id,
                 owner_prompt=owner_prompt,
                 target_duration_minutes=target_duration_minutes,
-                status="RESEARCH_PENDING",
             )
-            session.add(project)
-            await session.flush()
-            research_project = ResearchProject(
-                human_question=node.human_question or node.title,
-                created_by="owner",
-            )
-            session.add(research_project)
-            await session.flush()
-            project.research_project_id = research_project.id
             node.generation_count += 1
             node.last_generated_at = datetime.now(UTC)
             session.add(
@@ -206,6 +199,71 @@ class TopicStrategyService:
                 )
             )
             return project.id
+
+    async def use_content_topic(
+        self,
+        topic_id: UUID,
+        *,
+        owner_prompt: str | None = None,
+        target_duration_minutes: int | None = None,
+    ) -> UUID:
+        """Enter a dynamic topic through the same production workspace as the tree."""
+
+        async with self.database.transaction() as session:
+            topic = await session.get(ContentTopic, topic_id)
+            if topic is None:
+                raise ValueError("topic not found")
+            active_statuses = {"RESEARCH_PENDING", "IN_RESEARCH", "DRAFT"}
+            existing = await session.scalar(
+                select(EditorialProject)
+                .where(
+                    EditorialProject.content_topic_id == topic.id,
+                    EditorialProject.status.in_(active_statuses),
+                )
+                .order_by(EditorialProject.created_at.desc())
+            )
+            if existing is not None:
+                return existing.id
+            project = await self._create_project(
+                session,
+                title=topic.title,
+                human_question=topic.human_question or topic.title,
+                content_topic_id=topic.id,
+                owner_prompt=owner_prompt,
+                target_duration_minutes=target_duration_minutes,
+            )
+            return project.id
+
+    async def _create_project(
+        self,
+        session: AsyncSession,
+        *,
+        title: str,
+        human_question: str,
+        strategy_node_id: UUID | None = None,
+        content_topic_id: UUID | None = None,
+        owner_prompt: str | None = None,
+        target_duration_minutes: int | None = None,
+    ) -> EditorialProject:
+        project = EditorialProject(
+            strategy_node_id=strategy_node_id,
+            content_topic_id=content_topic_id,
+            title=title,
+            human_question=human_question,
+            owner_prompt=owner_prompt,
+            target_duration_minutes=target_duration_minutes,
+            status="RESEARCH_PENDING",
+        )
+        session.add(project)
+        await session.flush()
+        research_project = ResearchProject(
+            human_question=human_question,
+            created_by="owner",
+        )
+        session.add(research_project)
+        await session.flush()
+        project.research_project_id = research_project.id
+        return project
 
     async def metrics(self, strategy_id: UUID) -> dict[str, int]:
         async with self.database.transaction() as session:

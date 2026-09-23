@@ -354,15 +354,40 @@ async def topic_detail(
         topic = await session.get(ContentTopic, topic_id)
         if topic is None:
             return HTMLResponse("Thema nicht gefunden", status_code=404)
+        projects = list(
+            await session.scalars(
+                select(EditorialProject)
+                .where(EditorialProject.content_topic_id == topic.id)
+                .order_by(EditorialProject.created_at.desc())
+            )
+        )
     detail = topic_detail_view(topic)
     return await _render(
         request,
         "topic_detail.html",
         title=topic.title,
         topic=topic,
+        editorial_projects=projects,
         analysis_feedback=analysis,
         **detail,
     )
+
+
+@router.post("/topics/{topic_id}/use")
+async def use_content_topic(request: Request, topic_id: UUID) -> RedirectResponse:
+    form = await request.form()
+    prompt = str(form.get("owner_prompt", "")).strip() or None
+    raw_duration = str(form.get("target_duration_minutes", "")).strip()
+    duration = int(raw_duration) if raw_duration.isdigit() else None
+    try:
+        project_id = await TopicStrategyService(_database(request)).use_content_topic(
+            topic_id,
+            owner_prompt=prompt,
+            target_duration_minutes=duration,
+        )
+    except ValueError:
+        return RedirectResponse(f"/topics/{topic_id}?production=error", status_code=303)
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
 
 
 @router.post("/topics/{topic_id}/analyze", response_class=HTMLResponse)

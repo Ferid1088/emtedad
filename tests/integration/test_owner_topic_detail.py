@@ -6,12 +6,13 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from app.content_strategy.models import ContentTopic
+from app.content_strategy.models import ContentTopic, EditorialProject
 from app.core.config import Environment, Settings
 from app.db.session import Database
 from app.main import create_app
+from app.research.models import ResearchProject
 from app.web.service import TopicAnalysisService
 
 
@@ -96,9 +97,10 @@ def test_topic_analysis_is_persisted_and_refreshable() -> None:
         assert refresh_response.headers["location"] == (
             f"/topics/{created_id}?analysis=updated"
         )
-        assert "Analyse aktualisiert" in client.get(
-            refresh_response.headers["location"]
-        ).text
+        assert (
+            "Analyse aktualisiert"
+            in client.get(refresh_response.headers["location"]).text
+        )
 
     async def remove_temporary_topic() -> None:
         async with database.transaction() as session:
@@ -146,4 +148,75 @@ def test_topic_analysis_does_not_fabricate_concept_for_unmatched_text() -> None:
     warnings = result["warnings"]
     assert isinstance(warnings, list)
     assert "Keine belastbare Zuordnung gefunden." in warnings
+    asyncio.run(database.dispose())
+
+
+@pytest.mark.integration
+def test_dynamic_topics_enter_the_canonical_editorial_workflow() -> None:
+    database_url = os.environ.get("EMTEDAD_DATABASE_URL")
+    if not database_url:
+        pytest.skip("EMTEDAD_DATABASE_URL is required")
+    database = Database(database_url)
+    settings = Settings(
+        _env_file=None,
+        environment=Environment.TEST,
+        database_url=SecretStr(database_url),
+        storage_root=Path("/tmp/emtedad-owner-web-test"),
+    )
+    created_ids: list[UUID] = []
+    project_ids: list[UUID] = []
+    with TestClient(create_app(settings)) as client:
+        for origin in ("USER_CREATED", "AI_SUGGESTED"):
+            response = client.post(
+                "/topics/save",
+                data={
+                    "title": f"Temporäres {origin}-Thema",
+                    "question": (
+                        "Wie kann ein Muster nach der Einsicht anders weitergehen?"
+                    ),
+                    "origin": origin,
+                },
+                follow_redirects=False,
+            )
+            assert response.status_code == 303
+            topic_id = UUID(response.headers["location"].rsplit("/", 1)[-1])
+            created_ids.append(topic_id)
+            detail = client.get(f"/topics/{topic_id}")
+            assert detail.status_code == 200
+            assert "Recherche starten ist in dieser Phase bewusst deaktiviert" not in (
+                detail.text
+            )
+            assert "Thema verwenden" in detail.text
+            used = client.post(f"/topics/{topic_id}/use", follow_redirects=False)
+            assert used.status_code == 303
+            assert used.headers["location"].startswith("/workspace/")
+            project_ids.append(UUID(used.headers["location"].rsplit("/", 1)[-1]))
+            duplicate = client.post(f"/topics/{topic_id}/use", follow_redirects=False)
+            assert duplicate.headers["location"] == used.headers["location"]
+
+    async def verify_and_cleanup() -> None:
+        async with database.transaction() as session:
+            projects = list(
+                await session.scalars(
+                    select(EditorialProject).where(EditorialProject.id.in_(project_ids))
+                )
+            )
+            assert len(projects) == 2
+            assert all(project.content_topic_id in created_ids for project in projects)
+            research_ids = [
+                project.research_project_id
+                for project in projects
+                if project.research_project_id is not None
+            ]
+            await session.execute(
+                delete(EditorialProject).where(EditorialProject.id.in_(project_ids))
+            )
+            await session.execute(
+                delete(ResearchProject).where(ResearchProject.id.in_(research_ids))
+            )
+            await session.execute(
+                delete(ContentTopic).where(ContentTopic.id.in_(created_ids))
+            )
+
+    asyncio.run(verify_and_cleanup())
     asyncio.run(database.dispose())
