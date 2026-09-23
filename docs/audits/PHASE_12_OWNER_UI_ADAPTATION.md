@@ -11,8 +11,8 @@ tables or using published prose as writer context.
 ## Acceptance evidence
 
 - Primary navigation contains Dashboard, Lektionen, Themen, Quellen, Kanäle,
-  Wissensbasis, Studio, Texte, and Archiv; the historical strategy tree is not a
-  primary navigation item.
+  Wissensbasis, Studio, Texte, and Archiv; the historical strategy tree is not
+  an owner-facing content surface.
 - `/lessons` renders exactly 100 imported lessons and the real 837-relation and
   22-core-concept health counts.
 - Search, status/concept/prerequisite/range filters, lesson detail, relation
@@ -23,6 +23,8 @@ tables or using published prose as writer context.
   not offer ordinary full-book Ayin retrieval.
 - Studio, Texte, and text detail retain lesson, AI-topic, owner-topic, or
   historical provenance without forcing every text into the canon.
+- Legacy strategy URLs redirect to `/lessons`; tree rendering, approval, and
+  topic-use actions cannot recreate or expose the old fixed strategy.
 - Archiv and the knowledge-base script archive contain only published texts;
   unpublished drafts are explicitly excluded.
 - A safe local-browser fixture was created, approved, published, observed in
@@ -56,11 +58,25 @@ remaining failures are outside this UI change and are not hidden:
   multilingual regression test still expects byte-identical voice text;
 - the topic-suggestion integration fixture selects a latest persistent batch
   that contains no topics after repeated local runs;
-- the historical strategy-tree integration fixture expects a seeded strategy,
-  but the current local database contains none.
+- the historical strategy-tree integration fixture expected a seeded strategy,
+  but the current local database contained none. This obsolete expectation was
+  closed by the later tree-retirement regression test.
 
 The directly affected owner tests, all unit tests, strict mypy, changed-file
 Ruff, template parsing, and browser QA pass.
+
+Legacy-tree retirement follow-up:
+
+```text
+uv run pytest tests/unit/test_owner_web.py tests/unit/test_text_library.py -q
+9 passed
+
+EMTEDAD_DATABASE_URL=... uv run pytest \
+  tests/integration/test_topic_strategy.py \
+  tests/integration/test_owner_dashboard.py \
+  tests/integration/test_owner_lessons.py -q
+3 passed
+```
 
 ## Browser QA
 

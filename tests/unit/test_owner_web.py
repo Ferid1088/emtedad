@@ -46,6 +46,13 @@ def test_primary_navigation_uses_lessons_not_strategy_tree() -> None:
     assert "('/strategy', 'Themenbaum')" not in template
 
 
+def test_legacy_strategy_templates_are_removed() -> None:
+    templates = Path(__file__).parents[2] / "app" / "web" / "templates"
+
+    assert not (templates / "strategy_tree.html").exists()
+    assert not (templates / "strategy_topic_detail.html").exists()
+
+
 def test_overlap_is_deterministic() -> None:
     assert (
         TopicSuggestionService._overlap("pattern and change", "pattern and change")

@@ -86,8 +86,8 @@ The German-first owner workspace now exposes the lesson-canon production model:
 - Studio and the text library retain lesson or dynamic-topic provenance;
 - published-only memory is visible through `Archiv` and the knowledge-base
   review area; drafts never appear there;
-- the old strategy route remains available only for historical compatibility
-  and is absent from primary navigation.
+- the old strategy tree templates and actions are retired; legacy URLs redirect
+  to `/lessons`, while historical project provenance remains intact.
 
 Acceptance evidence includes owner-route integration coverage plus responsive
 desktop, tablet, and mobile browser QA of the canonical lesson journey.

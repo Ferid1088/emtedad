@@ -113,7 +113,7 @@ def _origin(
     if strategy_node is not None:
         return "STRATEGY", ORIGIN_LABELS["STRATEGY"]
     if getattr(project, "strategy_topic_snapshot", None):
-        return "STRATEGY", "Historisches Themenbaum-Thema"
+        return "STRATEGY", ORIGIN_LABELS["STRATEGY"]
     key = getattr(topic.origin, "value", topic.origin) if topic else "LEGACY"
     key = str(key)
     return key, ORIGIN_LABELS.get(key, "Historisches Thema")

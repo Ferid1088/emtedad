@@ -1,4 +1,3 @@
-import asyncio
 import os
 from pathlib import Path
 from uuid import UUID
@@ -6,93 +5,40 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import delete, select
 
-from app.content_strategy.models import (
-    EditorialProject,
-    TopicStrategy,
-    TopicStrategyNode,
-    TopicUseHistory,
-)
 from app.core.config import Environment, Settings
-from app.db.session import Database
 from app.main import create_app
-from app.research.models import ResearchProject
 
 
 @pytest.mark.integration
-def test_strategy_tree_is_grounded_and_topic_use_is_repeatable() -> None:
+def test_strategy_tree_owner_workflow_is_retired() -> None:
     database_url = os.environ.get("EMTEDAD_DATABASE_URL")
     if not database_url:
         pytest.skip("EMTEDAD_DATABASE_URL is required")
-    database = Database(database_url)
-
-    async def unused_node() -> tuple[UUID, int]:
-        async with database.transaction() as session:
-            strategy = await session.scalar(
-                select(TopicStrategy).order_by(TopicStrategy.version_number.desc())
-            )
-            assert strategy is not None
-            node = await session.scalar(
-                select(TopicStrategyNode)
-                .where(
-                    TopicStrategyNode.strategy_id == strategy.id,
-                    TopicStrategyNode.node_type == "TOPIC",
-                    TopicStrategyNode.generation_count == 0,
-                )
-                .order_by(TopicStrategyNode.ordinal)
-            )
-            assert node is not None
-            return node.id, node.generation_count
-
-    node_id, count_before = asyncio.run(unused_node())
     settings = Settings(
         _env_file=None,
         environment=Environment.TEST,
         database_url=SecretStr(database_url),
         storage_root=Path("/tmp/emtedad-topic-strategy-test"),
     )
+    retired_id = UUID("00000000-0000-0000-0000-000000000001")
     with TestClient(create_app(settings)) as client:
-        tree = client.get("/strategy")
-        assert tree.status_code == 200
-        assert "Emtedad Themenbaum" in tree.text
-        assert "unbenutzt" in tree.text
-        detail = client.get(f"/strategy/topics/{node_id}")
-        assert detail.status_code == 200
-        used = client.post(
-            f"/strategy/topics/{node_id}/use",
-            data={
-                "owner_prompt": "Persian-first focus",
-                "target_duration_minutes": "10",
-            },
-            follow_redirects=False,
+        requests = (
+            client.get("/strategy", follow_redirects=False),
+            client.post("/strategy/generate", follow_redirects=False),
+            client.post(f"/strategy/{retired_id}/approve", follow_redirects=False),
+            client.get(f"/strategy/topics/{retired_id}", follow_redirects=False),
+            client.post(f"/strategy/topics/{retired_id}/use", follow_redirects=False),
         )
-        assert used.status_code == 303
-        workspace = client.get(used.headers["location"])
-        assert workspace.status_code == 200
-        assert "Recherche" in workspace.text
+        for response in requests:
+            assert response.status_code == 303
+            assert response.headers["location"] == "/lessons"
 
-    async def cleanup() -> None:
-        async with database.transaction() as session:
-            project = await session.get(
-                EditorialProject, UUID(used.headers["location"].split("/")[-1])
-            )
-            if project is not None:
-                research_id = project.research_project_id
-                await session.execute(
-                    delete(TopicUseHistory).where(
-                        TopicUseHistory.editorial_project_id == project.id
-                    )
-                )
-                await session.delete(project)
-                if research_id is not None:
-                    research = await session.get(ResearchProject, research_id)
-                    if research is not None:
-                        await session.delete(research)
-            node = await session.get(TopicStrategyNode, node_id)
-            assert node is not None
-            node.generation_count = count_before
-            node.last_generated_at = None
+        lessons = client.get("/lessons")
+        assert lessons.status_code == 200
+        assert "100-Lektionen-Kanon" in lessons.text
 
-    asyncio.run(cleanup())
-    asyncio.run(database.dispose())
+        topics = client.get("/topics")
+        assert topics.status_code == 200
+        assert "Freie Themen" in topics.text
+        assert 'href="/strategy"' not in topics.text

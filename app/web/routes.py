@@ -30,7 +30,6 @@ from app.content_strategy.models import (
     EditorialLanguageTrack,
     EditorialProject,
     PersianDraft,
-    TopicStrategyNode,
     TopicSuggestionBatch,
 )
 from app.content_strategy.multilingual_service import MultilingualEditorialService
@@ -771,78 +770,37 @@ async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
     return RedirectResponse(f"/topics/{topic_id}?analysis=updated", status_code=303)
 
 
-@router.get("/strategy", response_class=HTMLResponse)
-async def strategy_tree(request: Request) -> HTMLResponse:
-    service = TopicStrategyService(_database(request))
-    strategy, nodes = await service.current()
-    children: dict[UUID | None, list[TopicStrategyNode]] = {}
-    for node in nodes:
-        children.setdefault(node.parent_id, []).append(node)
-    metrics = (
-        await service.metrics(strategy.id)
-        if strategy
-        else {
-            "total": 0,
-            "used": 0,
-            "unused": 0,
-        }
-    )
-    return await _render(
-        request,
-        "strategy_tree.html",
-        title="Historischer Themenbaum",
-        strategy=strategy,
-        root=next((node for node in nodes if node.node_type == "ROOT"), None),
-        children=children,
-        metrics=metrics,
-    )
+@router.get("/strategy")
+async def retired_strategy_tree() -> RedirectResponse:
+    """Retire the former fixed tree without deleting historical references."""
+
+    return RedirectResponse("/lessons", status_code=303)
 
 
 @router.post("/strategy/generate")
-async def generate_strategy(request: Request) -> RedirectResponse:
-    # The former lexicon-oriented generator is intentionally disabled while
-    # the replacement content strategy is being designed.
-    return RedirectResponse("/strategy?generation=disabled", status_code=303)
+async def generate_strategy() -> RedirectResponse:
+    """Never recreate the obsolete owner-facing strategy tree."""
+
+    return RedirectResponse("/lessons", status_code=303)
 
 
 @router.post("/strategy/{strategy_id}/approve")
 async def approve_strategy(request: Request, strategy_id: UUID) -> RedirectResponse:
-    await TopicStrategyService(_database(request)).approve(strategy_id)
-    return RedirectResponse("/strategy", status_code=303)
+    return RedirectResponse("/lessons", status_code=303)
 
 
-@router.get("/strategy/topics/{node_id}", response_class=HTMLResponse)
-async def strategy_topic_detail(request: Request, node_id: UUID) -> HTMLResponse:
-    async with _database(request).transaction() as session:
-        node = await session.get(TopicStrategyNode, node_id)
-        if node is None or node.node_type != "TOPIC":
-            return HTMLResponse("Strategiethema nicht gefunden", status_code=404)
-        projects = list(
-            await session.scalars(
-                select(EditorialProject)
-                .where(EditorialProject.strategy_node_id == node.id)
-                .order_by(EditorialProject.created_at.desc())
-            )
-        )
-    return await _render(
-        request,
-        "strategy_topic_detail.html",
-        title=node.title,
-        node=node,
-        editorial_projects=projects,
-    )
+@router.get("/strategy/topics/{node_id}")
+async def retired_strategy_topic(node_id: UUID) -> RedirectResponse:
+    """Keep old URLs safe while removing the tree as a navigation surface."""
+
+    return RedirectResponse("/lessons", status_code=303)
 
 
 @router.post("/strategy/topics/{node_id}/use")
-async def use_strategy_topic(request: Request, node_id: UUID) -> RedirectResponse:
-    form = await request.form()
-    prompt = str(form.get("owner_prompt", "")).strip() or None
-    raw_duration = str(form.get("target_duration_minutes", "")).strip()
-    duration = int(raw_duration) if raw_duration.isdigit() else None
-    project_id = await TopicStrategyService(_database(request)).use_topic(
-        node_id, owner_prompt=prompt, target_duration_minutes=duration
-    )
-    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+async def use_strategy_topic(node_id: UUID) -> RedirectResponse:
+    """Block new projects from obsolete fixed strategy topics."""
+
+    return RedirectResponse("/lessons", status_code=303)
 
 
 @router.get("/workspace/{project_id}", response_class=HTMLResponse)

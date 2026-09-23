@@ -19,7 +19,7 @@ Only one phase may be `in_progress` at a time.
   (2026-09-24)
 - Latest owner-UI checkpoint: canonical lesson catalog, lesson-aware Studio and
   text provenance, separated external research, and published-only channel
-  memory (2026-09-24)
+  memory; legacy topic-tree UI retired (2026-09-24)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
 - Open blocker: None remaining for Phase 8. Phase 9 requires explicit approval
@@ -43,7 +43,7 @@ Only one phase may be `in_progress` at a time.
 | 9 | Four Languages | complete | FA/DE/EN/AR localization, pronunciation QA, and voice boundary |
 | 10 | Content Strategy and Publishing | complete | Series, coverage and publication packages |
 | 11 | Evaluation | complete | Owner source/topic discovery and validation checkpoints |
-| 12 | Emtedad Editorial Pipeline | complete | Strategy tree, research workspace, Persian approval, multilingual text output |
+| 12 | Emtedad Editorial Pipeline | complete | Lesson canon, research workspace, Persian approval, multilingual text output |
 
 ## Phase 0 — Repository Audit
 
