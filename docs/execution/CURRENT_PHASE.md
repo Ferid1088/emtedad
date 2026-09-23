@@ -2,7 +2,7 @@
 
 ## Execution status
 
-Phase 11 is complete as of 2026-09-23. The owner MVP web app provides
+Phase 12 final editorial output is complete as of 2026-09-23. The owner MVP web app provides
 German-first source ingestion, knowledge browsing, grounded topic suggestions,
 and manual topic analysis using the existing Phase 4 and Phase 10 services.
 See `docs/audits/PHASE_11_OWNER_MVP_WEB_APP.md`.
@@ -35,6 +35,14 @@ Completion evidence: `docs/audits/PHASE_7_COMPLETION.md`.
 - immutable READY masters and standalone Phase 9 handoff exports.
 
 Completion evidence: `docs/audits/PHASE_8_COMPLETION.md`.
+
+## Completed Phase 12 final checkpoint
+
+- approved Persian remains the exact FA editorial source;
+- direct, independently versioned FA/DE/EN/AR editorial tracks;
+- explicit voice-ready text preparation with no audio or ElevenLabs calls;
+- standalone text-to-voice preparation utility;
+- duration-aware Persian generation and immutable provenance.
 
 ## Next-phase goal
 

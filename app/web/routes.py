@@ -16,10 +16,12 @@ from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_strategy.domain import TopicOrigin
 from app.content_strategy.models import (
     ContentTopic,
+    EditorialLanguageTrack,
     EditorialProject,
     PersianDraft,
     TopicStrategyNode,
 )
+from app.content_strategy.multilingual_service import MultilingualEditorialService
 from app.content_strategy.persian_service import PersianEditorialService
 from app.content_strategy.strategy_service import TopicStrategyService
 from app.db.session import Database
@@ -457,6 +459,16 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
                 .order_by(PersianDraft.variant_index, PersianDraft.version_number)
             )
         )
+        tracks = list(
+            await session.scalars(
+                select(EditorialLanguageTrack)
+                .where(EditorialLanguageTrack.editorial_project_id == project.id)
+                .order_by(
+                    EditorialLanguageTrack.language,
+                    EditorialLanguageTrack.version_number.desc(),
+                )
+            )
+        )
         masters = list(
             await session.scalars(
                 select(LectureMasterVersion).order_by(
@@ -470,6 +482,7 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
         title=project.title,
         project=project,
         drafts=drafts,
+        tracks=tracks,
         masters=masters,
     )
 
@@ -520,6 +533,27 @@ async def approve_persian_draft(
     return RedirectResponse(f"/workspace/{project_id}", status_code=303)
 
 
+@router.post("/workspace/{project_id}/translations")
+async def create_translations(request: Request, project_id: UUID) -> RedirectResponse:
+    form = await request.form()
+    draft_id = UUID(str(form.get("draft_id")))
+    raw_languages = form.getlist("languages")
+    languages = tuple(str(item) for item in raw_languages) or ("fa", "de", "en", "ar")
+    service = MultilingualEditorialService(_database(request))
+    await service.create(draft_id, languages, expected_project_id=project_id)
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
+@router.post("/workspace/{project_id}/tracks/{track_id}/voice")
+async def prepare_track_voice(
+    request: Request, project_id: UUID, track_id: UUID
+) -> RedirectResponse:
+    await MultilingualEditorialService(_database(request)).prepare_voice(
+        track_id, expected_project_id=project_id
+    )
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
 @router.get("/studio", response_class=HTMLResponse)
 async def studio(request: Request) -> HTMLResponse:
     async with _database(request).transaction() as session:
@@ -529,6 +563,43 @@ async def studio(request: Request) -> HTMLResponse:
             )
         )
     return await _render(request, "studio.html", title="Studio", projects=projects)
+
+
+@router.get("/studio/voice", response_class=HTMLResponse)
+async def studio_voice(request: Request) -> HTMLResponse:
+    return await _render(
+        request,
+        "studio_voice.html",
+        title="Text für Voice vorbereiten",
+        result=None,
+        error=None,
+    )
+
+
+@router.post("/studio/voice", response_class=HTMLResponse)
+async def studio_voice_prepare(request: Request) -> HTMLResponse:
+    form = await request.form()
+    language = str(form.get("language", "fa"))
+    text = str(form.get("text", ""))
+    if language not in {"fa", "de", "en", "ar"} or not text.strip():
+        return await _render(
+            request,
+            "studio_voice.html",
+            title="Text für Voice vorbereiten",
+            result=None,
+            error="Sprache und Text sind erforderlich.",
+        )
+    from app.lecture.domain import PublicationLanguage
+    from app.localization.pronunciation import prepare_pronunciation
+
+    result = prepare_pronunciation(PublicationLanguage(language), text, [])
+    return await _render(
+        request,
+        "studio_voice.html",
+        title="Text für Voice vorbereiten",
+        result=result,
+        error=None,
+    )
 
 
 @router.get("/channels", response_class=HTMLResponse)

@@ -20,6 +20,16 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"[\w\u0600-\u06ff]+", text))
 
 
+def _fit_duration(text: str, target_words: int) -> str:
+    words = text.split()
+    if _word_count(text) <= target_words:
+        return text
+    end = min(target_words, len(words))
+    while end > 1 and _word_count(" ".join(words[:end])) > target_words:
+        end -= 1
+    return " ".join(words[:end]).rstrip("،؛,.؟") + " …"
+
+
 class PersianEditorialService:
     """Create immutable draft versions; owner text is never overwritten."""
 
@@ -54,6 +64,8 @@ class PersianEditorialService:
             "در چارچوب آیین امتداد، این پرسش را با دقت و بدون ادعای اثبات "
             "علمی دنبال می‌کنیم.\n\n" + "\n\n".join(claims)
         )
+        target_words = target_minutes * 110
+        text = _fit_duration(text, target_words)
         count = _word_count(text)
         async with self.database.transaction() as session:
             project = await session.get(EditorialProject, project_id)
@@ -74,8 +86,8 @@ class PersianEditorialService:
                     text=text,
                     owner_prompt=owner_prompt,
                     target_duration_minutes=target_minutes,
-                    target_word_count_min=target_minutes * 110,
-                    target_word_count_max=target_minutes * 145,
+                    target_word_count_min=round(target_words * 0.9),
+                    target_word_count_max=round(target_words * 1.1),
                     actual_word_count=count,
                     estimated_duration_seconds=round(count / 110 * 60),
                     provenance={

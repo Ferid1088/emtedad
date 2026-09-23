@@ -245,6 +245,37 @@ class PersianReviewFinding(Base):
     )
 
 
+class EditorialLanguageTrack(Base):
+    """One versioned FA/DE/EN/AR text track sourced from approved Persian."""
+
+    __tablename__ = "editorial_language_tracks"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    editorial_project_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.editorial_projects.id", ondelete="RESTRICT")
+    )
+    source_persian_draft_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.persian_drafts.id", ondelete="RESTRICT")
+    )
+    semantic_master_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.lecture_master_versions.id", ondelete="RESTRICT")
+    )
+    language: Mapped[str] = mapped_column(String(8))
+    version_number: Mapped[int] = mapped_column(Integer)
+    display_text: Mapped[str] = mapped_column(Text)
+    voice_ready_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="TRANSLATED")
+    semantic_validation_status: Mapped[str] = mapped_column(
+        String(32), default="NOT_VALIDATED"
+    )
+    actual_word_count: Mapped[int] = mapped_column(Integer)
+    estimated_duration_seconds: Mapped[int] = mapped_column(Integer)
+    provenance: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
 class ContentTopicRelation(Base):
     __tablename__ = "content_topic_relations"
     __table_args__ = {"schema": CONTENT}

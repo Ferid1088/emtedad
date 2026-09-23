@@ -11,8 +11,8 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: Phase 9 — Four Languages (pending owner review)
-- Last completed checkpoint: Phase 8 - Semantic Lecture Master
+- Active phase: Phase 12 — complete (pending owner review)
+- Last completed checkpoint: Phase 12 - approved Persian multilingual production
   (2026-09-23)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
@@ -34,9 +34,10 @@ Only one phase may be `in_progress` at a time.
 | 6 | Ayin–External Dialogue | complete | Typed relations, classification, criticism and review |
 | 7 | Research Engine | complete | Ayin Spine, ResearchPlan and frozen ResearchPackage |
 | 8 | Lecture Master | complete | Cited Semantic Master and validators |
-| 9 | Four Languages | in_progress | FA/DE/EN/AR localization, pronunciation QA, and TTS boundary |
-| 10 | Content Strategy and Publishing | pending | Series, coverage and publication packages |
-| 11 | Evaluation | pending | Gold sets, fidelity fixtures and benchmarks |
+| 9 | Four Languages | complete | FA/DE/EN/AR localization, pronunciation QA, and voice boundary |
+| 10 | Content Strategy and Publishing | complete | Series, coverage and publication packages |
+| 11 | Evaluation | complete | Owner source/topic discovery and validation checkpoints |
+| 12 | Emtedad Editorial Pipeline | complete | Strategy tree, research workspace, Persian approval, multilingual text output |
 
 ## Phase 0 — Repository Audit
 
