@@ -10,6 +10,7 @@ from alembic import context
 from app.core.ayin import models as ayin_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.terminology import models as terminology_models  # noqa: F401
+from app.content_strategy import models as content_strategy_models  # noqa: F401
 from app.db.base import Base
 from app.dialogue import models as dialogue_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
