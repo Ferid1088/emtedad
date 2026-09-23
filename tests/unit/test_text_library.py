@@ -36,10 +36,10 @@ def test_text_library_origin_prefers_strategy_node() -> None:
         cast(EditorialProject, project),
         cast(ContentTopic, topic),
         cast(TopicStrategyNode, node),
-    ) == ("STRATEGY", "Themenbaum")
+    ) == ("STRATEGY", "Historisches Strategiethema")
     assert _origin(
         cast(EditorialProject, project), cast(ContentTopic, topic), None
-    ) == ("AI_SUGGESTED", "KI-Vorschlag")
+    ) == ("AI_SUGGESTED", "KI-Thema")
 
 
 def test_text_detail_keeps_three_text_representations_separate() -> None:

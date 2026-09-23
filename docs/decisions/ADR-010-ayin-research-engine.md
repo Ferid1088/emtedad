@@ -39,4 +39,6 @@ required before any later publishing phase.
 
 ## Supersedes / Superseded by
 
-None.
+ADR-013 supersedes Ayin retrieval inside the ordinary 100-lesson production
+path. Frozen external research, counterevidence, reproducibility, and specialist
+research behavior remain in force.

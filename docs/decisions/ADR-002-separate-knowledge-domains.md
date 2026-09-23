@@ -29,3 +29,9 @@ lecture generation.
 - One vector index with only similarity ranking: rejected.
 - One corpus with prompt-only authority instructions: rejected because domain
   integrity must not depend solely on model obedience.
+
+## Supersedes / Superseded by
+
+ADR-013 supersedes the use of the Ayin retrieval lane as ordinary 100-lesson
+writer input. The separate-domain and specialist-retrieval decisions remain in
+force.

@@ -29,3 +29,4 @@ belong to the editorial versioning workflow.
 - [ADR-010: Ayin Research Engine and Frozen ResearchPackages](ADR-010-ayin-research-engine.md)
 - [ADR-011: Semantic Lecture Master and ResearchPackage Writer Isolation](ADR-011-semantic-lecture-master.md)
 - [ADR-012: Localization and Pronunciation Boundary](ADR-012-localization-pronunciation-boundary.md)
+- [ADR-013: Lesson Canon and Script-Generation Retrieval Boundary](ADR-013-lesson-canon-generation-boundary.md)

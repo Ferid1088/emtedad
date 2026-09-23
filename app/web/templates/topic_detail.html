@@ -11,7 +11,7 @@
 <section class="card">
   <h2>Mit diesem Thema weiterarbeiten</h2>
   {% if overlap_score >= 0.8 %}<p class="warning">Dieses Thema überschneidet sich stark mit bestehenden Themen. Du kannst es trotzdem verwenden.</p>{% endif %}
-  <p class="muted">Dieses analysierte Thema kann in denselben redaktionellen Produktionsablauf wie ein Thema aus dem Themenbaum übernommen werden.</p>
+  <p class="muted">Dieses freie Thema kann in den bestehenden redaktionellen Produktionsablauf übernommen werden. Es wird dadurch nicht zu einer kanonischen Lektion.</p>
   <form method="post" action="/topics/{{ topic.id }}/use">
     <button class="button" type="submit">{{ "Neues Projekt mit diesem Thema" if editorial_projects else "Thema verwenden" }}</button>
   </form>

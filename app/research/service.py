@@ -1006,14 +1006,9 @@ class ResearchEngineService:
 
     @staticmethod
     def _default_questions(
-        human_question: str, spine: AyinSpine
+        human_question: str, _spine: AyinSpine
     ) -> list[ResearchQuestionInput]:
         return [
-            ResearchQuestionInput(
-                kind=ResearchQuestionKind.AYIN,
-                question=f"How does Ayin frame this question: {human_question}",
-                retrieval_text=human_question,
-            ),
             ResearchQuestionInput(
                 kind=ResearchQuestionKind.EMPIRICAL,
                 question=("What external evidence is relevant without proving Ayin?"),

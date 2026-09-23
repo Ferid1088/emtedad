@@ -42,4 +42,7 @@ optional experiential link rather than evidence.
 
 ## Supersedes / Superseded by
 
-None.
+ADR-013 supersedes the frozen ResearchPackage as the sole writer input for
+ordinary 100-lesson production. The writer boundary is now a pinned canonical
+Lesson Content Package plus Core Concept Registry plus frozen external research;
+writer isolation and immutable READY masters remain in force.

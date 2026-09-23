@@ -44,6 +44,56 @@ Completion evidence: `docs/audits/PHASE_8_COMPLETION.md`.
 - standalone text-to-voice preparation utility;
 - duration-aware Persian generation and immutable provenance.
 
+## Completed Phase 12 lesson-canon generation boundary revision
+
+ADR-013 is implemented as of 2026-09-24:
+
+- ordinary 100-lesson production loads a content-hashed canonical Lesson
+  Content Package directly from `resources/editorial/lesson_canon`;
+- the canonical lesson explanation is the Ayin core and is not regenerated as
+  an AI-authored seed;
+- default lesson research retrieves external evidence and counterevidence, not
+  the complete Ayin book;
+- Ayin-origin Semantic Master claims and evidence are filtered out of the
+  Persian writer context;
+- Channel Ledger, Published Script Archive, and lesson relations remain
+  post-draft review inputs;
+- the complete Ayin corpus remains available for provenance, inspection,
+  verification, revision, citations, and explicit specialist research;
+- lesson ID, package version, full package snapshot, canon hash, input roles,
+  and provenance-completeness state are stored with every generated draft.
+
+Acceptance evidence:
+
+- `docs/audits/PHASE_12_LESSON_CANON_GENERATION_BOUNDARY.md`
+
+Open review item: the supplied lesson JSON contains no per-lesson Ayin source
+version, passage/page, concept, or distinction mapping. The package records
+`MISSING_LESSON_AYIN_PROVENANCE`; no source evidence was invented.
+
+## Completed Phase 12 owner UI adaptation
+
+The German-first owner workspace now exposes the lesson-canon production model:
+
+- `Lektionen` is the primary 100-lesson catalog and replaces the strategy tree
+  in owner navigation;
+- lesson list, search, filters, detail, relations, concepts, production status,
+  and real database progress counts are available without exposing raw IDs;
+- lesson projects enter the existing `EditorialProject` and Studio workflow
+  with a pinned, read-only Lesson Content Package;
+- Studio separates the canonical Ayin core from external research and offers no
+  ordinary full-book Ayin search;
+- Studio and the text library retain lesson or dynamic-topic provenance;
+- published-only memory is visible through `Archiv` and the knowledge-base
+  review area; drafts never appear there;
+- the old strategy route remains available only for historical compatibility
+  and is absent from primary navigation.
+
+Acceptance evidence includes owner-route integration coverage plus responsive
+desktop, tablet, and mobile browser QA of the canonical lesson journey.
+
+- `docs/audits/PHASE_12_OWNER_UI_ADAPTATION.md`
+
 ## Next-phase goal
 
 Implement language realization and pronunciation preparation from standalone

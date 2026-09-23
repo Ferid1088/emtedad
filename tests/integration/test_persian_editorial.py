@@ -60,6 +60,7 @@ def test_persian_drafts_are_researched_versioned_and_owner_approvable() -> None:
             f"/workspace/{project_id}/persian/drafts",
             data={
                 "semantic_master_id": str(master_id),
+                "lesson_id": "1.1",
                 "target_duration_minutes": "15",
                 "draft_count": "3",
                 "owner_prompt": "Ruhig und verständlich.",

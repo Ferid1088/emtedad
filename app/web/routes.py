@@ -15,6 +15,16 @@ from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_strategy.domain import TopicOrigin, TopicWorkspaceStatus
+from app.content_strategy.lesson_canon import LessonCanonRepository
+from app.content_strategy.lesson_catalog import (
+    filter_lesson_catalog,
+    load_lesson_catalog,
+)
+from app.content_strategy.lesson_workflow import (
+    create_lesson_project,
+    lesson_package_from_project,
+    lesson_project_metadata,
+)
 from app.content_strategy.models import (
     ContentTopic,
     EditorialLanguageTrack,
@@ -32,8 +42,10 @@ from app.content_strategy.text_library import (
     duplicate_project,
     library_filter_options,
     load_library_items,
+    publish_project,
     restore_project,
 )
+from app.core.ayin.models import CanonDocument
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
@@ -72,6 +84,15 @@ async def _render(request: Request, name: str, **context: object) -> HTMLRespons
     return templates.TemplateResponse(request=request, name=name, context=context)
 
 
+def _optional_int(value: str) -> int | None:
+    """Treat empty HTML number inputs as absent instead of returning HTTP 422."""
+
+    try:
+        return int(value) if value.strip() else None
+    except ValueError:
+        return None
+
+
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
     async with _database(request).transaction() as session:
@@ -94,6 +115,18 @@ async def dashboard(request: Request) -> HTMLResponse:
             )
             or 0
         )
+        lesson_progress = None
+        lesson_health = None
+        try:
+            lesson_repository = LessonCanonRepository()
+            _, lesson_progress = await load_lesson_catalog(session, lesson_repository)
+            lesson_health = {
+                "lessons": lesson_repository.lesson_count,
+                "relations": lesson_repository.relation_count,
+                "concepts": len(lesson_repository.core_concepts()),
+            }
+        except (FileNotFoundError, ValueError):
+            logger.exception("lesson canon unavailable for dashboard")
     return await _render(
         request,
         "dashboard.html",
@@ -102,6 +135,8 @@ async def dashboard(request: Request) -> HTMLResponse:
         sources=sources,
         topics=topics,
         pending_channels=pending_channels,
+        lesson_progress=lesson_progress,
+        lesson_health=lesson_health,
     )
 
 
@@ -242,7 +277,15 @@ async def source_detail(request: Request, source_id: UUID) -> HTMLResponse:
 async def knowledge(request: Request, section: str = "sources") -> HTMLResponse:
     async with _database(request).transaction() as session:
         data: object
-        if section == "people":
+        if section == "script_archive":
+            data = await load_library_items(session, status="PUBLISHED")
+        elif section == "ayin_source":
+            data = list(
+                await session.scalars(
+                    select(CanonDocument).order_by(CanonDocument.created_at.desc())
+                )
+            )
+        elif section == "people":
             data = list(
                 await session.scalars(select(Person).order_by(Person.canonical_name))
             )
@@ -275,8 +318,182 @@ async def knowledge(request: Request, section: str = "sources") -> HTMLResponse:
                 await session.scalars(select(Source).order_by(Source.created_at.desc()))
             )
     return await _render(
-        request, "knowledge.html", title="Wissensbasis", section=section, data=data
+        request,
+        "knowledge.html",
+        title="Wissensbasis",
+        section=section,
+        data=data,
+        ayin_zone_labels={
+            "AYIN_CANON": "Ayin-Kanon",
+            "AYIN_WORKING": "Ayin-Arbeitsstand",
+        },
     )
+
+
+@router.get("/lessons", response_class=HTMLResponse)
+async def lessons(
+    request: Request,
+    q: str = "",
+    status: str = "",
+    concept: str = "",
+    prerequisites: str = "ALL",
+    number_from: str = "",
+    number_to: str = "",
+) -> HTMLResponse:
+    """Render the approved lesson canon as the long-term editorial map."""
+
+    try:
+        repository = LessonCanonRepository()
+        async with _database(request).transaction() as session:
+            catalog, progress = await load_lesson_catalog(session, repository)
+        filtered = filter_lesson_catalog(
+            catalog,
+            query=q,
+            status=status,
+            concept=concept,
+            prerequisites=prerequisites,
+            number_from=_optional_int(number_from),
+            number_to=_optional_int(number_to),
+        )
+        health = {
+            "lessons": repository.lesson_count,
+            "relations": repository.relation_count,
+            "concepts": len(repository.core_concepts()),
+        }
+        core_concepts = repository.core_concepts()
+        error = None
+    except (FileNotFoundError, ValueError) as exc:
+        logger.exception("lesson canon unavailable")
+        filtered = []
+        progress = None
+        health = None
+        core_concepts = []
+        error = str(exc)
+    return await _render(
+        request,
+        "lessons.html",
+        title="Lektionen",
+        lessons=filtered,
+        progress=progress,
+        health=health,
+        core_concepts=core_concepts,
+        error=error,
+        q=q,
+        selected_status=status,
+        selected_concept=concept,
+        selected_prerequisites=prerequisites,
+        number_from=number_from,
+        number_to=number_to,
+    )
+
+
+@router.get("/lessons/concepts", response_class=HTMLResponse)
+async def lesson_concepts(request: Request) -> HTMLResponse:
+    try:
+        repository = LessonCanonRepository()
+        concepts = repository.core_concepts()
+        error = None
+    except (FileNotFoundError, ValueError) as exc:
+        logger.exception("lesson core concepts unavailable")
+        concepts = []
+        error = str(exc)
+    return await _render(
+        request,
+        "lesson_concepts.html",
+        title="Kernbegriffe",
+        concepts=concepts,
+        error=error,
+    )
+
+
+@router.get("/lessons/{lesson_id}", response_class=HTMLResponse)
+async def lesson_detail(request: Request, lesson_id: str) -> HTMLResponse:
+    try:
+        repository = LessonCanonRepository()
+        package = repository.package(lesson_id)
+    except ValueError:
+        return HTMLResponse("Lektion nicht gefunden", status_code=404)
+    except FileNotFoundError:
+        return HTMLResponse("Lektionskanon nicht importiert", status_code=503)
+
+    summaries = {item.lesson_id: item for item in repository.summaries()}
+    prerequisites_view = [
+        {
+            "lesson": summaries[relation.to_lesson_id],
+            "number": repository.ordinal(relation.to_lesson_id),
+            "explanation": relation.explanation_fa,
+        }
+        for relation in repository.outgoing_relations(lesson_id)
+        if relation.is_prerequisite
+    ]
+    prepares_view = [
+        {
+            "lesson": summaries[relation.from_lesson_id],
+            "number": repository.ordinal(relation.from_lesson_id),
+            "explanation": relation.explanation_fa,
+        }
+        for relation in repository.incoming_relations(lesson_id)
+        if relation.is_prerequisite
+    ]
+    related: dict[str, dict[str, object]] = {}
+    for relation in repository.outgoing_relations(lesson_id):
+        if not relation.is_prerequisite:
+            related[relation.to_lesson_id] = {
+                "lesson": summaries[relation.to_lesson_id],
+                "number": repository.ordinal(relation.to_lesson_id),
+                "explanation": relation.explanation_fa,
+            }
+    for relation in repository.incoming_relations(lesson_id):
+        if not relation.is_prerequisite:
+            related.setdefault(
+                relation.from_lesson_id,
+                {
+                    "lesson": summaries[relation.from_lesson_id],
+                    "number": repository.ordinal(relation.from_lesson_id),
+                    "explanation": relation.explanation_fa,
+                },
+            )
+
+    async with _database(request).transaction() as session:
+        catalog, _ = await load_lesson_catalog(session, repository)
+        item = next(entry for entry in catalog if entry.package.lesson_id == lesson_id)
+        projects = [
+            entry
+            for entry in await load_library_items(session, status=None)
+            if entry.lesson is not None and entry.lesson.lesson_id == lesson_id
+        ]
+    return await _render(
+        request,
+        "lesson_detail.html",
+        title=package.canonical_lesson_title,
+        item=item,
+        package=package,
+        projects=projects,
+        prerequisites_view=prerequisites_view,
+        prepares_view=prepares_view,
+        related_view=list(related.values()),
+    )
+
+
+@router.post("/lessons/{lesson_id}/projects")
+async def start_lesson_project(request: Request, lesson_id: str) -> Response:
+    form = await request.form()
+    owner_prompt = str(form.get("owner_prompt", "")).strip() or None
+    raw_duration = str(form.get("target_duration_minutes", "")).strip()
+    duration = int(raw_duration) if raw_duration.isdigit() else None
+    try:
+        repository = LessonCanonRepository()
+        async with _database(request).transaction() as session:
+            project = await create_lesson_project(
+                session,
+                repository,
+                lesson_id,
+                owner_prompt=owner_prompt,
+                target_duration_minutes=duration,
+            )
+    except ValueError:
+        return HTMLResponse("Lektion nicht gefunden", status_code=404)
+    return RedirectResponse(f"/workspace/{project.id}", status_code=303)
 
 
 @router.get("/topics", response_class=HTMLResponse)
@@ -573,7 +790,7 @@ async def strategy_tree(request: Request) -> HTMLResponse:
     return await _render(
         request,
         "strategy_tree.html",
-        title="Themenbaum",
+        title="Historischer Themenbaum",
         strategy=strategy,
         root=next((node for node in nodes if node.node_type == "ROOT"), None),
         children=children,
@@ -630,6 +847,11 @@ async def use_strategy_topic(request: Request, node_id: UUID) -> RedirectRespons
 
 @router.get("/workspace/{project_id}", response_class=HTMLResponse)
 async def editorial_workspace(request: Request, project_id: UUID) -> HTMLResponse:
+    try:
+        lesson_canon = LessonCanonRepository()
+        lesson_summaries = lesson_canon.summaries()
+    except (FileNotFoundError, ValueError):
+        lesson_summaries = []
     async with _database(request).transaction() as session:
         project = await session.get(EditorialProject, project_id)
         if project is None:
@@ -658,6 +880,12 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
                 )
             )
         )
+        workspace_items = await load_library_items(session, status=None)
+        workspace_item = next(
+            (item for item in workspace_items if item.project.id == project.id), None
+        )
+        lesson_metadata = lesson_project_metadata(project)
+        lesson_package = lesson_package_from_project(project)
     return await _render(
         request,
         "editorial_workspace.html",
@@ -666,6 +894,12 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
         drafts=drafts,
         tracks=tracks,
         masters=masters,
+        lessons=lesson_summaries,
+        lesson_metadata=lesson_metadata,
+        lesson_package=lesson_package,
+        project_status_label=(
+            workspace_item.status_label if workspace_item else "In Arbeit"
+        ),
     )
 
 
@@ -725,6 +959,15 @@ async def text_detail(request: Request, project_id: UUID) -> HTMLResponse:
                 )
             )
         )
+        published_items = await load_library_items(session, status="PUBLISHED")
+        related_published = [
+            published
+            for published in published_items
+            if published.project.id != project_id
+            and item.lesson is not None
+            and published.lesson is not None
+            and published.lesson.lesson_id == item.lesson.lesson_id
+        ]
     return await _render(
         request,
         "text_detail.html",
@@ -735,6 +978,7 @@ async def text_detail(request: Request, project_id: UUID) -> HTMLResponse:
         tracks=item.tracks,
         track_history=track_history,
         track_status_labels=TRACK_STATUS_LABELS,
+        related_published=related_published,
     )
 
 
@@ -757,6 +1001,32 @@ async def restore_text(request: Request, project_id: UUID) -> RedirectResponse:
     async with _database(request).transaction() as session:
         await restore_project(session, project_id)
     return RedirectResponse("/texts?status=ACTIVE", status_code=303)
+
+
+@router.post("/texts/{project_id}/publish")
+async def publish_text(request: Request, project_id: UUID) -> Response:
+    try:
+        async with _database(request).transaction() as session:
+            await publish_project(session, project_id)
+    except ValueError:
+        return RedirectResponse(
+            f"/texts/{project_id}?publication=approval-required", status_code=303
+        )
+    return RedirectResponse(f"/texts/{project_id}", status_code=303)
+
+
+@router.get("/archive", response_class=HTMLResponse)
+async def published_archive(request: Request) -> HTMLResponse:
+    """Expose published-only channel memory without raw ledger tables."""
+
+    async with _database(request).transaction() as session:
+        items = await load_library_items(session, status="PUBLISHED")
+    return await _render(
+        request,
+        "archive.html",
+        title="Archiv",
+        items=items,
+    )
 
 
 @router.get("/texts/{project_id}/export")
@@ -820,12 +1090,14 @@ async def generate_persian_drafts(
 ) -> RedirectResponse:
     form = await request.form()
     master_id = UUID(str(form.get("semantic_master_id")))
+    lesson_id = str(form.get("lesson_id", "")).strip()
     target = int(str(form.get("target_duration_minutes", "15")))
     count = int(str(form.get("draft_count", "1")))
     prompt = str(form.get("owner_prompt", "")).strip() or None
     await PersianEditorialService(_database(request)).generate(
         project_id,
         master_id,
+        lesson_id=lesson_id,
         target_minutes=target,
         draft_count=count,
         owner_prompt=prompt,
@@ -894,12 +1166,8 @@ async def prepare_track_performance(
 @router.get("/studio", response_class=HTMLResponse)
 async def studio(request: Request) -> HTMLResponse:
     async with _database(request).transaction() as session:
-        projects = list(
-            await session.scalars(
-                select(EditorialProject).order_by(EditorialProject.created_at.desc())
-            )
-        )
-    return await _render(request, "studio.html", title="Studio", projects=projects)
+        items = await load_library_items(session, status="ACTIVE")
+    return await _render(request, "studio.html", title="Studio", items=items)
 
 
 @router.get("/studio/voice", response_class=HTMLResponse)

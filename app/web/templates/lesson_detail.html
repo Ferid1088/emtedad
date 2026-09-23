@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Lektion {{ item.number }} / {{ item.total }}</p>
+    <h1 dir="rtl">{{ package.canonical_lesson_title }}</h1>
+    <p class="lede" dir="rtl">{{ item.excerpt }}</p>
+    <div class="status-row"><span class="badge {% if item.published %}published{% endif %}">{{ item.status_label }}</span>{% if package.is_core_concept %}<span class="badge">Kernbegriff</span>{% endif %}</div>
+  </div>
+  <form method="post" action="/lessons/{{ package.lesson_id }}/projects"><button class="button" type="submit">Neues Textprojekt starten</button></form>
+</div>
+<nav class="tabs" aria-label="Lektionsbereiche"><a href="#uebersicht">Übersicht</a><a href="#ayin-kern">Ayin-Kern</a><a href="#beziehungen">Beziehungen</a><a href="#texte">Texte</a><a href="#veroeffentlichung">Veröffentlichung</a></nav>
+<section class="card" id="uebersicht">
+  <h2>Übersicht</h2>
+  <dl class="metadata"><div><dt>Kapitel</dt><dd dir="rtl">{{ package.chapter_title_fa }}</dd></div><div><dt>Voraussetzungen</dt><dd>{{ item.prerequisite_count }}</dd></div><div><dt>Textprojekte</dt><dd>{{ item.project_count }}</dd></div></dl>
+  <p class="muted">Der Kanon ist der direkte Ayin-Eingang für Produktion. Die vollständige Ayin-Quelle wird hier nicht live als Book-RAG abgerufen.</p>
+</section>
+<section class="card context-panel" id="ayin-kern">
+  <div class="split-head"><div><p class="eyebrow">100-Lektionen-Kanon</p><h2>Ayin-Kern</h2></div><span class="badge success">Kanonisch</span></div>
+  {% if package.central_question %}<h3>Zentrale menschliche Frage</h3><p dir="rtl" class="prose">{{ package.central_question }}</p>{% endif %}
+  <h3>Kanonische Lektionserklärung</h3><div class="prose" dir="rtl">{% for paragraph in package.canonical_lesson_explanation.split('\n\n') %}<p>{{ paragraph }}</p>{% endfor %}</div>
+  {% if item.concepts %}<h3>Kernbegriffe</h3><div class="status-row">{% for concept in item.concepts %}<a class="badge" href="/lessons/{{ concept.lesson_id }}" dir="rtl">{{ concept.title_fa }}</a>{% endfor %}</div>{% endif %}
+  {% if package.required_distinctions %}<h3>Erforderliche Unterscheidungen</h3><ul>{% for value in package.required_distinctions %}<li dir="rtl">{{ value }}</li>{% endfor %}</ul>{% endif %}
+  {% if package.conceptual_boundaries %}<h3>Begriffliche Grenzen</h3><ul>{% for value in package.conceptual_boundaries %}<li dir="rtl">{{ value }}</li>{% endfor %}</ul>{% endif %}
+  {% if package.what_should_remain_open %}<h3>Was offen bleiben soll</h3><ul>{% for value in package.what_should_remain_open %}<li dir="rtl">{{ value }}</li>{% endfor %}</ul>{% endif %}
+  <details><summary>Ayin-Provenienz</summary>{% if package.ayin_provenance %}<pre>{{ package.ayin_provenance.model_dump_json(indent=2) }}</pre>{% else %}<p class="warning">Im gelieferten Kanon ist für diese Lektion noch keine passagegenaue Ayin-Provenienz hinterlegt. Es wurde nichts ergänzt oder erfunden.</p>{% endif %}</details>
+</section>
+<section class="card" id="beziehungen">
+  <h2>Beziehungen</h2>
+  {% for heading, entries in [('Voraussetzungen', prerequisites_view), ('Bereitet vor', prepares_view), ('Verwandte Lektionen', related_view)] %}
+  <h3>{{ heading }}</h3>
+  <ul class="relation-list">{% for relation in entries %}<li class="relation-item"><a href="/lessons/{{ relation.lesson.lesson_id }}"><strong>Lektion {{ relation.number }} / 100</strong> · <span dir="rtl">{{ relation.lesson.title_fa }}</span></a><p dir="rtl">{{ relation.explanation }}</p></li>{% else %}<li class="muted">Keine Beziehungen dieser Art im importierten Kanon.</li>{% endfor %}</ul>
+  {% endfor %}
+  {% if package.canonical_relations_section_fa %}<details><summary>Kanonische Beziehungsnotiz</summary><pre dir="rtl" style="white-space:pre-wrap">{{ package.canonical_relations_section_fa }}</pre></details>{% endif %}
+</section>
+<section class="card" id="texte">
+  <div class="split-head"><h2>Texte</h2><form method="post" action="/lessons/{{ package.lesson_id }}/projects"><button class="button" type="submit">Neues Textprojekt</button></form></div>
+  {% for project in projects %}<p><a href="/texts/{{ project.project.id }}">{{ project.project.title }}</a><small>{{ project.status_label }} · {{ project.updated_at.strftime('%d.%m.%Y') }}</small></p>{% else %}<p class="muted">Für diese Lektion gibt es noch kein Textprojekt.</p>{% endfor %}
+</section>
+<section class="card" id="veroeffentlichung"><h2>Veröffentlichung</h2>{% if item.published %}<p class="notice">Mindestens ein Text dieser Lektion ist veröffentlicht und Teil des veröffentlichten Gedächtnisses.</p>{% else %}<p class="muted">Noch kein veröffentlichter Text. Entwürfe erscheinen nicht im Channel Memory.</p>{% endif %}</section>
+{% endblock %}

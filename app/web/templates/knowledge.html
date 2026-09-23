@@ -1,1 +1,23 @@
-{% extends "base.html" %}{% block content %}<h1>Wissensbasis</h1><div class="tabs">{% for key,label in [('sources','Quellen'),('people','Personen'),('works','Werke'),('claims','Claims'),('references','Referenzen'),('review','Prüfung')] %}<a class="{% if section == key %}active{% endif %}" href="/knowledge?section={{ key }}">{{ label }}</a>{% endfor %}</div><section class="card list">{% for item in data %}{% if section == 'sources' %}<p><a href="/sources/{{ item.id }}">{{ item.title }}</a> · {{ item.language }}</p>{% elif section == 'people' %}<p>{{ item.canonical_name }}</p>{% elif section == 'works' %}<p>{{ item.canonical_title }}</p>{% elif section == 'claims' %}<p>{{ item.claim_text }} <small>{{ item.verification_status }}</small></p>{% elif section == 'references' %}<p>{{ item.surface_text }} <small>{{ item.resolution_status }}</small></p>{% else %}<p>{{ item.message }} <small>{{ item.status }}</small></p>{% endif %}{% else %}<p class="muted">Keine Einträge.</p>{% endfor %}</section>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="eyebrow">Getrennte Retrieval-Rollen</p><h1>Wissensbasis</h1><p class="lede">Externe Wissensquellen erweitern Lektionen. Veröffentlichte Skripte dienen ausschließlich der nachgelagerten Prüfung.</p></div><a class="button secondary" href="/sources/new">Quelle hinzufügen</a></div>
+<div class="context-grid">
+  <section class="card research-panel"><h2>Externe Wissensbasis</h2><p>Generative Recherche für Evidenz, Perspektiven, Beispiele, Gegenargumente und historischen Kontext.</p><div class="status-row"><span class="badge">YouTube</span><span class="badge">Bücher</span><span class="badge">Papers</span><span class="badge">Artikel</span><span class="badge">Vorträge</span><span class="badge">Andere Quellen</span></div></section>
+  <section class="card context-panel"><h2>Veröffentlichtes Skriptarchiv</h2><p>Wird nur zur Prüfung auf Wiederholung, Ähnlichkeit und Widerspruch verwendet. Nicht als Schreibquelle.</p><a class="button secondary" href="/knowledge?section=script_archive">Archiv prüfen</a></section>
+</div>
+<section class="card" style="margin-top:1rem"><h2>Ayin-Quelle und Lektionen bleiben verschieden</h2><p>Die ursprüngliche Ayin-Quelle bleibt für Provenienz, Audit und Kanonprüfung zugänglich. Der 100-Lektionen-Kanon ist die vorbereitete Produktionsgrundlage und keine Vektor-Sammlung.</p><div class="button-row"><a class="button secondary" href="/knowledge?section=ayin_source">Ayin-Quellenprovenienz</a><a class="button secondary" href="/lessons">100-Lektionen-Kanon</a></div></section>
+<nav class="tabs" aria-label="Wissensbereiche">{% for key,label in [('sources','Quellen'),('people','Personen'),('works','Werke'),('claims','Claims'),('references','Referenzen'),('review','Prüfung'),('script_archive','Skriptarchiv'),('ayin_source','Ayin-Quelle')] %}<a class="{% if section == key %}active{% endif %}" href="/knowledge?section={{ key }}">{{ label }}</a>{% endfor %}</nav>
+<section class="card list">
+{% if section == 'script_archive' %}<h2>Veröffentlichtes Skriptarchiv</h2><p class="muted">Published-only · review-only · keine Schreibquelle</p>{% elif section == 'ayin_source' %}<h2>Ayin-Quellenprovenienz</h2><p class="muted">Originale Dokumentidentitäten für Audit und Prüfung, nicht die Lektionskarte.</p>{% endif %}
+{% for item in data %}
+  {% if section == 'sources' %}<p><a href="/sources/{{ item.id }}">{{ item.title }}</a> · {{ item.language }}</p>
+  {% elif section == 'people' %}<p>{{ item.canonical_name }}</p>
+  {% elif section == 'works' %}<p>{{ item.canonical_title }}</p>
+  {% elif section == 'claims' %}<p>{{ item.claim_text }} <small>{{ item.verification_status }}</small></p>
+  {% elif section == 'references' %}<p>{{ item.surface_text }} <small>{{ item.resolution_status }}</small></p>
+  {% elif section == 'script_archive' %}<p><a href="/texts/{{ item.project.id }}">{{ item.published_title }}</a><small>{{ item.origin_label }}{% if item.published_at %} · {{ item.published_at.strftime('%d.%m.%Y') }}{% endif %}</small></p>
+  {% elif section == 'ayin_source' %}<p>{{ item.title }}<small>{{ ayin_zone_labels.get(item.corpus_zone.value, 'Ayin-Quelle') }} · {{ item.original_language.value|upper }}</small></p>
+  {% else %}<p>{{ item.message }} <small>{{ item.status }}</small></p>{% endif %}
+{% else %}<p class="muted">Keine Einträge.</p>{% endfor %}
+</section>
+{% endblock %}

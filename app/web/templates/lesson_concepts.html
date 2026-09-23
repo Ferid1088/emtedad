@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><div><p class="eyebrow">100-Lektionen-Kanon</p><h1>Kernbegriffe</h1><p class="lede">Die {{ concepts|length }} tatsächlich als Kernbegriff markierten kanonischen Lektionen. Es werden keine fehlenden Transliterationen oder Übersetzungen ergänzt.</p></div><a class="button secondary" href="/lessons">Zurück zu Lektionen</a></div>
+{% if error %}<p class="error">Import unvollständig: {{ error }}</p>{% endif %}
+<section class="lesson-grid">{% for concept in concepts %}<article class="card lesson-card"><span class="badge">Kernbegriff</span><h2 dir="rtl"><a href="/lessons/{{ concept.lesson_id }}">{{ concept.title_fa }}</a></h2><div class="prose" dir="rtl"><p>{{ concept.text_fa[:420] }}{% if concept.text_fa|length > 420 %}…{% endif %}</p></div><a class="button secondary" href="/lessons/{{ concept.lesson_id }}">Definition im Kontext</a></article>{% else %}<section class="card empty-state"><p>Keine Kernbegriffe verfügbar.</p></section>{% endfor %}</section>
+{% endblock %}

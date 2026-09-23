@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="pagehead">
-  <div><p class="muted">Dynamische Themen entdecken</p><h1>Themen</h1></div>
-  <a class="button secondary" href="/strategy">Themenbaum öffnen</a>
+  <div><p class="eyebrow">Flexibler Ideenraum</p><h1>Freie Themen</h1><p class="lede">Zusätzliche Themen außerhalb des festen 100-Lektionen-Kanons. KI-Vorschläge und eigene Themen werden nicht automatisch zu kanonischen Lektionen.</p></div>
+  <a class="button secondary" href="/lessons">100-Lektionen-Kanon</a>
 </div>
 <section class="card">
   <h2>Neue Themen entdecken</h2>
-  <p class="muted">Neue Vorschläge bleiben getrennt vom festen Emtedad-Themenbaum und ersetzen keine früheren Vorschläge.</p>
+  <p class="muted">Neue Vorschläge bleiben vom freigegebenen 100-Lektionen-Kanon getrennt und ersetzen keine früheren Vorschläge.</p>
   <form method="post" action="/topics/suggestions">
     <label>Anzahl<input name="requested_count" type="number" min="1" max="50" value="5"></label>
     <div class="button-row" aria-label="Schnellauswahl">{% for count in [3, 5, 10, 20] %}<button class="button secondary" type="submit" name="requested_count" value="{{ count }}">{{ count }}</button>{% endfor %}</div>

@@ -83,7 +83,8 @@ parent ritual and cannot weaken stop, leave, consent, or optionality language.
 
 Every Ayin lecture:
 
-- has a validated Ayin Spine;
+- pins either a validated Ayin Spine for specialist research or, for ordinary
+  100-lesson production, the approved canonical Lesson Content Package;
 - pins the Canon versions it uses;
 - keeps Ayin as its conceptual center;
 - distinguishes Ayin claims, external claims, criticism, and interpretation;
@@ -93,6 +94,33 @@ Every Ayin lecture:
 - never treats ritual intensity as truth;
 - binds citations at statement level;
 - passes Ayin-fidelity, epistemic, and citation validation.
+
+## Script-generation retrieval boundary
+
+For ordinary production of the approved 100 lessons:
+
+- canonical lesson content is loaded directly and is the `AYIN CORE`;
+- the full Ayin book is not vector-retrieved or injected into the writer;
+- a complete canonical lesson explanation is never replaced by an
+  AI-generated Ayin seed;
+- the Core Concept Registry is selected directly, without vector retrieval;
+- only `EXTERNAL_KNOWLEDGE` is generative RAG;
+- external material expands, challenges, or contextualizes the lesson but
+  cannot redefine it;
+- the Channel Ledger, Published Script Archive, and lesson relations are
+  review-only and never generative prose context;
+- supplied lesson-to-Ayin source versions, passages/pages, concepts, and
+  distinctions remain pinned; missing mappings become review items rather than
+  fabricated provenance;
+- the Ayin corpus remains stored and searchable for audit, verification, canon
+  revision, citations, human inspection, and explicit specialist research.
+
+Generation and review inputs must never be mixed:
+
+```text
+Generation = Canonical Lesson Content + Core Concept Registry + External Research
+Review     = Channel Ledger + Published Script Archive + Lesson Relations
+```
 
 ## Multilingual invariants
 

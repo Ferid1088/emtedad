@@ -14,6 +14,12 @@ Only one phase may be `in_progress` at a time.
 - Active phase: Phase 12 — complete (pending owner review)
 - Last completed checkpoint: Phase 12 - approved Persian multilingual production
   (2026-09-23)
+- Latest architectural checkpoint: Phase 12 - lesson-canon generation boundary
+  (ADR-013; full-book Ayin RAG removed from ordinary script generation)
+  (2026-09-24)
+- Latest owner-UI checkpoint: canonical lesson catalog, lesson-aware Studio and
+  text provenance, separated external research, and published-only channel
+  memory (2026-09-24)
 - Application runnable: Yes; health, PostgreSQL readiness, Ayin, Manasek,
   external-knowledge, and retrieval APIs/CLIs and validators are verified
 - Open blocker: None remaining for Phase 8. Phase 9 requires explicit approval

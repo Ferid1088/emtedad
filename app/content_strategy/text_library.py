@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content_strategy.lesson_workflow import (
+    LessonProjectMetadata,
+    lesson_project_metadata,
+)
 from app.content_strategy.models import (
     ContentTopic,
     EditorialLanguageTrack,
@@ -24,6 +29,8 @@ STATUS_LABELS = {
     "TRANSLATED": "Übersetzungen offen",
     "READY_FOR_VOICE": "Voice Ready",
     "PERFORMANCE_READY": "Voice Ready",
+    "VIDEO_READY": "Video Ready",
+    "PUBLISHED": "Veröffentlicht",
     "ARCHIVED": "Archiviert",
 }
 TRACK_STATUS_LABELS = {
@@ -34,8 +41,9 @@ TRACK_STATUS_LABELS = {
     "STALE": "Ausgangsversion geändert",
 }
 ORIGIN_LABELS = {
-    "STRATEGY": "Themenbaum",
-    "AI_SUGGESTED": "KI-Vorschlag",
+    "LESSON": "Kanonische Lektion",
+    "STRATEGY": "Historisches Strategiethema",
+    "AI_SUGGESTED": "KI-Thema",
     "USER_CREATED": "Eigenes Thema",
     "LEGACY": "Historisches Thema",
 }
@@ -46,6 +54,7 @@ class TextLibraryItem:
     project: EditorialProject
     topic: ContentTopic | None
     strategy_node: TopicStrategyNode | None
+    lesson: LessonProjectMetadata | None
     branch_title: str | None
     tracks: dict[str, EditorialLanguageTrack]
     approved_persian: PersianDraft | None
@@ -68,12 +77,39 @@ class TextLibraryItem:
     def language_status(self) -> dict[str, str]:
         return {language: track.status for language, track in self.tracks.items()}
 
+    @property
+    def published_at(self) -> datetime | None:
+        snapshot = self.project.strategy_topic_snapshot or {}
+        publication = snapshot.get("publication")
+        if not isinstance(publication, dict):
+            return None
+        raw = publication.get("published_at")
+        if not isinstance(raw, str):
+            return None
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    @property
+    def published_title(self) -> str:
+        snapshot = self.project.strategy_topic_snapshot or {}
+        publication = snapshot.get("publication")
+        if isinstance(publication, dict):
+            title = publication.get("published_title")
+            if isinstance(title, str) and title.strip():
+                return title
+        return self.project.title
+
 
 def _origin(
     project: EditorialProject,
     topic: ContentTopic | None,
     strategy_node: TopicStrategyNode | None,
 ) -> tuple[str, str]:
+    lesson = lesson_project_metadata(project)
+    if lesson is not None:
+        return "LESSON", f"Lektion {lesson.number} / {lesson.total}"
     if strategy_node is not None:
         return "STRATEGY", ORIGIN_LABELS["STRATEGY"]
     if getattr(project, "strategy_topic_snapshot", None):
@@ -88,8 +124,13 @@ def _status(
     approved: PersianDraft | None,
     project: EditorialProject,
 ) -> tuple[str, str]:
+    snapshot = getattr(project, "strategy_topic_snapshot", None) or {}
+    if project.status == "PUBLISHED" or isinstance(snapshot.get("publication"), dict):
+        return "PUBLISHED", STATUS_LABELS["PUBLISHED"]
     if project.status == "ARCHIVED":
         return "ARCHIVED", STATUS_LABELS["ARCHIVED"]
+    if project.status == "VIDEO_READY":
+        return "VIDEO_READY", STATUS_LABELS["VIDEO_READY"]
     if approved is None:
         return project.status, STATUS_LABELS.get(project.status, "In Arbeit")
     if set(item_tracks) >= {"fa", "de", "en", "ar"}:
@@ -167,8 +208,18 @@ async def load_library_items(
             None,
         )
         project_tracks = tracks_by_project.get(project.id, {})
+        lesson = lesson_project_metadata(project)
         origin_key, origin_label = _origin(project, topic, node)
         status_key, status_label = _status(project_tracks, approved, project)
+        if (
+            project_drafts
+            and approved is None
+            and status_key not in {"PUBLISHED", "VIDEO_READY", "ARCHIVED"}
+        ):
+            if any(draft.status == "REVIEW_REQUIRED" for draft in project_drafts):
+                status_key, status_label = "IN_REVIEW", "In Prüfung"
+            else:
+                status_key, status_label = "TEXT_AVAILABLE", "Text vorhanden"
         timestamps = [project.created_at]
         timestamps.extend(draft.created_at for draft in project_drafts)
         timestamps.extend(track.created_at for track in project_tracks.values())
@@ -176,6 +227,7 @@ async def load_library_items(
             project=project,
             topic=topic,
             strategy_node=node,
+            lesson=lesson,
             branch_title=(
                 _branch_title(node, nodes)
                 if node is not None
@@ -203,6 +255,7 @@ async def load_library_items(
                 project.owner_prompt or "",
                 topic.title if topic else "",
                 topic.human_question if topic else "",
+                lesson.title if lesson else "",
             )
         ).casefold()
         if query and query.casefold() not in haystack:
@@ -240,6 +293,7 @@ async def duplicate_project(
         raise ValueError("editorial project not found")
     copy = EditorialProject(
         strategy_node_id=original.strategy_node_id,
+        strategy_topic_snapshot=deepcopy(original.strategy_topic_snapshot),
         content_topic_id=original.content_topic_id,
         title=f"{original.title} (Kopie)",
         human_question=original.human_question,
@@ -265,6 +319,30 @@ async def restore_project(session: AsyncSession, project_id: UUID) -> EditorialP
     if project is None:
         raise ValueError("editorial project not found")
     project.status = "RESEARCH_PENDING"
+    return project
+
+
+async def publish_project(session: AsyncSession, project_id: UUID) -> EditorialProject:
+    """Publish an approved text and record owner-facing channel-memory metadata."""
+
+    project = await session.get(EditorialProject, project_id)
+    if project is None:
+        raise ValueError("editorial project not found")
+    approved = await session.scalar(
+        select(PersianDraft).where(
+            PersianDraft.editorial_project_id == project_id,
+            PersianDraft.status == "PERSIAN_APPROVED",
+        )
+    )
+    if approved is None:
+        raise ValueError("publication requires an approved Persian text")
+    snapshot = deepcopy(project.strategy_topic_snapshot) or {}
+    snapshot["publication"] = {
+        "published_at": datetime.now(UTC).isoformat(),
+        "published_title": project.title,
+    }
+    project.strategy_topic_snapshot = snapshot
+    project.status = "PUBLISHED"
     return project
 
 

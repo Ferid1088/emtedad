@@ -1,1 +1,30 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }} · Ayin</title><link rel="stylesheet" href="/static/owner.css"></head><body><header><a class="brand" href="/">Ayin-e Emtedad</a><nav><a href="/">Dashboard</a><a href="/strategy">Themenbaum</a><a href="/topics">Themen</a><a href="/sources">Quellen</a><a href="/channels">Kanäle</a><a href="/knowledge">Wissensbasis</a><a href="/studio">Studio</a><a href="/texts">Texte</a><a href="/studio/voice">Voice</a></nav></header><main>{% block content %}{% endblock %}</main></body></html>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title }} · Ayin</title>
+  <link rel="stylesheet" href="/static/owner.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Ayin-e Emtedad</a>
+    <nav class="primary-nav" aria-label="Hauptnavigation">
+      {% for href, label in [
+        ('/', 'Dashboard'),
+        ('/lessons', 'Lektionen'),
+        ('/topics', 'Themen'),
+        ('/sources', 'Quellen'),
+        ('/channels', 'Kanäle'),
+        ('/knowledge', 'Wissensbasis'),
+        ('/studio', 'Studio'),
+        ('/texts', 'Texte'),
+        ('/archive', 'Archiv')
+      ] %}
+      <a href="{{ href }}" {% if request.url.path == href or (href != '/' and request.url.path.startswith(href)) %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

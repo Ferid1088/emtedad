@@ -18,17 +18,28 @@ security, or ownership requirements justify it.
 
 ```mermaid
 flowchart TD
-    A["Ayin Canonical Core"] --> B["Ayin Spine"]
-    B --> C["Research questions"]
-    C --> D["Research Package"]
+    A["Ayin source corpus"] -->|editorial packaging| B["Canonical Lesson Content Package"]
+    B --> C["External research questions"]
+    C --> D["External Research Package"]
     M["Approved Manasek"] --> D
     E["External knowledge"] --> D
     X["Counterevidence"] --> D
-    D --> S["Semantic Master"]
+    B --> S["Semantic Master"]
+    D --> S
     S --> Q["Fidelity and epistemic QA"]
     Q --> L["FA / EN / AR"]
     L --> P["Publication Package"]
+    G["Channel Ledger"] --> R["Post-draft review"]
+    H["Published Script Archive"] --> R
+    J["Lesson relations"] --> R
+    L --> R
 ```
+
+The Ayin source corpus remains indexed for audit, lesson verification, canon
+revision, citations, and explicit specialist research. It is not retrieved into
+the ordinary lesson writer. The writer receives direct canonical lesson content,
+direct locked concept definitions, and external research only. Ledger, archive,
+and relation inputs enter after drafting.
 
 ## Bounded domains and schema ownership
 
@@ -77,6 +88,12 @@ Retrieval must expose, at minimum:
 2. external evidence retrieval;
 3. counterevidence and alternative retrieval;
 4. optional, approved Manasek retrieval.
+
+The existence of a lane does not authorize it for every workflow. Ordinary
+100-lesson generation invokes external and counterevidence retrieval only.
+Ayin Canon retrieval is reserved for audit, verification, canon revision,
+citations, and explicit specialist research. Published script retrieval is a
+post-draft review capability and never a generation lane.
 
 Each lane applies its own authority, version, language, and publication filters
 and returns provenance. Fusion occurs only after corpus zone and epistemic-role
@@ -144,8 +161,12 @@ not assumed in Phase 1.
 - Structured entities pin their source/version and passage locations.
 - Retrieval artifacts identify normalization, chunking, embedding, lexical,
   fusion, and reranking configuration versions.
-- Research Packages freeze the evidence and canonical versions used.
-- Lectures refer to one Semantic Master and pinned Research Package.
+- Ordinary lesson drafts pin the full Lesson Content Package snapshot, package
+  version, lesson ID, and lesson-canon content hash.
+- Research Packages freeze external evidence and retrieval configuration; legacy
+  or specialist packages may also pin Ayin source material for verification.
+- Lectures refer to one Semantic Master, a pinned Lesson Content Package, and
+  frozen external research.
 - Localizations preserve concept, claim, citation, and epistemic identities.
 - Canon or source changes mark affected outputs for review without rewriting
   history.

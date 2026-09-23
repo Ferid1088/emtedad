@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">100-Lektionen-Kanon</p>
+    <h1>Lektionen</h1>
+    <p class="lede">Der langfristige redaktionelle Emtedad-Plan. Diese Lektionen sind freigegebener Kanon – keine KI-Vorschläge und keine temporären Themen.</p>
+  </div>
+  <a class="button secondary" href="/lessons/concepts">22 Kernbegriffe</a>
+</div>
+{% if error %}
+<section class="card empty-state">
+  <h2>Der 100-Lektionen-Kanon wurde noch nicht importiert.</h2>
+  <p>Die kanonischen Dateien fehlen oder sind unvollständig. Der alte Themenbaum wird nicht neu erzeugt.</p>
+  <p class="error">Import unvollständig: {{ error }}</p>
+</section>
+{% else %}
+<section class="card" aria-label="Importstatus">
+  <div class="split-head"><div><h2>Kanon bereit</h2><p class="muted">Direkt geladene redaktionelle Inhalte, ohne Book-RAG.</p></div><span class="badge success">Import vollständig</span></div>
+  <div class="health-line"><span><strong>{{ health.lessons }}</strong> Lektionen</span><span><strong>{{ health.relations }}</strong> Beziehungen</span><span><strong>{{ health.concepts }}</strong> Kernbegriffe</span></div>
+</section>
+{% if progress %}
+<div class="metric-strip" aria-label="Lektionsfortschritt">
+  <section class="card"><span class="metric-number">{{ progress.published }}</span><span>veröffentlicht</span></section>
+  <section class="card"><span class="metric-number">{{ progress.in_progress }}</span><span>in Arbeit</span></section>
+  <section class="card"><span class="metric-number">{{ progress.open }}</span><span>noch offen</span></section>
+</div>
+{% endif %}
+<section class="card filter-panel">
+  <form class="filters" method="get" action="/lessons">
+    <label class="wide">Lektionen durchsuchen<input type="search" name="q" value="{{ q }}" placeholder="Titel, Erklärung, Frage oder Kernbegriff"></label>
+    <label>Status<select name="status"><option value="">Alle</option>{% for key,label in [('NOT_STARTED','Noch nicht begonnen'),('RESEARCH_PENDING','In Arbeit'),('TEXT_AVAILABLE','Text vorhanden'),('PERSIAN_APPROVED','Persisch freigegeben'),('TRANSLATIONS','Übersetzungen vorhanden'),('VOICE_READY','Voice Ready'),('PUBLISHED','Veröffentlicht')] %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Kernbegriff<select name="concept"><option value="">Alle</option>{% for entry in core_concepts %}<option value="{{ entry.lesson_id }}" {% if selected_concept == entry.lesson_id %}selected{% endif %}>{{ entry.title_fa }}</option>{% endfor %}</select></label>
+    <label>Voraussetzungen<select name="prerequisites"><option value="ALL">Alle</option><option value="MET" {% if selected_prerequisites == 'MET' %}selected{% endif %}>Voraussetzungen erfüllt</option><option value="OPEN" {% if selected_prerequisites == 'OPEN' %}selected{% endif %}>Voraussetzungen offen</option></select></label>
+    <label class="compact">Von<input type="number" name="number_from" min="1" max="100" value="{{ number_from or '' }}"></label>
+    <label class="compact">Bis<input type="number" name="number_to" min="1" max="100" value="{{ number_to or '' }}"></label>
+    <div class="filter-action"><button class="button" type="submit">Filtern</button></div>
+  </form>
+</section>
+<p class="muted">{{ lessons|length }} Lektionen in dieser Auswahl</p>
+<section class="lesson-grid" aria-label="Kanonische Lektionen">
+{% for item in lessons %}
+  <article class="card lesson-card interactive" data-lesson-id="{{ item.package.lesson_id }}">
+    <div class="topic-card-head"><span class="badge">Lektion {{ item.number }} / {{ item.total }}</span><span class="badge {% if item.published %}published{% elif item.status_key == 'NOT_STARTED' %}open{% endif %}">{{ item.status_label }}</span></div>
+    <h2 dir="rtl"><a href="/lessons/{{ item.package.lesson_id }}">{{ item.package.canonical_lesson_title }}</a></h2>
+    <p dir="rtl">{{ item.excerpt }}</p>
+    {% if item.concepts %}<div class="status-row" aria-label="Kernbegriffe">{% for concept in item.concepts[:4] %}<span class="badge" dir="rtl">{{ concept.title_fa }}</span>{% endfor %}</div>{% endif %}
+    <p class="muted">{{ item.prerequisite_count }} Voraussetzungen · {{ item.related_count }} Beziehungen · {{ item.project_count }} Textprojekte</p>
+    <div class="button-row"><a class="button" href="/lessons/{{ item.package.lesson_id }}">Öffnen</a><form method="post" action="/lessons/{{ item.package.lesson_id }}/projects"><button class="button secondary" type="submit">Neues Textprojekt</button></form><a class="linkbutton" href="/lessons/{{ item.package.lesson_id }}#beziehungen">Beziehungen</a></div>
+  </article>
+{% else %}
+  <section class="card empty-state"><h2>Keine Lektionen gefunden</h2><p>Bitte Suche oder Filter anpassen.</p><a class="button secondary" href="/lessons">Filter zurücksetzen</a></section>
+{% endfor %}
+</section>
+{% endif %}
+{% endblock %}
