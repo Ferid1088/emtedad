@@ -72,10 +72,41 @@ def test_topic_analysis_is_persisted_and_refreshable() -> None:
     with TestClient(create_app(settings)) as client:
         response = client.post(f"/topics/{topic_id}/analyze", follow_redirects=False)
         assert response.status_code == 303
-        detail = client.get(f"/topics/{topic_id}")
+        assert response.headers["location"] == f"/topics/{topic_id}?analysis=updated"
+        detail = client.get(response.headers["location"])
         assert detail.status_code == 200
         assert title in detail.text
         assert "Analyse aktualisieren" in detail.text
+        assert "Analyse aktualisiert" in detail.text
+
+        created = client.post(
+            "/topics/save",
+            data={
+                "title": "Temporäres Analysenthema",
+                "question": "Warum verändern sich Muster?",
+            },
+            follow_redirects=False,
+        )
+        assert created.status_code == 303
+        created_id = created.headers["location"].rsplit("/", 1)[-1]
+        refresh_response = client.post(
+            f"/topics/{created_id}/analyze", follow_redirects=False
+        )
+        assert refresh_response.status_code == 303
+        assert refresh_response.headers["location"] == (
+            f"/topics/{created_id}?analysis=updated"
+        )
+        assert "Analyse aktualisiert" in client.get(
+            refresh_response.headers["location"]
+        ).text
+
+    async def remove_temporary_topic() -> None:
+        async with database.transaction() as session:
+            topic = await session.get(ContentTopic, UUID(created_id))
+            if topic is not None:
+                await session.delete(topic)
+
+    asyncio.run(remove_temporary_topic())
 
     async def refreshed() -> tuple[dict[str, object] | None, str | None]:
         async with database.transaction() as session:

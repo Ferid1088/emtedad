@@ -1,5 +1,6 @@
 """German-first owner routes for sources, knowledge, and topic discovery."""
 
+import logging
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -39,6 +40,7 @@ from app.topic_discovery import (
 
 router = APIRouter(tags=["owner-web"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+logger = logging.getLogger(__name__)
 
 
 def _database(request: Request) -> Database:
@@ -333,14 +335,23 @@ async def save_topic_route(request: Request) -> RedirectResponse:
 
 
 @router.get("/topics/{topic_id}", response_class=HTMLResponse)
-async def topic_detail(request: Request, topic_id: UUID) -> HTMLResponse:
+async def topic_detail(
+    request: Request,
+    topic_id: UUID,
+    analysis: str | None = None,
+) -> HTMLResponse:
     async with _database(request).transaction() as session:
         topic = await session.get(ContentTopic, topic_id)
         if topic is None:
             return HTMLResponse("Thema nicht gefunden", status_code=404)
     detail = topic_detail_view(topic)
     return await _render(
-        request, "topic_detail.html", title=topic.title, topic=topic, **detail
+        request,
+        "topic_detail.html",
+        title=topic.title,
+        topic=topic,
+        analysis_feedback=analysis,
+        **detail,
     )
 
 
@@ -350,11 +361,21 @@ async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
         topic = await session.get(ContentTopic, topic_id)
         if topic is None:
             return HTMLResponse("Thema nicht gefunden", status_code=404)
-        analysis = await TopicAnalysisService().analyze(session, topic.human_question)
-        topic.analysis_json = analysis
-        primary = analysis.get("primary_concept_key")
-        topic.primary_concept_key = primary if isinstance(primary, str) else None
-    return RedirectResponse(f"/topics/{topic_id}", status_code=303)
+        try:
+            analysis_result = await TopicAnalysisService().analyze(
+                session, topic.human_question
+            )
+            topic.analysis_json = analysis_result
+            primary = analysis_result.get("primary_concept_key")
+            topic.primary_concept_key = primary if isinstance(primary, str) else None
+        except Exception:
+            logger.exception(
+                "topic analysis refresh failed", extra={"topic_id": str(topic_id)}
+            )
+            return RedirectResponse(
+                f"/topics/{topic_id}?analysis=error", status_code=303
+            )
+    return RedirectResponse(f"/topics/{topic_id}?analysis=updated", status_code=303)
 
 
 @router.get("/channels", response_class=HTMLResponse)
