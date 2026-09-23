@@ -9,10 +9,16 @@ from urllib.parse import parse_qs, urlparse
 
 from youtube_transcript_api import YouTubeTranscriptApi
 
-from app.knowledge.adapters.base import ExternalSourceSnapshot, TranscriptEntry
+from app.knowledge.adapters.base import (
+    ChannelSnapshot,
+    ChannelVideoSnapshot,
+    ExternalSourceSnapshot,
+    TranscriptEntry,
+)
 from app.knowledge.domain import SourceType
 
 _VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_CHANNEL_ID = re.compile(r"^UC[A-Za-z0-9_-]{22}$")
 
 
 class YouTubeAdapterError(RuntimeError):
@@ -55,6 +61,27 @@ def parse_youtube_video_id(locator: str) -> str:
     if not _VIDEO_ID.fullmatch(candidate):
         raise ValueError("invalid YouTube video URL or ID")
     return candidate
+
+
+def parse_youtube_channel_locator(locator: str) -> str:
+    """Validate a public YouTube channel URL or stable channel ID."""
+
+    candidate = locator.strip()
+    if _CHANNEL_ID.fullmatch(candidate):
+        return f"https://www.youtube.com/channel/{candidate}"
+    parsed = urlparse(candidate)
+    if (parsed.hostname or "").lower() not in {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+    }:
+        raise ValueError("invalid YouTube channel URL")
+    parts = parsed.path.strip("/").split("/")
+    if len(parts) == 2 and parts[0] in {"channel", "c"} and parts[1]:
+        return candidate.rstrip("/")
+    if len(parts) == 1 and parts[0].startswith("@") and len(parts[0]) > 1:
+        return candidate.rstrip("/")
+    raise ValueError("invalid YouTube channel URL")
 
 
 class YouTubeAdapter:
@@ -129,6 +156,56 @@ class YouTubeAdapter:
             thumbnail_url=thumbnail,
         )
 
+    async def resolve_channel(self, locator: str) -> ChannelSnapshot:
+        """Resolve a channel URL to its stable provider channel ID."""
+
+        url = parse_youtube_channel_locator(locator)
+        metadata = await asyncio.to_thread(self._channel_metadata, url)
+        channel_id = _optional_string(metadata.get("channel_id"))
+        if channel_id is None or not _CHANNEL_ID.fullmatch(channel_id):
+            raise YouTubeAdapterError("YouTube did not return a stable channel ID")
+        name = (
+            _optional_string(metadata.get("channel"))
+            or _optional_string(metadata.get("uploader"))
+            or channel_id
+        )
+        canonical = (
+            _optional_string(metadata.get("channel_url"))
+            or f"https://www.youtube.com/channel/{channel_id}"
+        )
+        handle = _optional_string(metadata.get("uploader_id"))
+        return ChannelSnapshot(channel_id, name, canonical, handle)
+
+    async def list_channel_videos(
+        self, locator: str
+    ) -> tuple[ChannelVideoSnapshot, ...]:
+        """List public videos without downloading transcripts or importing them."""
+
+        url = parse_youtube_channel_locator(locator)
+        payload = await asyncio.to_thread(self._channel_metadata, url, 100)
+        entries = payload.get("entries", [])
+        if not isinstance(entries, list):
+            raise YouTubeAdapterError("YouTube channel returned no video list")
+        videos: list[ChannelVideoSnapshot] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            video_id = _optional_string(entry.get("id"))
+            if video_id is None or not _VIDEO_ID.fullmatch(video_id):
+                continue
+            videos.append(
+                ChannelVideoSnapshot(
+                    youtube_video_id=video_id,
+                    title=_optional_string(entry.get("title")) or video_id,
+                    published_at=_upload_date(entry.get("upload_date")),
+                    thumbnail_url=_optional_string(entry.get("thumbnail")),
+                    duration_seconds=int(entry["duration"])
+                    if isinstance(entry.get("duration"), int | float)
+                    else None,
+                )
+            )
+        return tuple(videos)
+
     def _metadata(self, video_id: str) -> dict[str, object]:
         command = [
             self._executable,
@@ -159,6 +236,40 @@ class YouTubeAdapter:
             raise YouTubeAdapterError("yt-dlp returned invalid metadata JSON") from exc
         if not isinstance(value, dict):
             raise YouTubeAdapterError("yt-dlp metadata must be an object")
+        return value
+
+    def _channel_metadata(self, url: str, limit: int = 1) -> dict[str, object]:
+        command = [
+            self._executable,
+            "--dump-single-json",
+            "--flat-playlist",
+            "--playlist-end",
+            str(limit),
+            "--skip-download",
+            "--no-warnings",
+            url,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout,
+                shell=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise YouTubeAdapterError(
+                f"channel discovery failed: {type(exc).__name__}"
+            ) from exc
+        if result.returncode != 0:
+            raise YouTubeAdapterError("channel discovery failed")
+        try:
+            value = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise YouTubeAdapterError("yt-dlp returned invalid channel JSON") from exc
+        if not isinstance(value, dict):
+            raise YouTubeAdapterError("YouTube channel metadata must be an object")
         return value
 
     @staticmethod

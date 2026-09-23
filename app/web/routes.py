@@ -9,6 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 
+from app.channel_monitoring.domain import CandidateStatus
+from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
+from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_strategy.domain import TopicOrigin
 from app.content_strategy.models import ContentTopic
 from app.db.session import Database
@@ -59,6 +62,14 @@ async def dashboard(request: Request) -> HTMLResponse:
                 select(ContentTopic).order_by(ContentTopic.id.desc()).limit(5)
             )
         )
+        pending_channels = int(
+            await session.scalar(
+                select(func.count(ChannelVideoCandidate.id)).where(
+                    ChannelVideoCandidate.status == CandidateStatus.NEW
+                )
+            )
+            or 0
+        )
     return await _render(
         request,
         "dashboard.html",
@@ -66,6 +77,7 @@ async def dashboard(request: Request) -> HTMLResponse:
         counts=counts,
         sources=sources,
         topics=topics,
+        pending_channels=pending_channels,
     )
 
 
@@ -323,3 +335,200 @@ async def topic_detail(request: Request, topic_id: UUID) -> HTMLResponse:
         if topic is None:
             return HTMLResponse("Thema nicht gefunden", status_code=404)
     return await _render(request, "topic_detail.html", title=topic.title, topic=topic)
+
+
+@router.get("/channels", response_class=HTMLResponse)
+async def channels(request: Request) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        rows = list(
+            await session.scalars(
+                select(MonitoredChannel).order_by(MonitoredChannel.name)
+            )
+        )
+        counts = dict(
+            (
+                channel_id,
+                count,
+            )
+            for channel_id, count in (
+                await session.execute(
+                    select(
+                        ChannelVideoCandidate.channel_id,
+                        func.count(ChannelVideoCandidate.id),
+                    )
+                    .where(ChannelVideoCandidate.status == CandidateStatus.NEW)
+                    .group_by(ChannelVideoCandidate.channel_id)
+                )
+            ).all()
+        )
+    return await _render(
+        request,
+        "channels.html",
+        title="Kanäle",
+        channels=rows,
+        pending_counts=counts,
+        error=None,
+    )
+
+
+@router.get("/channels/new", response_class=HTMLResponse)
+async def channel_form(request: Request) -> HTMLResponse:
+    return await _render(
+        request, "channel_new.html", title="Kanal hinzufügen", error=None
+    )
+
+
+@router.post("/channels", response_class=HTMLResponse)
+async def add_channel(request: Request) -> Response:
+    form = await request.form()
+    locator = str(form.get("url", "")).strip()
+    try:
+        channel = await ChannelDiscoveryService(_database(request)).register(locator)
+    except ValueError as exc:
+        return await _render(
+            request, "channel_new.html", title="Kanal hinzufügen", error=str(exc)
+        )
+    except Exception:
+        return await _render(
+            request,
+            "channel_new.html",
+            title="Kanal hinzufügen",
+            error="Der YouTube-Kanal konnte nicht aufgelöst werden.",
+        )
+    return RedirectResponse(f"/channels/{channel.id}", status_code=303)
+
+
+@router.get("/channels/{channel_id}", response_class=HTMLResponse)
+async def channel_detail(request: Request, channel_id: UUID) -> HTMLResponse:
+    service = ChannelDiscoveryService(_database(request))
+    async with _database(request).transaction() as session:
+        channel = await session.get(MonitoredChannel, channel_id)
+    if channel is None:
+        return HTMLResponse("Kanal nicht gefunden", status_code=404)
+    candidates = await service.candidates(channel_id)
+    grouped = {
+        status.value: [item for item in candidates if item.status == status]
+        for status in CandidateStatus
+    }
+    return await _render(
+        request,
+        "channel_detail.html",
+        title=channel.name,
+        channel=channel,
+        grouped=grouped,
+        results=None,
+        error=None,
+    )
+
+
+@router.post("/channels/{channel_id}/check", response_class=HTMLResponse)
+async def check_channel(request: Request, channel_id: UUID) -> Response:
+    try:
+        await ChannelDiscoveryService(_database(request)).discover(channel_id)
+    except ValueError:
+        return HTMLResponse("Kanal nicht gefunden", status_code=404)
+    except Exception:
+        return RedirectResponse(f"/channels/{channel_id}?error=check", status_code=303)
+    return RedirectResponse(f"/channels/{channel_id}", status_code=303)
+
+
+@router.post("/channels/{channel_id}/import", response_class=HTMLResponse)
+async def import_channel_candidates(request: Request, channel_id: UUID) -> Response:
+    form = await request.form()
+    ignored = form.get("ignore_candidate")
+    if ignored is not None:
+        try:
+            await ChannelDiscoveryService(_database(request)).ignore(
+                channel_id, UUID(str(ignored))
+            )
+        except ValueError:
+            return HTMLResponse("Ungültige Videoauswahl", status_code=400)
+        return RedirectResponse(f"/channels/{channel_id}", status_code=303)
+    raw_ids = form.getlist("candidate_ids")
+    try:
+        candidate_ids = [UUID(str(value)) for value in raw_ids]
+    except ValueError:
+        return HTMLResponse("Ungültige Videoauswahl", status_code=400)
+    results = await ChannelDiscoveryService(_database(request)).import_selected(
+        channel_id, candidate_ids
+    )
+    service = ChannelDiscoveryService(_database(request))
+    async with _database(request).transaction() as session:
+        channel = await session.get(MonitoredChannel, channel_id)
+    if channel is None:
+        return HTMLResponse("Kanal nicht gefunden", status_code=404)
+    candidates = await service.candidates(channel_id)
+    grouped = {
+        status.value: [item for item in candidates if item.status == status]
+        for status in CandidateStatus
+    }
+    return await _render(
+        request,
+        "channel_detail.html",
+        title=channel.name,
+        channel=channel,
+        grouped=grouped,
+        results=results,
+        error=None,
+    )
+
+
+@router.post("/channels/{channel_id}/candidates/{candidate_id}/ignore")
+async def ignore_channel_candidate(
+    request: Request, channel_id: UUID, candidate_id: UUID
+) -> RedirectResponse:
+    await ChannelDiscoveryService(_database(request)).ignore(channel_id, candidate_id)
+    return RedirectResponse(f"/channels/{channel_id}", status_code=303)
+
+
+@router.post("/channels/check-all", response_class=HTMLResponse)
+async def check_all_channels(request: Request) -> HTMLResponse:
+    service = ChannelDiscoveryService(_database(request))
+    channels_to_check = await service.active_channels()
+    for channel in channels_to_check:
+        try:
+            await service.discover(channel.id)
+        except Exception:
+            continue
+    async with _database(request).transaction() as session:
+        candidates = list(
+            await session.scalars(
+                select(ChannelVideoCandidate).where(
+                    ChannelVideoCandidate.status == CandidateStatus.NEW
+                )
+            )
+        )
+        rows = {channel.id: channel for channel in channels_to_check}
+    return await _render(
+        request,
+        "channel_candidates.html",
+        title="Neue Videos",
+        candidates=candidates,
+        channels=rows,
+        error=None,
+    )
+
+
+@router.post("/channels/check-all/import", response_class=HTMLResponse)
+async def import_all_channel_candidates(request: Request) -> Response:
+    form = await request.form()
+    try:
+        selected = [UUID(str(value)) for value in form.getlist("candidate_ids")]
+    except ValueError:
+        return HTMLResponse("Ungültige Videoauswahl", status_code=400)
+    async with _database(request).transaction() as session:
+        rows = list(
+            await session.scalars(
+                select(ChannelVideoCandidate).where(
+                    ChannelVideoCandidate.id.in_(selected),
+                    ChannelVideoCandidate.status == CandidateStatus.NEW,
+                )
+            )
+        )
+    grouped_ids: dict[UUID, list[UUID]] = {}
+    for candidate in rows:
+        grouped_ids.setdefault(candidate.channel_id, []).append(candidate.id)
+    service = ChannelDiscoveryService(_database(request))
+    for channel_id, candidate_ids in grouped_ids.items():
+        await service.import_selected(channel_id, candidate_ids)
+    return RedirectResponse("/channels", status_code=303)

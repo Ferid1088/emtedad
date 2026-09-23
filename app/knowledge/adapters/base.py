@@ -36,6 +36,23 @@ class ExternalSourceSnapshot:
     thumbnail_url: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class ChannelSnapshot:
+    external_channel_id: str
+    name: str
+    channel_url: str
+    handle: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelVideoSnapshot:
+    youtube_video_id: str
+    title: str
+    published_at: datetime | None
+    thumbnail_url: str | None
+    duration_seconds: int | None
+
+
 class SourceAdapter(Protocol):
     async def acquire(self, locator: str) -> ExternalSourceSnapshot:
         """Acquire one immutable provider snapshot."""

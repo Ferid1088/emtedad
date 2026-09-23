@@ -8,6 +8,8 @@ from uuid import uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channel_monitoring.domain import CandidateStatus
+from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.content_strategy.domain import ContentStatus, LectureAngle, TopicOrigin
 from app.content_strategy.models import ContentTopic
 from app.core.ayin.models import AyinConcept, AyinConceptVersion
@@ -240,4 +242,15 @@ async def dashboard_counts(session: AsyncSession) -> dict[str, int]:
             or 0
         ),
         "topics": int(await session.scalar(select(func.count(ContentTopic.id))) or 0),
+        "channels": int(
+            await session.scalar(select(func.count(MonitoredChannel.id))) or 0
+        ),
+        "pending_candidates": int(
+            await session.scalar(
+                select(func.count(ChannelVideoCandidate.id)).where(
+                    ChannelVideoCandidate.status == CandidateStatus.NEW
+                )
+            )
+            or 0
+        ),
     }
