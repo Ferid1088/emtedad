@@ -127,6 +127,19 @@ def test_performance_text_is_nonempty_even_with_default_sparse_direction() -> No
         assert result.elevenlabs_performance_text == "A quiet sentence."
 
 
+def test_performance_director_can_add_sparse_rhetorical_cues() -> None:
+    result = PerformanceDirector().prepare(
+        PublicationLanguage.DE,
+        "Stell dir diesen Morgen vor. Das Handy vibriert.\n\nWas geschieht jetzt?",
+        auto_cues=True,
+    )
+
+    assert "[thoughtful]" in result.elevenlabs_performance_text
+    assert "[curious]" in result.elevenlabs_performance_text
+    assert "[laughs]" not in result.elevenlabs_performance_text
+    assert not [finding for finding in result.findings if finding.blocking]
+
+
 def test_canonical_registry_uses_project_tohigah_spelling() -> None:
     term = next(item for item in CANONICAL_AYIN_TERMS if item.canonical_id == "TOHIGAH")
     assert term.canonical_transliteration == "Tohigah"

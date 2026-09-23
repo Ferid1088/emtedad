@@ -193,6 +193,7 @@ class MultilingualEditorialService:
                 language,
                 prepared.voice_text,
                 profile=ElevenLabsCapabilityProfile.eleven_v3(),
+                auto_cues=True,
             )
             blocking = [item for item in performance.findings if item.blocking]
             if blocking:
@@ -265,6 +266,7 @@ class MultilingualEditorialService:
                 track.voice_ready_text,
                 tags_by_paragraph=tags_by_paragraph,
                 profile=ElevenLabsCapabilityProfile.eleven_v3(),
+                auto_cues=tags_by_paragraph is None,
             )
             blocking = [finding for finding in preparation.findings if finding.blocking]
             if blocking:

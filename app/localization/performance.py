@@ -148,10 +148,13 @@ class PerformanceDirector:
         *,
         tags_by_paragraph: dict[int, str] | None = None,
         profile: ElevenLabsCapabilityProfile | None = None,
+        auto_cues: bool = False,
     ) -> PerformancePreparation:
         selected_profile = profile or ElevenLabsCapabilityProfile.eleven_v3()
         paragraphs = voice_ready_text.split("\n\n")
         cues = tags_by_paragraph or {}
+        if auto_cues and not cues:
+            cues = self._suggest_cues(paragraphs)
         output: list[str] = []
         findings: list[NativeReviewFinding] = []
         for index, paragraph in enumerate(paragraphs):
@@ -182,6 +185,31 @@ class PerformanceDirector:
             selected_profile,
             tuple(findings),
         )
+
+    @staticmethod
+    def _suggest_cues(paragraphs: list[str]) -> dict[int, str]:
+        """Choose a few delivery cues from visible rhetorical signals.
+
+        Non-speech events are never invented.  Cues remain deliberately
+        sparse: ordinary paragraphs are spoken without markup.
+        """
+
+        cues: dict[int, str] = {}
+        if paragraphs and len(paragraphs[0].split()) >= 6:
+            cues[0] = "thoughtful"
+        for index, paragraph in enumerate(paragraphs):
+            if index in cues:
+                continue
+            if "?" in paragraph or "؟" in paragraph:
+                cues[index] = "curious"
+            elif "…" in paragraph or "..." in paragraph:
+                cues[index] = "pause"
+            if len(cues) >= 3:
+                break
+        if len(paragraphs) >= 3 and len(cues) < 3:
+            last = len(paragraphs) - 1
+            cues.setdefault(last, "softly")
+        return cues
 
 
 class PerformanceQualityValidator:
