@@ -17,6 +17,7 @@ from app.content_strategy.models import (
 from app.core.config import Environment, Settings
 from app.db.session import Database
 from app.main import create_app
+from app.research.models import ResearchProject
 
 
 @pytest.mark.integration
@@ -77,12 +78,17 @@ def test_strategy_tree_is_grounded_and_topic_use_is_repeatable() -> None:
                 EditorialProject, UUID(used.headers["location"].split("/")[-1])
             )
             if project is not None:
+                research_id = project.research_project_id
                 await session.execute(
                     delete(TopicUseHistory).where(
                         TopicUseHistory.editorial_project_id == project.id
                     )
                 )
                 await session.delete(project)
+                if research_id is not None:
+                    research = await session.get(ResearchProject, research_id)
+                    if research is not None:
+                        await session.delete(research)
             node = await session.get(TopicStrategyNode, node_id)
             assert node is not None
             node.generation_count = count_before

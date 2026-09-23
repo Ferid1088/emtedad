@@ -15,6 +15,7 @@ from app.content_strategy.models import (
 )
 from app.core.ayin.models import AyinConcept, AyinConceptVersion
 from app.db.session import Database
+from app.research.models import ResearchProject
 
 
 def _hash(value: object) -> str:
@@ -187,6 +188,13 @@ class TopicStrategyService:
             )
             session.add(project)
             await session.flush()
+            research_project = ResearchProject(
+                human_question=node.human_question or node.title,
+                created_by="owner",
+            )
+            session.add(research_project)
+            await session.flush()
+            project.research_project_id = research_project.id
             node.generation_count += 1
             node.last_generated_at = datetime.now(UTC)
             session.add(
