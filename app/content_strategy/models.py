@@ -12,6 +12,7 @@ from app.content_strategy.domain import (
     LectureAngle,
     PublicationPackageStatus,
     RepetitionDecision,
+    TopicOrigin,
     TopicRelationType,
 )
 from app.db.base import Base, PostgresSchema
@@ -74,6 +75,9 @@ class ContentTopic(Base):
     )
     status: Mapped[ContentStatus] = mapped_column(
         _enum(ContentStatus, "content_status"), default=ContentStatus.PLANNED
+    )
+    origin: Mapped[TopicOrigin] = mapped_column(
+        _enum(TopicOrigin, "topic_origin"), default=TopicOrigin.USER_CREATED
     )
     semantic_hash: Mapped[str] = mapped_column(String(64))
 

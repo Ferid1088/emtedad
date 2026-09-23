@@ -10,6 +10,14 @@ class ContentStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
+class TopicOrigin(StrEnum):
+    """How an owner topic entered the content strategy graph."""
+
+    AI_SUGGESTED = "AI_SUGGESTED"
+    USER_CREATED = "USER_CREATED"
+    LEGACY = "LEGACY"
+
+
 class LifeDomain(StrEnum):
     SELF = "self"
     FAMILY = "family"

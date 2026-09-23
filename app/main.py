@@ -4,11 +4,13 @@ import re
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.ayin import router as ayin_router
 from app.api.routes.dialogue import router as dialogue_router
@@ -24,6 +26,7 @@ from app.db.health import DatabaseReadinessService, ReadinessService
 from app.db.session import Database, create_database
 from app.ops.logging import configure_logging
 from app.retrieval.embeddings import SentenceTransformerEmbeddingProvider
+from app.web.routes import router as web_router
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
@@ -87,6 +90,12 @@ def create_app(
     app.include_router(retrieval_router)
     app.include_router(research_router)
     app.include_router(dialogue_router)
+    app.include_router(web_router)
+    app.mount(
+        "/static",
+        StaticFiles(directory=Path(__file__).parent / "web" / "static"),
+        name="owner-static",
+    )
 
     @app.middleware("http")
     async def request_context(

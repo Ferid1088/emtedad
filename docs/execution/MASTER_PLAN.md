@@ -281,6 +281,15 @@ citation identities; publication states.
 Target scope: topic graph, series, coverage analysis, publishing channels,
 publication packages, stale-content detection, and review workflow.
 
+Verified complete 2026-09-23. See `docs/audits/PHASE_10_COMPLETION.md`.
+
+## Phase 11 — Owner MVP Web App
+
+Target scope: owner source ingestion, knowledge-base browsing, grounded topic
+discovery, and advisory topic persistence. No research or lecture generation.
+
+Verified complete 2026-09-23. See `docs/audits/PHASE_11_OWNER_MVP_WEB_APP.md`.
+
 ## Phase 11 — Evaluation
 
 Target scope: multilingual retrieval gold set, lecture fidelity fixtures,
