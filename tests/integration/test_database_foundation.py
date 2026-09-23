@@ -182,10 +182,11 @@ def test_clean_migration_downgrade_and_second_upgrade_are_safe(
     assert ("content", "lecture_master_versions") in domain_tables
     assert ("content", "lecture_claims") in domain_tables
     assert ("content", "lecture_claim_evidence") in domain_tables
-    assert not any(
-        schema == "content" and "localization" in table_name
-        for schema, table_name in domain_tables
-    )
+    assert ("content", "localization_projects") in domain_tables
+    assert ("content", "localization_versions") in domain_tables
+    assert ("content", "localization_statements") in domain_tables
+    assert ("content", "pronunciation_lexicon_entries") in domain_tables
+    assert ("content", "audio_pronunciation_qa") in domain_tables
     assert review_status_default is not None
     assert "PROPOSED" in str(review_status_default[0])
     assert classifier_key_unique == (0,)

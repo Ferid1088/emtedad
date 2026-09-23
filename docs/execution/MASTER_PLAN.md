@@ -34,7 +34,7 @@ Only one phase may be `in_progress` at a time.
 | 6 | Ayin–External Dialogue | complete | Typed relations, classification, criticism and review |
 | 7 | Research Engine | complete | Ayin Spine, ResearchPlan and frozen ResearchPackage |
 | 8 | Lecture Master | complete | Cited Semantic Master and validators |
-| 9 | Four Languages | pending | FA/DE/EN/AR localization with fidelity QA |
+| 9 | Four Languages | in_progress | FA/DE/EN/AR localization, pronunciation QA, and TTS boundary |
 | 10 | Content Strategy and Publishing | pending | Series, coverage and publication packages |
 | 11 | Evaluation | pending | Gold sets, fidelity fixtures and benchmarks |
 

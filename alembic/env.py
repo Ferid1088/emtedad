@@ -17,6 +17,7 @@ from app.ops.assets import models as asset_models  # noqa: F401
 from app.retrieval import models as retrieval_models  # noqa: F401
 from app.research import models as research_models  # noqa: F401
 from app.lecture import models as lecture_models  # noqa: F401
+from app.localization import models as localization_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 
 config = context.config

@@ -10,6 +10,15 @@ from app.lecture.validator import (
     DialogueStatusValidator,
     RitualBoundaryValidator,
 )
+from app.localization.domain import PronunciationCriticality
+from app.localization.pronunciation import (
+    ArabicDiacritizer,
+    PersianPronunciationAnnotator,
+)
+from app.localization.validators import (
+    PronunciationValidator,
+    SemanticFidelityValidator,
+)
 
 
 def test_ayin_fidelity_rejects_known_conflations() -> None:
@@ -65,3 +74,42 @@ def test_semantic_master_handoff_declares_four_languages_without_scripts() -> No
     assert "terminology_references" in SemanticLectureMasterExport.model_fields
     assert "persian_script" not in SemanticLectureMasterExport.model_fields
     assert "german_script" not in SemanticLectureMasterExport.model_fields
+
+
+def test_semantic_localization_requires_claim_alignment() -> None:
+    findings = SemanticFidelityValidator().validate(
+        [{"id": "claim-1", "epistemic_status": "AYIN_DEFINITION", "certainty": "HIGH"}],
+        [],
+    )
+    assert findings[0].code == "CLAIM_OMISSION"
+
+
+def test_critical_pronunciation_requires_approved_lexicon_entry() -> None:
+    findings = PronunciationValidator().validate(
+        PublicationLanguage.DE,
+        [{"tts_text": "Bon"}],
+        [
+            {
+                "written_form": "Bon",
+                "criticality": PronunciationCriticality.CRITICAL.value,
+                "status": "PROPOSED",
+            }
+        ],
+    )
+    assert findings[0].code == "CRITICAL_PRONUNCIATION_MISSING"
+
+
+def test_pronunciation_preparation_preserves_display_text() -> None:
+    fa = PersianPronunciationAnnotator().annotate(
+        "بُن",
+        [{"written_form": "بُن", "preferred_pronunciation": "بُنِ"}],
+    )
+    ar = ArabicDiacritizer().annotate(
+        "امتداد",
+        [{"written_form": "امتداد", "preferred_pronunciation": "اِمْتِداد"}],
+        fully_vocalized=True,
+    )
+    assert fa.display_text == "بُن"
+    assert fa.tts_text == "بُنِ"
+    assert ar.display_text == "امتداد"
+    assert ar.tts_text == "اِمْتِداد"

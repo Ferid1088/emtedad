@@ -33,8 +33,9 @@ Completion evidence: `docs/audits/PHASE_8_COMPLETION.md`.
 
 ## Next-phase goal
 
-Implement language realization from standalone SemanticLectureMasterExport
-objects only after owner review. Do not add localization in this phase.
+Implement language realization and pronunciation preparation from standalone
+SemanticLectureMasterExport objects, with separate semantic approval and TTS
+readiness. Do not generate audio or publish in this phase.
 
 ## Phase 8 and Phase 9 boundary
 
