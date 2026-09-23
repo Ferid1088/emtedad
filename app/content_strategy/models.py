@@ -158,6 +158,14 @@ class EditorialProject(Base):
         ForeignKey(f"{CONTENT}.research_projects.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    research_package_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.research_packages.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    semantic_master_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.lecture_master_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     title: Mapped[str] = mapped_column(String(512))
     human_question: Mapped[str] = mapped_column(Text)
     owner_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -182,6 +190,56 @@ class TopicUseHistory(Base):
     )
     owner_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_duration_minutes: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class PersianDraft(Base):
+    """Versioned Persian authoring artifact derived from one Semantic Master."""
+
+    __tablename__ = "persian_drafts"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    editorial_project_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.editorial_projects.id", ondelete="RESTRICT")
+    )
+    parent_draft_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.persian_drafts.id", ondelete="RESTRICT"), nullable=True
+    )
+    semantic_master_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.lecture_master_versions.id", ondelete="RESTRICT")
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    variant_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="PROPOSED")
+    owner_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_duration_minutes: Mapped[int] = mapped_column(Integer)
+    target_word_count_min: Mapped[int] = mapped_column(Integer)
+    target_word_count_max: Mapped[int] = mapped_column(Integer)
+    actual_word_count: Mapped[int] = mapped_column(Integer)
+    estimated_duration_seconds: Mapped[int] = mapped_column(Integer)
+    speaking_rate_profile: Mapped[str] = mapped_column(
+        String(64), default="fa-spoken-v1"
+    )
+    provenance: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class PersianReviewFinding(Base):
+    __tablename__ = "persian_review_findings"
+    __table_args__ = {"schema": CONTENT}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    draft_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.persian_drafts.id", ondelete="CASCADE")
+    )
+    code: Mapped[str] = mapped_column(String(128))
+    severity: Mapped[str] = mapped_column(String(16))
+    message: Mapped[str] = mapped_column(Text)
+    blocking: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

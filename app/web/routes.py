@@ -17,8 +17,10 @@ from app.content_strategy.domain import TopicOrigin
 from app.content_strategy.models import (
     ContentTopic,
     EditorialProject,
+    PersianDraft,
     TopicStrategyNode,
 )
+from app.content_strategy.persian_service import PersianEditorialService
 from app.content_strategy.strategy_service import TopicStrategyService
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
@@ -34,6 +36,7 @@ from app.knowledge.models import (
     SourceVersion,
     Work,
 )
+from app.lecture.models import LectureMasterVersion
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
@@ -447,9 +450,74 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
         project = await session.get(EditorialProject, project_id)
         if project is None:
             return HTMLResponse("Arbeitsbereich nicht gefunden", status_code=404)
+        drafts = list(
+            await session.scalars(
+                select(PersianDraft)
+                .where(PersianDraft.editorial_project_id == project.id)
+                .order_by(PersianDraft.variant_index, PersianDraft.version_number)
+            )
+        )
+        masters = list(
+            await session.scalars(
+                select(LectureMasterVersion).order_by(
+                    LectureMasterVersion.created_at.desc()
+                )
+            )
+        )
     return await _render(
-        request, "editorial_workspace.html", title=project.title, project=project
+        request,
+        "editorial_workspace.html",
+        title=project.title,
+        project=project,
+        drafts=drafts,
+        masters=masters,
     )
+
+
+@router.post("/workspace/{project_id}/persian/drafts")
+async def generate_persian_drafts(
+    request: Request, project_id: UUID
+) -> RedirectResponse:
+    form = await request.form()
+    master_id = UUID(str(form.get("semantic_master_id")))
+    target = int(str(form.get("target_duration_minutes", "15")))
+    count = int(str(form.get("draft_count", "1")))
+    prompt = str(form.get("owner_prompt", "")).strip() or None
+    await PersianEditorialService(_database(request)).generate(
+        project_id,
+        master_id,
+        target_minutes=target,
+        draft_count=count,
+        owner_prompt=prompt,
+    )
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
+@router.post("/workspace/{project_id}/persian/drafts/{draft_id}/edit")
+async def edit_persian_draft(
+    request: Request, project_id: UUID, draft_id: UUID
+) -> RedirectResponse:
+    form = await request.form()
+    await PersianEditorialService(_database(request)).edit(
+        draft_id, str(form.get("text", ""))
+    )
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
+@router.post("/workspace/{project_id}/persian/drafts/{draft_id}/review")
+async def review_persian_draft(
+    request: Request, project_id: UUID, draft_id: UUID
+) -> RedirectResponse:
+    await PersianEditorialService(_database(request)).review(draft_id)
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
+
+
+@router.post("/workspace/{project_id}/persian/drafts/{draft_id}/approve")
+async def approve_persian_draft(
+    request: Request, project_id: UUID, draft_id: UUID
+) -> RedirectResponse:
+    await PersianEditorialService(_database(request)).approve(draft_id)
+    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
 
 
 @router.get("/studio", response_class=HTMLResponse)
