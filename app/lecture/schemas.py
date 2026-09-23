@@ -90,5 +90,6 @@ class SemanticLectureMasterExport(BaseModel):
     evidence: list[dict[str, object]]
     citations: list[dict[str, object]]
     ritual_links: list[dict[str, object]]
+    dialogue_relations: list[dict[str, object]]
     terminology_references: list[dict[str, object]]
     validation: LectureValidationRead

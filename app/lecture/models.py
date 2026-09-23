@@ -136,6 +136,17 @@ class LectureClaim(Base):
     stable_key: Mapped[str] = mapped_column(String(255))
     sequence: Mapped[int] = mapped_column(Integer)
     claim_intent: Mapped[str] = mapped_column(Text)
+    # Human-readable semantic payload.  Nullable for historical masters only;
+    # newly generated masters must populate it and pass standalone validation.
+    semantic_proposition: Mapped[str | None] = mapped_column(Text, nullable=True)
+    plain_meaning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    required_concepts: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    required_qualifiers: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    prohibited_overstatements: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    source_support_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_evidence: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, default=list
+    )
     claim_origin: Mapped[ClaimOrigin] = mapped_column(
         _enum(ClaimOrigin, "claim_origin")
     )

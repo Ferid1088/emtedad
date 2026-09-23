@@ -9,6 +9,14 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ayin.models import (
+    AyinConcept,
+    AyinConceptVersion,
+    AyinDistinctionVersion,
+    AyinOpenQuestionVersion,
+    AyinPrincipleVersion,
+    CanonPassage,
+)
 from app.db.session import Database
 from app.lecture.domain import (
     SUPPORTED_PUBLICATION_LANGUAGES,
@@ -199,6 +207,7 @@ class LectureMasterService:
                 evidence=payload["evidence"],
                 citations=payload["citations"],
                 ritual_links=payload["ritual_links"],
+                dialogue_relations=payload["dialogue_relations"],
                 terminology_references=self._terminology_references(
                     payload["sections"]
                 ),
@@ -238,6 +247,7 @@ class LectureMasterService:
         if project.lecture_type.value == "RITUAL_COMPANION":
             roles.insert(-1, SectionRole.RITUAL_BRIDGE)
         sections: list[LectureSection] = []
+        terminology = await self._terminology_for_package(session, package.id)
         for ordinal, role in enumerate(roles, start=1):
             section = LectureSection(
                 lecture_master_version_id=master.id,
@@ -250,6 +260,7 @@ class LectureMasterService:
                     if project.target_duration_seconds
                     else None
                 ),
+                required_terminology=terminology,
             )
             session.add(section)
             sections.append(section)
@@ -263,18 +274,27 @@ class LectureMasterService:
         sections: list[LectureSection],
         package: ResearchPackage,
     ) -> None:
+        snapshot: Any = package.retrieval_snapshot
+        package_items = self._snapshot_items(snapshot)
         ayin_ids = await self._ayin_ids(session, package.id)
         sequence = 1
         for kind, item_id in ayin_ids:
+            semantic = await self._ayin_semantic(session, kind, item_id, package_items)
             claim = LectureClaim(
                 lecture_master_version_id=master.id,
                 section_id=sections[1].id,
                 stable_key=f"ayin_{kind.lower()}_{sequence}",
                 sequence=sequence,
-                claim_intent=(
-                    f"Preserve the selected Ayin {kind.lower()} item {item_id} "
-                    "without changing its Working authority."
-                ),
+                claim_intent=semantic["semantic_proposition"],
+                semantic_proposition=semantic["semantic_proposition"],
+                plain_meaning=semantic["plain_meaning"],
+                required_concepts=semantic["required_concepts"],
+                required_qualifiers=["Ayin Working material; not Canon"],
+                prohibited_overstatements=[
+                    "Do not present external evidence as proof of this Ayin statement"
+                ],
+                source_support_summary=semantic["source_support_summary"],
+                source_evidence=semantic["source_evidence"],
                 claim_origin=ClaimOrigin.AYIN,
                 discourse_type=DiscourseType.CONCEPTUAL,
                 epistemic_status=ClaimEpistemicStatus.AYIN_DEFINITION,
@@ -294,8 +314,16 @@ class LectureMasterService:
                     provenance={"package_id": str(package.id)},
                 )
             )
+            session.add(
+                LectureCitation(
+                    lecture_master_version_id=master.id,
+                    claim_id=claim.id,
+                    kind=CitationKind.AYIN,
+                    package_id=package.id,
+                    citation_data=semantic["citation"],
+                )
+            )
             sequence += 1
-        snapshot: Any = package.retrieval_snapshot
         seen: set[str] = set()
         for query in snapshot.get("queries", []):
             if not isinstance(query, dict):
@@ -314,16 +342,41 @@ class LectureMasterService:
                     if counter
                     else ClaimEpistemicStatus.EXTERNAL_EMPIRICAL_CLAIM
                 )
+                text = str(item.get("text", "")).strip()
+                proposition = (
+                    "The external source provides a counterpoint relevant to the "
+                    "question: "
+                    if counter
+                    else "The external source provides evidence relevant to the "
+                    "question: "
+                ) + text
                 claim = LectureClaim(
                     lecture_master_version_id=master.id,
                     section_id=sections[3].id if counter else sections[2].id,
                     stable_key=f"external_{sequence}",
                     sequence=sequence,
-                    claim_intent=(
-                        f"Use package evidence item {chunk_id} as "
-                        f"{'counterevidence' if counter else 'external evidence'}; "
-                        "preserve its source attribution and uncertainty."
+                    claim_intent=proposition,
+                    semantic_proposition=proposition,
+                    plain_meaning=(
+                        "This is a source-attributed counterpoint, not an Ayin "
+                        "conclusion."
+                        if counter
+                        else "This is source-attributed external evidence, not "
+                        "Ayin's own statement."
                     ),
+                    required_qualifiers=[
+                        "Preserve source attribution",
+                        "Do not strengthen the source's certainty",
+                    ],
+                    prohibited_overstatements=["Do not say research proves Ayin"],
+                    source_support_summary=text,
+                    source_evidence=[
+                        {
+                            "text": text,
+                            "chunk_id": chunk_id,
+                            "provenance": item.get("provenance", {}),
+                        }
+                    ],
                     claim_origin=ClaimOrigin.EXTERNAL,
                     epistemic_status=status,
                     discourse_type=DiscourseType.DESCRIPTIVE
@@ -366,15 +419,38 @@ class LectureMasterService:
                 if relation_type == "NOT_EQUIVALENT_TO"
                 else ClaimEpistemicStatus.CONCEPTUAL_PARALLEL
             )
+            explanation = str(relation.get("explanation", "")).strip()
+            proposition = (
+                f"The external dialogue item is classified as {relation_type} "
+                f"within {relation.get('scope', 'UNSPECIFIED')} scope. "
+                "The classification remains "
+                f"{relation.get('review_status', 'PROPOSED')}: {explanation}"
+            )
             claim = LectureClaim(
                 lecture_master_version_id=master.id,
                 section_id=sections[2].id,
                 stable_key=f"dialogue_{sequence}",
                 sequence=sequence,
-                claim_intent=(
-                    f"Retain the {relation_type} relation as an unreviewed "
-                    "dialogue classification; do not state it as established."
+                claim_intent=proposition,
+                semantic_proposition=proposition,
+                plain_meaning=(
+                    "This relation is a reviewable dialogue classification, "
+                    "not an identity or proof claim."
                 ),
+                required_qualifiers=[
+                    f"Review status is {relation.get('review_status', 'PROPOSED')}",
+                    "Preserve non-equivalence where present",
+                ],
+                prohibited_overstatements=[
+                    "Do not call the relation established, confirmed, or approved"
+                ],
+                source_support_summary=explanation,
+                source_evidence=[
+                    {
+                        "relation_id": str(relation.get("relation_id")),
+                        "explanation": explanation,
+                    }
+                ],
                 claim_origin=ClaimOrigin.EXTERNAL,
                 epistemic_status=status,
                 discourse_type=DiscourseType.CONCEPTUAL,
@@ -466,13 +542,24 @@ class LectureMasterService:
         relations = (
             package.retrieval_snapshot.get("dialogue_relations", []) if package else []
         )
+        snapshot_items = (
+            self._snapshot_items(package.retrieval_snapshot) if package else {}
+        )
+        evidence_payload: list[dict[str, object]] = []
+        for row in evidence:
+            value = self._row_dict(row) | {"claim_id": str(row.claim_id)}
+            item = snapshot_items.get(str(row.evidence_item_id))
+            if item:
+                value["text"] = item.get("text", "")
+                value["language"] = item.get("language")
+                value["content_hash"] = item.get("content_hash")
+                value["package_provenance"] = item.get("provenance", {})
+            evidence_payload.append(value)
         return {
             "master": LectureMasterRead.model_validate(master).model_dump(mode="json"),
             "sections": [self._row_dict(s) for s in sections],
             "claims": [self._row_dict(c) for c in claims],
-            "evidence": [
-                self._row_dict(e) | {"claim_id": str(e.claim_id)} for e in evidence
-            ],
+            "evidence": evidence_payload,
             "citations": [self._row_dict(c) for c in citations],
             "ritual_links": [self._row_dict(r) for r in rituals],
             "dialogue_relations": relations,
@@ -496,6 +583,153 @@ class LectureMasterService:
                     references.append(value)
                     seen.add(term_id)
         return references
+
+    @staticmethod
+    def _snapshot_items(snapshot: Any) -> dict[str, dict[str, object]]:
+        items: dict[str, dict[str, object]] = {}
+        for query in snapshot.get("queries", []) if isinstance(snapshot, dict) else []:
+            if not isinstance(query, dict):
+                continue
+            for item in query.get("results", []):
+                if not isinstance(item, dict):
+                    continue
+                chunk_id = str(item.get("chunk_id", ""))
+                if chunk_id:
+                    items[chunk_id] = item
+                provenance = item.get("provenance", {})
+                if isinstance(provenance, dict):
+                    for record_id in provenance.get("record_ids", []):
+                        items[str(record_id)] = item
+        return items
+
+    async def _ayin_semantic(
+        self,
+        session: AsyncSession,
+        kind: EvidenceKind,
+        item_id: UUID,
+        snapshot_items: dict[str, dict[str, object]],
+    ) -> dict[str, object]:
+        source_text = ""
+        proposition = "The selected Ayin Working source states the following material: "
+        citation: dict[str, object] = {
+            "evidence_item_id": str(item_id),
+            "authority_status": "AYIN_WORKING",
+        }
+        if kind is EvidenceKind.AYIN_CONCEPT:
+            row: Any = await session.get(AyinConceptVersion, item_id)
+            if row:
+                parent = await session.get(AyinConcept, row.concept_id)
+                source_text = row.definition
+                citation.update(
+                    {
+                        "concept_id": str(row.concept_id),
+                        "stable_key": parent.stable_key if parent else None,
+                        "source_passage_id": str(row.source_passage_id),
+                        "version": row.version_number,
+                    }
+                )
+        elif kind is EvidenceKind.AYIN_PRINCIPLE:
+            row = await session.get(AyinPrincipleVersion, item_id)
+            if row:
+                source_text = row.statement
+                citation.update(
+                    {
+                        "source_passage_id": str(row.source_passage_id),
+                        "version": row.version_number,
+                    }
+                )
+        elif kind is EvidenceKind.AYIN_DISTINCTION:
+            row = await session.get(AyinDistinctionVersion, item_id)
+            if row:
+                source_text = row.explanation
+                citation.update(
+                    {
+                        "source_passage_id": str(row.source_passage_id),
+                        "relation": row.relation.value,
+                        "version": row.version_number,
+                    }
+                )
+        elif kind is EvidenceKind.AYIN_OPEN_QUESTION:
+            row = await session.get(AyinOpenQuestionVersion, item_id)
+            if row:
+                source_text = f"{row.question}\n{row.context}"
+                proposition = (
+                    "The Ayin source preserves this as an open question, not a "
+                    "resolved conclusion: "
+                )
+                citation.update(
+                    {
+                        "source_passage_id": str(row.source_passage_id),
+                        "version": row.version_number,
+                    }
+                )
+        elif kind is EvidenceKind.AYIN_PASSAGE:
+            row = await session.get(CanonPassage, item_id)
+            if row:
+                source_text = row.raw_text
+                citation.update(
+                    {
+                        "source_passage_id": str(row.id),
+                        "page": row.page_number,
+                        "heading_path": row.heading_path,
+                        "language": row.language.value,
+                    }
+                )
+        item = snapshot_items.get(str(item_id))
+        if item and not source_text:
+            source_text = str(item.get("text", ""))
+        source_text = source_text.strip() or (
+            "Source text is unavailable in the frozen package; retain the item "
+            "as unresolved."
+        )
+        return {
+            "semantic_proposition": proposition + source_text,
+            "plain_meaning": source_text,
+            "required_concepts": [str(citation.get("stable_key"))]
+            if citation.get("stable_key")
+            else [],
+            "source_support_summary": source_text,
+            "source_evidence": [
+                {
+                    "text": source_text,
+                    "evidence_item_id": str(item_id),
+                    "authority_status": "AYIN_WORKING",
+                }
+            ],
+            "citation": citation,
+        }
+
+    async def _terminology_for_package(
+        self, session: AsyncSession, package_id: UUID
+    ) -> list[dict[str, object]]:
+        refs: list[dict[str, object]] = []
+        rows = await session.scalars(
+            select(ResearchPackageAyinConcept).where(
+                ResearchPackageAyinConcept.package_id == package_id
+            )
+        )
+        for link in rows:
+            version = await session.get(AyinConceptVersion, link.concept_version_id)
+            if version is None:
+                continue
+            concept = await session.get(AyinConcept, version.concept_id)
+            if concept is None:
+                continue
+            refs.append(
+                {
+                    "term_id": str(concept.id),
+                    "source_form": concept.stable_key,
+                    "definition": version.definition,
+                    "usage_constraints": [
+                        "Preserve Ayin Working meaning and do not replace with "
+                        "a misleading equivalent"
+                    ],
+                    "prohibited_equivalents": [],
+                    "review_status": "WORKING",
+                    "available_language_forms": {},
+                }
+            )
+        return refs
 
     @staticmethod
     def _row_dict(row: Any) -> dict[str, object]:

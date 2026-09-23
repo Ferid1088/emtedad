@@ -1,5 +1,6 @@
 """Deterministic Semantic Master integrity validators."""
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -182,4 +183,151 @@ class LectureValidator:
         findings.extend(
             RitualBoundaryValidator().validate(payload.get("ritual_links", []), claims)
         )
+        findings.extend(SemanticMasterStandaloneValidator().validate(payload))
+        findings.extend(LocalizationReadinessValidator().validate(payload))
+        return findings
+
+
+_UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f-]{27,}\b", re.IGNORECASE)
+
+
+class SemanticMasterStandaloneValidator:
+    """Ensure an export can be understood without database lookups."""
+
+    def validate(self, payload: dict[str, Any]) -> list[LectureFinding]:
+        findings: list[LectureFinding] = []
+        claims = payload.get("claims", [])
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+            proposition = str(claim.get("semantic_proposition") or "").strip()
+            intent = str(claim.get("claim_intent") or "").strip()
+            if not proposition:
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "MISSING_SEMANTIC_PROPOSITION",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+            if (
+                _UUID.search(proposition)
+                and len(_UUID.sub("", proposition).strip()) < 20
+            ):
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "UUID_ONLY_CLAIM",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+            if _UUID.search(intent) and len(_UUID.sub("", intent).strip()) < 20:
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "UUID_ONLY_CLAIM",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+            if (
+                claim.get("required", True)
+                and claim.get("claim_origin")
+                in {ClaimOrigin.EXTERNAL, ClaimOrigin.AYIN}
+                and not claim.get("source_evidence")
+            ):
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "MISSING_EVIDENCE_TEXT",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+            if (
+                claim.get("epistemic_status")
+                in {"OPEN_QUESTION", ClaimEpistemicStatus.OPEN_QUESTION}
+                and "?" not in proposition
+                and not proposition.lower().startswith(("what", "how", "why", "can "))
+            ):
+                findings.append(
+                    LectureFinding(
+                        "OPEN_QUESTION_PRESERVATION",
+                        "MISSING_OPEN_QUESTION_TEXT",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+            if claim.get(
+                "epistemic_status"
+            ) == ClaimEpistemicStatus.SYNTHESIS_INFERENCE and not claim.get(
+                "plain_meaning"
+            ):
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "MISSING_SYNTHESIS_PREMISE_MEANING",
+                        "ERROR",
+                        str(claim.get("stable_key")),
+                    )
+                )
+        for section in payload.get("sections", []):
+            if not isinstance(section, dict):
+                continue
+            for field in ("purpose", "transition_intent"):
+                value = str(section.get(field) or "").strip()
+                if field == "purpose" and not value:
+                    findings.append(
+                        LectureFinding(
+                            "PACKAGE_TRACEABILITY",
+                            "MISSING_SECTION_SEMANTICS",
+                            "ERROR",
+                            str(section.get("id")),
+                        )
+                    )
+                if _UUID.search(value) and len(_UUID.sub("", value).strip()) < 20:
+                    findings.append(
+                        LectureFinding(
+                            "PACKAGE_TRACEABILITY",
+                            "UUID_ONLY_SECTION",
+                            "ERROR",
+                            str(section.get("id")),
+                        )
+                    )
+        for relation in payload.get("dialogue_relations", []):
+            if not str(relation.get("explanation") or "").strip():
+                findings.append(
+                    LectureFinding(
+                        "DIALOGUE_STATUS",
+                        "MISSING_RELATION_EXPLANATION",
+                        "ERROR",
+                        str(relation.get("relation_id")),
+                    )
+                )
+        for term in payload.get("terminology_references", []):
+            if not str(term.get("definition") or "").strip():
+                findings.append(
+                    LectureFinding(
+                        "PACKAGE_TRACEABILITY",
+                        "MISSING_TERM_DEFINITION",
+                        "ERROR",
+                        str(term.get("term_id")),
+                    )
+                )
+        return findings
+
+
+class LocalizationReadinessValidator:
+    """Final deterministic gate for the language-neutral handoff."""
+
+    def validate(self, payload: dict[str, Any]) -> list[LectureFinding]:
+        findings = SemanticMasterStandaloneValidator().validate(payload)
+        if not payload.get("claims"):
+            findings.append(
+                LectureFinding(
+                    "PACKAGE_TRACEABILITY", "NO_SEMANTIC_CLAIMS", "ERROR", "master"
+                )
+            )
         return findings
