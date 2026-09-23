@@ -558,14 +558,18 @@ async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
 async def strategy_tree(request: Request) -> HTMLResponse:
     service = TopicStrategyService(_database(request))
     strategy, nodes = await service.current()
-    if strategy is None:
-        await service.generate()
-        strategy, nodes = await service.current()
-    assert strategy is not None
     children: dict[UUID | None, list[TopicStrategyNode]] = {}
     for node in nodes:
         children.setdefault(node.parent_id, []).append(node)
-    metrics = await service.metrics(strategy.id)
+    metrics = (
+        await service.metrics(strategy.id)
+        if strategy
+        else {
+            "total": 0,
+            "used": 0,
+            "unused": 0,
+        }
+    )
     return await _render(
         request,
         "strategy_tree.html",
@@ -579,8 +583,9 @@ async def strategy_tree(request: Request) -> HTMLResponse:
 
 @router.post("/strategy/generate")
 async def generate_strategy(request: Request) -> RedirectResponse:
-    await TopicStrategyService(_database(request)).generate()
-    return RedirectResponse("/strategy", status_code=303)
+    # The former lexicon-oriented generator is intentionally disabled while
+    # the replacement content strategy is being designed.
+    return RedirectResponse("/strategy?generation=disabled", status_code=303)
 
 
 @router.post("/strategy/{strategy_id}/approve")
@@ -772,6 +777,7 @@ async def export_text(request: Request, project_id: UUID) -> Response:
             "strategy_node_id": str(item.strategy_node.id)
             if item.strategy_node
             else None,
+            "strategy_topic_snapshot": item.project.strategy_topic_snapshot,
             "content_topic_id": str(item.topic.id) if item.topic else None,
             "target_duration_minutes": item.project.target_duration_minutes,
             "status": item.status_key,

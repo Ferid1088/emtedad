@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.content_strategy.strategy_service import TopicStrategyService
 from app.core.ayin.importer import AyinImporter, default_seed_manifest
 from app.core.ayin.service import AyinExtractionService, AyinReadService
 from app.core.ayin.validator import AyinStructuralValidator
@@ -271,6 +272,17 @@ def _parser() -> argparse.ArgumentParser:
     freeze_lecture.add_argument("master_id", type=UUID)
     export_lecture = lecture_commands.add_parser("export")
     export_lecture.add_argument("master_id", type=UUID)
+
+    strategy = domains.add_parser("strategy")
+    strategy_commands = strategy.add_subparsers(dest="command", required=True)
+    reset_strategy = strategy_commands.add_parser(
+        "reset", help="remove the legacy fixed strategy tree"
+    )
+    reset_strategy.add_argument(
+        "--confirm",
+        action="store_true",
+        help="perform the destructive reset; without it only a preview is shown",
+    )
     return parser
 
 
@@ -308,6 +320,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_research(args, database, settings.storage_root)
         if args.domain == "lecture":
             return await _run_lecture(args, database)
+        if args.domain == "strategy":
+            return await _run_strategy(args, database)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -443,6 +457,14 @@ async def _run_lecture(args: argparse.Namespace, database: Database) -> int:
         raise RuntimeError(f"unsupported lecture command: {args.command}")
     print(_json(output))
     return 0
+
+
+async def _run_strategy(args: argparse.Namespace, database: Database) -> int:
+    if args.command != "reset":
+        raise RuntimeError(f"unsupported strategy command: {args.command}")
+    result = await TopicStrategyService(database).reset_legacy(confirm=args.confirm)
+    print(_json(result))
+    return 0 if args.confirm else 2
 
 
 async def _run_retrieval(

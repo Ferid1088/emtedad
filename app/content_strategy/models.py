@@ -174,8 +174,11 @@ class EditorialProject(Base):
     __table_args__ = {"schema": CONTENT}
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     strategy_node_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey(f"{CONTENT}.topic_strategy_nodes.id", ondelete="RESTRICT"),
+        ForeignKey(f"{CONTENT}.topic_strategy_nodes.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    strategy_topic_snapshot: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True
     )
     content_topic_id: Mapped[UUID | None] = mapped_column(
         ForeignKey(f"{CONTENT}.content_topics.id", ondelete="RESTRICT"), nullable=True

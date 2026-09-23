@@ -1,11 +1,9 @@
 """Grounded, versioned Emtedad topic strategy and production workspace."""
 
-import hashlib
-import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content_strategy.models import (
@@ -15,33 +13,12 @@ from app.content_strategy.models import (
     TopicStrategyNode,
     TopicUseHistory,
 )
-from app.core.ayin.models import AyinConcept, AyinConceptVersion
 from app.db.session import Database
 from app.research.models import ResearchProject
 
 
-def _hash(value: object) -> str:
-    return hashlib.sha256(
-        json.dumps(value, ensure_ascii=False, sort_keys=True, default=str).encode()
-    ).hexdigest()
-
-
 class TopicStrategyService:
     """Build a fixed tree from the currently stored Ayin ontology."""
-
-    _question_forms = (
-        "What does {concept} reveal about recurring human experience?",
-        "How can {concept} be distinguished from its nearest confusion?",
-        "What changes when we look at {concept} in everyday life?",
-        "Which conditions make {concept} visible or difficult to see?",
-        "How does {concept} relate to change without erasing continuity?",
-        "What remains open when we ask about {concept}?",
-        "How might relationships illuminate {concept}?",
-        "What can external knowledge clarify about {concept}, and what can it "
-        "not decide?",
-        "How does {concept} shape attention to suffering and possibility?",
-        "What would a careful practice of asking about {concept} require?",
-    )
 
     def __init__(self, database: Database) -> None:
         self.database = database
@@ -65,101 +42,78 @@ class TopicStrategyService:
             return strategy, nodes
 
     async def generate(self) -> UUID:
+        raise ValueError(
+            "legacy strategy generation is disabled; the replacement strategy "
+            "will be introduced in a later checkpoint"
+        )
+
+    async def reset_legacy(self, *, confirm: bool = False) -> dict[str, int | bool]:
+        """Remove only the legacy fixed strategy tree.
+
+        Historical editorial projects are detached and retain a JSON snapshot;
+        dynamic topics and all research/editorial artifacts remain untouched.
+        Without ``confirm`` this is a read-only preview.
+        """
+
         async with self.database.transaction() as session:
-            latest = await session.scalar(
-                select(TopicStrategy).order_by(TopicStrategy.version_number.desc())
-            )
-            if latest and latest.status == "APPROVED":
-                raise ValueError("approved strategy is immutable; create a new version")
-            version = (latest.version_number + 1) if latest else 1
-            concepts = list(
+            strategies = list(await session.scalars(select(TopicStrategy)))
+            nodes = list(await session.scalars(select(TopicStrategyNode)))
+            histories = list(await session.scalars(select(TopicUseHistory)))
+            projects = list(
                 await session.scalars(
-                    select(AyinConcept).order_by(AyinConcept.stable_key)
-                )
-            )
-            versions = list(
-                await session.scalars(
-                    select(AyinConceptVersion).order_by(
-                        AyinConceptVersion.version_number.desc()
+                    select(EditorialProject).where(
+                        EditorialProject.strategy_node_id.is_not(None)
                     )
                 )
             )
-            latest_versions: dict[UUID, AyinConceptVersion] = {}
-            for item in versions:
-                latest_versions.setdefault(item.concept_id, item)
-            selected = [
-                concept for concept in concepts if concept.id in latest_versions
-            ][:10]
-            if not selected:
-                raise ValueError("Ayin ontology has no grounded concepts")
-            grounding = {
-                "concept_ids": [str(item.id) for item in selected],
-                "source": "core.ayin_concepts and core.ayin_concept_versions",
+            counts: dict[str, int | bool] = {
+                "confirmed": confirm,
+                "strategies": len(strategies),
+                "nodes": len(nodes),
+                "roots": sum(item.node_type == "ROOT" for item in nodes),
+                "branches": sum(item.node_type == "BRANCH" for item in nodes),
+                "fixed_topics": sum(item.node_type == "TOPIC" for item in nodes),
+                "usage_records": len(histories),
+                "historical_projects": len(projects),
             }
-            strategy = TopicStrategy(
-                version_number=version,
-                title="Emtedad / Ayin-e Emtedad",
-                status="DRAFT",
-                source_hash=_hash(grounding),
-                grounding=grounding,
-            )
-            session.add(strategy)
+            if not confirm or not nodes and not strategies:
+                return counts
+
+            strategy_by_id = {item.id: item for item in strategies}
+            node_by_id = {item.id: item for item in nodes}
+            for project in projects:
+                node_id = project.strategy_node_id
+                if node_id is None:
+                    continue
+                node = node_by_id.get(node_id)
+                if node is None:
+                    continue
+                strategy = strategy_by_id.get(node.strategy_id)
+                branch = node_by_id.get(node.parent_id) if node.parent_id else None
+                if (
+                    branch is not None
+                    and branch.node_type != "BRANCH"
+                    and branch.parent_id is not None
+                ):
+                    branch = node_by_id.get(branch.parent_id)
+                project.strategy_topic_snapshot = {
+                    "strategy_id": str(strategy.id) if strategy else None,
+                    "strategy_version": strategy.version_number if strategy else None,
+                    "strategy_title": strategy.title if strategy else None,
+                    "strategy_status": strategy.status if strategy else None,
+                    "node_id": str(node.id),
+                    "node_title": node.title,
+                    "node_question": node.human_question,
+                    "branch_title": branch.title if branch else None,
+                    "captured_at": datetime.now(UTC).isoformat(),
+                }
+                project.strategy_node_id = None
             await session.flush()
-            root = TopicStrategyNode(
-                strategy_id=strategy.id,
-                node_type="ROOT",
-                stable_key="emtedad",
-                title="Emtedad / Ayin-e Emtedad",
-                rationale="Root of the grounded Emtedad strategy tree.",
-                ordinal=0,
-                grounding=grounding,
-                generation_count=0,
-            )
-            session.add(root)
-            await session.flush()
-            ordinal = 1
-            for branch_index, concept in enumerate(selected, 1):
-                concept_version = latest_versions[concept.id]
-                branch = TopicStrategyNode(
-                    strategy_id=strategy.id,
-                    parent_id=root.id,
-                    node_type="BRANCH",
-                    stable_key=f"branch-{concept.stable_key}",
-                    title=concept.stable_key,
-                    rationale=concept_version.definition,
-                    ordinal=branch_index,
-                    grounding={
-                        "concept_id": str(concept.id),
-                        "concept_version_id": str(concept_version.id),
-                        "definition": concept_version.definition,
-                        "source_passage_id": str(concept_version.source_passage_id),
-                    },
-                    generation_count=0,
-                )
-                session.add(branch)
-                await session.flush()
-                for leaf_index, form in enumerate(self._question_forms, 1):
-                    question = form.format(concept=concept.stable_key)
-                    session.add(
-                        TopicStrategyNode(
-                            strategy_id=strategy.id,
-                            parent_id=branch.id,
-                            node_type="TOPIC",
-                            stable_key=f"{concept.stable_key}-{leaf_index}",
-                            title=f"{concept.stable_key}: {question}",
-                            human_question=question,
-                            rationale=(
-                                "Fixed topic grounded in the Ayin concept definition; "
-                                "the question is an editorial angle, not a new "
-                                "Ayin claim."
-                            ),
-                            ordinal=ordinal,
-                            grounding=branch.grounding,
-                            generation_count=0,
-                        )
-                    )
-                    ordinal += 1
-            return strategy.id
+            if histories:
+                await session.execute(delete(TopicUseHistory))
+            await session.execute(delete(TopicStrategyNode))
+            await session.execute(delete(TopicStrategy))
+            return counts
 
     async def approve(self, strategy_id: UUID) -> None:
         async with self.database.transaction() as session:

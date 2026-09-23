@@ -12,8 +12,8 @@
 </li>
 {%- endmacro %}
 {% block content %}
-<div class="pagehead"><div><p class="muted">Strategie</p><h1>Emtedad Themenbaum</h1></div><form method="post" action="/strategy/{{ strategy.id }}/approve"><button class="button" {% if strategy.status == "APPROVED" %}disabled{% endif %}>{{ "Freigegeben" if strategy.status == "APPROVED" else "Strategie freigeben" }}</button></form></div>
-<section class="card"><p>Version {{ strategy.version_number }} · {{ strategy.status }}</p><label>Baum durchsuchen<input id="strategy-search" type="search" placeholder="Konzept oder Frage"></label><p>{{ metrics.total }} feste Themen · {{ metrics.used }} verwendet · {{ metrics.unused }} unbenutzt · {{ ((metrics.used / metrics.total * 100) if metrics.total else 0)|round|int }}% Abdeckung</p></section>
+<div class="pagehead"><div><p class="muted">Strategie</p><h1>Emtedad Themenbaum</h1></div></div>
+{% if strategy %}<section class="card"><p>Version {{ strategy.version_number }} · {{ strategy.status }}</p><label>Baum durchsuchen<input id="strategy-search" type="search" placeholder="Konzept oder Frage"></label><p>{{ metrics.total }} feste Themen · {{ metrics.used }} verwendet · {{ metrics.unused }} unbenutzt · {{ ((metrics.used / metrics.total * 100) if metrics.total else 0)|round|int }}% Abdeckung</p></section>{% else %}<section class="card"><h2>Noch keine Themenstrategie vorhanden.</h2><p class="muted">Die frühere feste Strategie wurde entfernt. Eine neue, semantisch entwickelte Strategie folgt in einem späteren Schritt.</p></section>{% endif %}
 <section class="card strategy-tree"><ul>{% if root %}{{ render_node(root) }}{% else %}<li class="muted">Noch kein Strategiebaum vorhanden.</li>{% endif %}</ul></section>
-<script>document.getElementById('strategy-search').addEventListener('input', function(e) { const q=e.target.value.toLowerCase(); document.querySelectorAll('.strategy-node').forEach(function(n) { n.hidden = !!q && !n.textContent.toLowerCase().includes(q); }); });</script>
+{% if strategy %}<script>document.getElementById('strategy-search').addEventListener('input', function(e) { const q=e.target.value.toLowerCase(); document.querySelectorAll('.strategy-node').forEach(function(n) { n.hidden = !!q && !n.textContent.toLowerCase().includes(q); }); });</script>{% endif %}
 {% endblock %}

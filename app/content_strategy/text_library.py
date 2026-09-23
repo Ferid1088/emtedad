@@ -76,6 +76,8 @@ def _origin(
 ) -> tuple[str, str]:
     if strategy_node is not None:
         return "STRATEGY", ORIGIN_LABELS["STRATEGY"]
+    if getattr(project, "strategy_topic_snapshot", None):
+        return "STRATEGY", "Historisches Themenbaum-Thema"
     key = getattr(topic.origin, "value", topic.origin) if topic else "LEGACY"
     key = str(key)
     return key, ORIGIN_LABELS.get(key, "Historisches Thema")
@@ -174,7 +176,16 @@ async def load_library_items(
             project=project,
             topic=topic,
             strategy_node=node,
-            branch_title=_branch_title(node, nodes),
+            branch_title=(
+                _branch_title(node, nodes)
+                if node is not None
+                else (
+                    str(project.strategy_topic_snapshot.get("branch_title"))
+                    if project.strategy_topic_snapshot
+                    and project.strategy_topic_snapshot.get("branch_title")
+                    else None
+                )
+            ),
             tracks=project_tracks,
             approved_persian=approved,
             drafts=project_drafts,
