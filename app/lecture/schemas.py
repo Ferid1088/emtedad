@@ -46,7 +46,7 @@ class LectureMasterRead(BaseModel):
     research_package_id: UUID
     research_package_version: int
     research_package_content_hash: str
-    canon_version_id: UUID
+    canon_version_id: UUID | None
     manasek_version_id: UUID | None
     package_authority: dict[str, object]
     central_human_question: str

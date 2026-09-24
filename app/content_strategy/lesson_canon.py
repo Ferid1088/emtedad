@@ -72,8 +72,11 @@ class LessonContentPackage(BaseModel):
     """Complete direct writer input for one lesson, without book retrieval."""
 
     package_version: str = "1"
+    catalog_version: str = "100-lessons-v1"
     lesson_canon_hash: str
     lesson_id: str
+    lesson_number: int | None = None
+    lesson_count: int = 100
     chapter: int
     chapter_title_fa: str
     order_in_chapter: int
@@ -217,6 +220,8 @@ class LessonCanonRepository:
         return LessonContentPackage(
             lesson_canon_hash=self.content_hash,
             lesson_id=lesson.lesson_id,
+            lesson_number=self.ordinal(lesson.lesson_id),
+            lesson_count=self.lesson_count,
             chapter=lesson.chapter,
             chapter_title_fa=lesson.chapter_title_fa,
             order_in_chapter=lesson.order_in_chapter,

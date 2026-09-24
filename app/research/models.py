@@ -208,20 +208,44 @@ class AyinSpinePassage(Base):
 
 
 class ResearchPlan(Base):
-    """Versioned, narrower research instructions derived from one Ayin Spine."""
+    """Versioned research instructions from a specialist spine or lesson."""
 
     __tablename__ = "research_plans"
     __table_args__ = (
         UniqueConstraint("ayin_spine_id", "version_number"),
+        UniqueConstraint(
+            "lesson_id",
+            "lesson_canon_hash",
+            "version_number",
+            name="uq_research_plan_lesson_version",
+        ),
         CheckConstraint("version_number > 0", name="positive_version"),
         CheckConstraint("input_hash ~ '^[0-9a-f]{64}$'", name="valid_input_hash"),
+        CheckConstraint(
+            "(ayin_spine_id IS NOT NULL AND lesson_id IS NULL "
+            "AND lesson_canon_hash IS NULL "
+            "AND lesson_content_package_snapshot IS NULL) "
+            "OR (ayin_spine_id IS NULL AND lesson_id IS NOT NULL "
+            "AND lesson_canon_hash IS NOT NULL "
+            "AND lesson_content_package_snapshot IS NOT NULL)",
+            name="valid_research_plan_origin",
+        ),
         {"schema": CONTENT},
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    ayin_spine_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CONTENT}.ayin_spines.id", ondelete="RESTRICT"), index=True
+    ayin_spine_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.ayin_spines.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=True,
     )
+    lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    lesson_canon_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lesson_content_package_snapshot: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    human_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    query_provenance: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     version_number: Mapped[int] = mapped_column(Integer)
     manasek_relevant: Mapped[bool] = mapped_column(Boolean, default=False)
     manasek_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -272,6 +296,16 @@ class ResearchPackage(Base):
         CheckConstraint("package_version > 0", name="positive_package_version"),
         CheckConstraint("input_hash ~ '^[0-9a-f]{64}$'", name="valid_input_hash"),
         CheckConstraint("content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"),
+        CheckConstraint(
+            "(lesson_id IS NOT NULL AND lesson_canon_hash IS NOT NULL "
+            "AND lesson_content_package_version IS NOT NULL "
+            "AND lesson_content_package_snapshot IS NOT NULL "
+            "AND ayin_spine_id IS NULL AND research_plan_id IS NOT NULL "
+            "AND canon_version_id IS NULL) OR "
+            "(lesson_id IS NULL AND ayin_spine_id IS NOT NULL "
+            "AND research_plan_id IS NOT NULL AND canon_version_id IS NOT NULL)",
+            name="valid_research_origin",
+        ),
         {"schema": CONTENT},
     )
 
@@ -279,14 +313,22 @@ class ResearchPackage(Base):
     research_project_id: Mapped[UUID] = mapped_column(
         ForeignKey(f"{CONTENT}.research_projects.id", ondelete="RESTRICT"), index=True
     )
-    ayin_spine_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CONTENT}.ayin_spines.id", ondelete="RESTRICT")
+    ayin_spine_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.ayin_spines.id", ondelete="RESTRICT"), nullable=True
     )
-    research_plan_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CONTENT}.research_plans.id", ondelete="RESTRICT")
+    research_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.research_plans.id", ondelete="RESTRICT"), nullable=True
     )
-    canon_version_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{CORE}.canon_versions.id", ondelete="RESTRICT")
+    canon_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CORE}.canon_versions.id", ondelete="RESTRICT"), nullable=True
+    )
+    lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    lesson_canon_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lesson_content_package_version: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    lesson_content_package_snapshot: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True
     )
     retrieval_configuration_id: Mapped[UUID] = mapped_column(
         ForeignKey(f"{RETRIEVAL}.configurations.id", ondelete="RESTRICT")

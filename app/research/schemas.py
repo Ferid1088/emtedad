@@ -110,7 +110,12 @@ class ResearchPlanRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    ayin_spine_id: UUID
+    ayin_spine_id: UUID | None
+    lesson_id: str | None
+    lesson_canon_hash: str | None
+    lesson_content_package_snapshot: dict[str, object] | None
+    human_question: str | None
+    query_provenance: dict[str, object]
     version_number: int
     manasek_relevant: bool
     manasek_reason: str | None
@@ -159,9 +164,13 @@ class ResearchPackageRead(BaseModel):
 
     id: UUID
     research_project_id: UUID
-    ayin_spine_id: UUID
-    research_plan_id: UUID
-    canon_version_id: UUID
+    ayin_spine_id: UUID | None
+    research_plan_id: UUID | None
+    canon_version_id: UUID | None
+    lesson_id: str | None
+    lesson_canon_hash: str | None
+    lesson_content_package_version: str | None
+    lesson_content_package_snapshot: dict[str, object] | None
     retrieval_configuration_id: UUID
     package_version: int
     status: PackageStatus

@@ -34,6 +34,7 @@ def test_owner_routes_are_registered(test_settings: Settings) -> None:
         "/lessons",
         "/lessons/{lesson_id}",
         "/archive",
+        "/workspace/{project_id}/research",
     } <= paths
 
 
@@ -51,6 +52,21 @@ def test_legacy_strategy_templates_are_removed() -> None:
 
     assert not (templates / "strategy_tree.html").exists()
     assert not (templates / "strategy_topic_detail.html").exists()
+
+
+def test_lesson_studio_exposes_real_external_research_action() -> None:
+    template = (
+        Path(__file__).parents[2]
+        / "app"
+        / "web"
+        / "templates"
+        / "editorial_workspace.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'action="/workspace/{{ project.id }}/research"' in template
+    assert "Externe Recherche starten" in template
+    assert "Recherche starten (nächster Schritt)" not in template
+    assert "Wird ausschließlich in der externen Wissensbasis gesucht." in template
 
 
 def test_overlap_is_deterministic() -> None:

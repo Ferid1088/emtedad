@@ -77,8 +77,8 @@ class LectureMasterVersion(Base):
     )
     research_package_version: Mapped[int] = mapped_column(Integer)
     research_package_content_hash: Mapped[str] = mapped_column(String(64))
-    canon_version_id: Mapped[UUID] = mapped_column(
-        ForeignKey("core.canon_versions.id", ondelete="RESTRICT")
+    canon_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core.canon_versions.id", ondelete="RESTRICT"), nullable=True
     )
     manasek_version_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("ritual.ritual_versions.id", ondelete="RESTRICT"), nullable=True

@@ -8,7 +8,12 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import delete, select
 
-from app.content_strategy.models import EditorialProject, PersianDraft
+from app.content_strategy.models import (
+    ChannelLedgerEntry,
+    EditorialProject,
+    PersianDraft,
+)
+from app.content_strategy.persian_service import PersianEditorialService
 from app.core.config import Environment, Settings
 from app.db.session import Database
 from app.lecture.models import LectureMasterVersion
@@ -75,6 +80,10 @@ def test_owner_lesson_workflow_and_published_only_memory() -> None:
         assert "Externe Recherche" in workspace.text
         assert "kein automatisches Ayin-Book-RAG" in workspace.text
         assert "Im Ayin-Buch suchen" not in workspace.text
+        assert f'action="/workspace/{project_id}/research"' in workspace.text
+        assert "Externe Recherche starten" in workspace.text
+        assert "Vor dem Schreiben muss die externe Recherche" in workspace.text
+        assert 'name="semantic_master_id"' not in workspace.text
 
         texts = client.get("/texts")
         assert texts.status_code == 200
@@ -85,7 +94,16 @@ def test_owner_lesson_workflow_and_published_only_memory() -> None:
         assert unpublished_archive.status_code == 200
         assert "بُن" not in unpublished_archive.text
 
+        premature_publish = client.post(
+            f"/texts/{project_id}/publish", follow_redirects=False
+        )
+        assert premature_publish.status_code == 303
+        assert "approval-required" in premature_publish.headers["location"]
+
+    asyncio.run(_assert_no_ledger_entry(database, project_id))
+
     asyncio.run(_add_approved_fixture(database, project_id))
+    asyncio.run(_assert_edit_creates_version(database, project_id))
 
     with TestClient(create_app(settings)) as client:
         published = client.post(f"/texts/{project_id}/publish", follow_redirects=False)
@@ -99,6 +117,8 @@ def test_owner_lesson_workflow_and_published_only_memory() -> None:
         assert topics.status_code == 200
         assert "Freie Themen" in topics.text
         assert "Themenbaum öffnen" not in topics.text
+
+    asyncio.run(_assert_published_ledger_entry(database, project_id))
 
     asyncio.run(_cleanup(database, project_id))
     asyncio.run(database.dispose())
@@ -130,8 +150,62 @@ async def _add_approved_fixture(database: Database, project_id: UUID) -> None:
 async def _cleanup(database: Database, project_id: UUID) -> None:
     async with database.transaction() as session:
         await session.execute(
+            delete(ChannelLedgerEntry).where(
+                ChannelLedgerEntry.editorial_project_id == project_id
+            )
+        )
+        await session.execute(
             delete(PersianDraft).where(PersianDraft.editorial_project_id == project_id)
         )
         project = await session.get(EditorialProject, project_id)
         if project is not None:
             await session.delete(project)
+
+
+async def _assert_no_ledger_entry(database: Database, project_id: UUID) -> None:
+    async with database.transaction() as session:
+        entry = await session.scalar(
+            select(ChannelLedgerEntry).where(
+                ChannelLedgerEntry.editorial_project_id == project_id
+            )
+        )
+        assert entry is None
+
+
+async def _assert_edit_creates_version(database: Database, project_id: UUID) -> None:
+    async with database.transaction() as session:
+        approved = await session.scalar(
+            select(PersianDraft).where(
+                PersianDraft.editorial_project_id == project_id,
+                PersianDraft.status == "PERSIAN_APPROVED",
+            )
+        )
+        assert approved is not None
+        approved_id = approved.id
+        original_text = approved.text
+    edited_id = await PersianEditorialService(database).edit(
+        approved_id, original_text + " ویرایش صاحب اثر."
+    )
+    with pytest.raises(ValueError, match="review must be completed"):
+        await PersianEditorialService(database).approve(edited_id)
+    async with database.transaction() as session:
+        original = await session.get(PersianDraft, approved_id)
+        edited = await session.get(PersianDraft, edited_id)
+        assert original is not None and original.status == "PERSIAN_APPROVED"
+        assert edited is not None and edited.parent_draft_id == approved_id
+        assert edited.version_number == original.version_number + 1
+        assert edited.provenance["review_completed"] is False
+
+
+async def _assert_published_ledger_entry(
+    database: Database, project_id: UUID
+) -> None:
+    async with database.transaction() as session:
+        entry = await session.scalar(
+            select(ChannelLedgerEntry).where(
+                ChannelLedgerEntry.editorial_project_id == project_id
+            )
+        )
+        assert entry is not None
+        assert entry.lesson_id == "3.1"
+        assert len(entry.content_hash) == 64

@@ -122,9 +122,21 @@ class LectureMasterService:
                 research_package_content_hash=package.content_hash,
                 canon_version_id=package.canon_version_id,
                 package_authority=self._authority(package),
-                central_human_question=project.working_title,
+                central_human_question=self._human_question(package),
                 ending_mode="OPEN",
-                architecture={"writer_isolation": "FROZEN_RESEARCH_PACKAGE_ONLY"},
+                architecture=(
+                    {
+                        "writer_isolation": (
+                            "PINNED_LESSON_PACKAGE_PLUS_FROZEN_EXTERNAL_RESEARCH"
+                        ),
+                        "lesson_id": package.lesson_id,
+                        "lesson_canon_hash": package.lesson_canon_hash,
+                        "full_ayin_book_rag": False,
+                        "published_archive_role": "POST_DRAFT_REVIEW_ONLY",
+                    }
+                    if package.lesson_id is not None
+                    else {"writer_isolation": "FROZEN_RESEARCH_PACKAGE_ONLY"}
+                ),
                 prohibited_conflations=self._prohibited(package),
                 uncertainty_constraints=[
                     "Never present PROPOSED dialogue relations as approved",
@@ -553,7 +565,22 @@ class LectureMasterService:
                 value["text"] = item.get("text", "")
                 value["language"] = item.get("language")
                 value["content_hash"] = item.get("content_hash")
-                value["package_provenance"] = item.get("provenance", {})
+                package_provenance = item.get("provenance", {})
+                value["package_provenance"] = package_provenance
+                if isinstance(package_provenance, dict):
+                    for field in (
+                        "corpus_zone",
+                        "lane",
+                        "source_type",
+                        "source_title",
+                        "creator",
+                        "source_url",
+                        "page_start",
+                        "page_end",
+                        "timestamp_start",
+                        "timestamp_end",
+                    ):
+                        value[field] = package_provenance.get(field)
             evidence_payload.append(value)
         return {
             "master": LectureMasterRead.model_validate(master).model_dump(mode="json"),
@@ -729,6 +756,36 @@ class LectureMasterService:
                     "available_language_forms": {},
                 }
             )
+        if refs:
+            return refs
+        package = await session.get(ResearchPackage, package_id)
+        snapshot = package.lesson_content_package_snapshot if package else None
+        if not isinstance(snapshot, dict):
+            return refs
+        registry = snapshot.get("core_concept_registry", [])
+        if not isinstance(registry, list):
+            return refs
+        for item in registry:
+            if not isinstance(item, dict):
+                continue
+            lesson_id = str(item.get("lesson_id", "")).strip()
+            title = str(item.get("title_fa", "")).strip()
+            definition = str(item.get("locked_definition_fa", "")).strip()
+            if lesson_id and title and definition:
+                refs.append(
+                    {
+                        "term_id": f"lesson:{lesson_id}",
+                        "source_form": title,
+                        "definition": definition,
+                        "usage_constraints": [
+                            "Preserve the locked Lesson Canon meaning",
+                            "Do not auto-translate protected Ayin terminology",
+                        ],
+                        "prohibited_equivalents": [],
+                        "review_status": "CANONICAL_LESSON",
+                        "available_language_forms": {"fa": title},
+                    }
+                )
         return refs
 
     @staticmethod
@@ -803,9 +860,12 @@ class LectureMasterService:
             for query in queries
         )
         return {
-            "ayin": "AYIN_WORKING",
+            "ayin": "LESSON_CANON" if package.lesson_id else "AYIN_WORKING",
             "manasek": "MANASEK_WORKING" if has_manasek else None,
             "package_status": package.status.value,
+            "lesson_id": package.lesson_id,
+            "lesson_canon_hash": package.lesson_canon_hash,
+            "external_research_only": package.lesson_id is not None,
         }
 
     @staticmethod
@@ -826,7 +886,7 @@ class LectureMasterService:
 
     @staticmethod
     def _section_purpose(role: SectionRole, _package: ResearchPackage) -> str:
-        return {
+        purposes = {
             SectionRole.HUMAN_ENTRY: "Connect the human question to lived experience.",
             SectionRole.AYIN_FRAME: (
                 "Establish the selected Ayin Working frame and distinctions."
@@ -841,4 +901,10 @@ class LectureMasterService:
             SectionRole.LIFE_RETURN: (
                 "Return the structured inquiry to life without false resolution."
             ),
-        }.get(role, role.value)
+        }
+        if role is SectionRole.AYIN_FRAME and _package.lesson_id is not None:
+            return (
+                "Use the pinned canonical Lesson Content Package as the Ayin core; "
+                "do not retrieve or recreate it."
+            )
+        return purposes.get(role, role.value)

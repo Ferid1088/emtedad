@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -269,6 +270,44 @@ class PersianReviewFinding(Base):
     severity: Mapped[str] = mapped_column(String(16))
     message: Mapped[str] = mapped_column(Text)
     blocking: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class ChannelLedgerEntry(Base):
+    """Published-only deterministic memory for one editorial project."""
+
+    __tablename__ = "channel_ledger_entries"
+    __table_args__ = (
+        CheckConstraint(
+            "content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"
+        ),
+        {"schema": CONTENT},
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    editorial_project_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.editorial_projects.id", ondelete="CASCADE"),
+        unique=True,
+    )
+    published_draft_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.persian_drafts.id", ondelete="RESTRICT")
+    )
+    lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    published_title: Mapped[str] = mapped_column(String(512))
+    concept_keys: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    canonical_definitions: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, default=list
+    )
+    examples: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    open_promises: Mapped[list[dict[str, object]]] = mapped_column(JSONB, default=list)
+    fulfilled_promises: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, default=list
+    )
+    title_history: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    coverage_summary: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

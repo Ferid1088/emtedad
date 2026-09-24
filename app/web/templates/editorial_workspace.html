@@ -1,13 +1,208 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="pagehead"><div><p class="eyebrow">Studio · Redaktionelles Projekt</p><h1>{{ project.title }}</h1>{% if lesson_metadata %}<p class="lede">Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }} · <span dir="rtl">{{ lesson_metadata.title }}</span></p>{% endif %}</div><a class="button secondary" href="{{ '/lessons/' ~ lesson_metadata.lesson_id if lesson_metadata else '/studio' }}">Zurück</a></div>
-<section class="card"><div class="split-head"><h2>Projekt</h2><span class="badge">{{ project_status_label }}</span></div><p>{{ project.human_question }}</p>{% if project.target_duration_minutes %}<p>Zieldauer: {{ project.target_duration_minutes }} Minuten</p>{% endif %}{% if project.owner_prompt %}<h3>Eigene Anweisung</h3><p>{{ project.owner_prompt }}</p>{% endif %}</section>
-<div class="context-grid" style="margin-top:1rem">
-  <section class="card context-panel"><div class="split-head"><div><p class="eyebrow">Ayin-Kern</p><h2>{{ 'Lektionskanon' if lesson_package else 'Freies Thema' }}</h2></div><span class="badge {% if lesson_package %}success{% endif %}">{{ 'aus dem 100-Lektionen-Kanon' if lesson_package else 'nicht kanonisch' }}</span></div>{% if lesson_package %}<p><strong>Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</strong></p><h3 dir="rtl">{{ lesson_package.canonical_lesson_title }}</h3><div class="prose" dir="rtl"><p>{{ lesson_package.canonical_lesson_explanation[:900] }}{% if lesson_package.canonical_lesson_explanation|length > 900 %}…{% endif %}</p></div>{% if lesson_package.core_concept_registry %}<h3>Kernbegriffe</h3><div class="status-row">{% for concept in lesson_package.core_concept_registry %}<span class="badge" dir="rtl">{{ concept.title_fa }}</span>{% endfor %}</div>{% endif %}{% if lesson_package.required_distinctions %}<h3>Wichtige Unterscheidungen</h3><ul>{% for value in lesson_package.required_distinctions %}<li dir="rtl">{{ value }}</li>{% endfor %}</ul>{% endif %}<p class="muted">{{ lesson_package.prerequisites|length }} Voraussetzungen · {{ lesson_package.lesson_relations|length }} relevante ausgehende Beziehungen</p><p class="checkline">Direkter Kanon-Kontext · kein automatisches Ayin-Book-RAG</p>{% else %}<p class="muted">Dieses Projekt stammt aus einem freien Thema. Es bleibt ein freies Thema und wird nicht automatisch zur kanonischen Lektion.</p><p class="checkline">Ein kanonischer Ayin-Kern wird erst für den konkreten Produktionslauf ausgewählt.</p>{% endif %}</section>
-  <section class="card research-panel"><div class="split-head"><div><p class="eyebrow">Externe Recherche</p><h2>ResearchPackage</h2></div><span class="badge warning">separater Eingang</span></div><p>Externe Quellen erweitern oder prüfen die Lektion. Sie definieren den Ayin-Kern nicht neu.</p><ul class="role-list"><li>YouTube und Vorträge</li><li>Bücher und Papers</li><li>Artikel und andere Wissensquellen</li><li>Evidenz, Gegenargumente und alternative Erklärungen</li></ul><p class="muted">Veröffentlichte Skripte werden erst nach dem Entwurf auf Wiederholung und Widerspruch geprüft.</p><button class="button" disabled>Recherche starten (nächster Schritt)</button></section>
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Studio · Redaktionelles Projekt</p>
+    <h1>{{ project.title }}</h1>
+    {% if lesson_metadata %}
+    <p class="lede">Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }} · <span dir="rtl">{{ lesson_metadata.title }}</span></p>
+    {% endif %}
+  </div>
+  <a class="button secondary" href="{{ '/lessons/' ~ lesson_metadata.lesson_id if lesson_metadata else '/studio' }}">Zurück</a>
 </div>
-<section class="card"><h2>Persische Entwürfe</h2><p>Der kanonische Lektionsinhalt und die externe Forschung bleiben getrennt. Das vollständige Ayin-Buch wird für den normalen Entwurf nicht abgerufen.</p><form method="post" action="/workspace/{{ project.id }}/persian/drafts">{% if lesson_metadata %}<input type="hidden" name="lesson_id" value="{{ lesson_metadata.lesson_id }}"><p><strong>Ayin-Kern:</strong> Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</p>{% else %}<label>Kanonischer Ayin-Kern für diesen Lauf<select name="lesson_id" required>{% for lesson in lessons %}<option value="{{ lesson.lesson_id }}">{{ lesson.lesson_id }} · {{ lesson.title_fa }}</option>{% else %}<option disabled>Kein Lektionskanon verfügbar</option>{% endfor %}</select></label>{% endif %}<label>Semantic Master mit externer Forschung<select name="semantic_master_id" required>{% for master in masters %}<option value="{{ master.id }}">{{ master.central_human_question }} · {{ master.status }}</option>{% else %}<option disabled>Kein READY Semantic Master vorhanden</option>{% endfor %}</select></label><label>Zieldauer<input name="target_duration_minutes" type="number" min="5" max="180" value="15"></label><label>Anzahl Entwürfe<select name="draft_count"><option>1</option><option>2</option><option>3</option><option>5</option></select></label><label>Eigene Anweisung<textarea name="owner_prompt" dir="auto"></textarea></label><button class="button" type="submit" {% if not masters or (not lesson_metadata and not lessons) %}disabled{% endif %}>Persische Entwürfe erstellen</button></form></section>
-{% if drafts %}<section class="card"><h2>Entwurfsversionen</h2>{% for draft in drafts %}<article class="suggestion" dir="rtl"><h3>Entwurf {{ draft.variant_index }} · Version {{ draft.version_number }}</h3><p dir="ltr">{{ draft.actual_word_count }} Wörter · ca. {{ (draft.estimated_duration_seconds // 60) }}:{{ "%02d"|format(draft.estimated_duration_seconds % 60) }} · {{ draft.status }}</p><form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/edit"><textarea name="text" dir="rtl" rows="12">{{ draft.text }}</textarea><button class="button" type="submit">Als neue Version speichern</button></form><form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/review"><button class="button secondary" type="submit">Semantisch prüfen</button></form><form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/approve"><button class="button" type="submit">Persische Version freigeben</button></form></article>{% endfor %}</section>{% endif %}
+
+{% if research_message %}
+<p class="{{ 'error' if research_message_is_error else 'notice' }}" role="status">{{ research_message }}</p>
+{% endif %}
+
+<section class="card">
+  <div class="split-head"><h2>Projekt</h2><span class="badge">{{ project_status_label }}</span></div>
+  <p>{{ project.human_question }}</p>
+  {% if project.target_duration_minutes %}<p>Zieldauer: {{ project.target_duration_minutes }} Minuten</p>{% endif %}
+  {% if project.owner_prompt %}<h3>Eigene Anweisung</h3><p>{{ project.owner_prompt }}</p>{% endif %}
+</section>
+
+{% if lesson_metadata %}
+<section class="card" aria-label="Produktionsfortschritt">
+  <h2>Produktionsfortschritt</h2>
+  <div class="status-row">
+    <span class="badge {{ 'success' if studio_progress.lesson else 'open' }}">Lektion {{ '✓' if studio_progress.lesson else '…' }}</span>
+    <span class="badge {{ 'success' if studio_progress.research else 'open' }}">Externe Recherche {{ '✓' if studio_progress.research else '…' }}</span>
+    <span class="badge {{ 'success' if studio_progress.package else 'open' }}">Research Package {{ '✓' if studio_progress.package else '…' }}</span>
+    <span class="badge {{ 'success' if studio_progress.persian else 'open' }}">Persischer Text {{ '✓' if studio_progress.persian else '…' }}</span>
+    <span class="badge {{ 'success' if studio_progress.review else 'open' }}">Prüfung {{ '✓' if studio_progress.review else '…' }}</span>
+    <span class="badge {{ 'success' if studio_progress.approval else 'open' }}">Freigabe {{ '✓' if studio_progress.approval else '…' }}</span>
+  </div>
+</section>
+{% endif %}
+
+<div class="context-grid" style="margin-top:1rem">
+  <section class="card context-panel">
+    <div class="split-head">
+      <div><p class="eyebrow">Ayin-Kern</p><h2>{{ 'Lektionskanon' if lesson_package else 'Freies Thema' }}</h2></div>
+      <span class="badge {% if lesson_package %}success{% endif %}">{{ 'aus dem 100-Lektionen-Kanon' if lesson_package else 'nicht kanonisch' }}</span>
+    </div>
+    {% if lesson_package %}
+    <p><strong>Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</strong></p>
+    <h3 dir="rtl">{{ lesson_package.canonical_lesson_title }}</h3>
+    <div class="prose" dir="rtl"><p>{{ lesson_package.canonical_lesson_explanation[:900] }}{% if lesson_package.canonical_lesson_explanation|length > 900 %}…{% endif %}</p></div>
+    {% if lesson_package.core_concept_registry %}
+    <h3>Kernbegriffe</h3>
+    <div class="status-row">{% for concept in lesson_package.core_concept_registry %}<span class="badge" dir="rtl">{{ concept.title_fa }}</span>{% endfor %}</div>
+    {% endif %}
+    {% if lesson_package.required_distinctions %}
+    <h3>Wichtige Unterscheidungen</h3>
+    <ul>{% for value in lesson_package.required_distinctions %}<li dir="rtl">{{ value }}</li>{% endfor %}</ul>
+    {% endif %}
+    <p class="muted">{{ lesson_package.prerequisites|length }} Voraussetzungen · {{ lesson_package.lesson_relations|length }} relevante ausgehende Beziehungen</p>
+    <p class="checkline">Direkter Kanon-Kontext · kein automatisches Ayin-Book-RAG</p>
+    {% else %}
+    <p class="muted">Dieses Projekt stammt aus einem freien Thema. Es bleibt ein freies Thema und wird nicht automatisch zur kanonischen Lektion.</p>
+    <p class="checkline">Ein kanonischer Ayin-Kern wird erst für den konkreten Produktionslauf ausgewählt.</p>
+    {% endif %}
+  </section>
+
+  <section class="card research-panel">
+    <div class="split-head">
+      <div><p class="eyebrow">Externe Recherche</p><h2>ResearchPackage</h2></div>
+      {% if research_summary %}
+      <span class="badge {{ research_summary.badge_class }}">{{ research_summary.status_label }}</span>
+      {% else %}
+      <span class="badge warning">noch nicht durchgeführt</span>
+      {% endif %}
+    </div>
+    <p>Externe Quellen erweitern oder prüfen die Lektion. Sie definieren den Ayin-Kern nicht neu.</p>
+    <ul class="role-list">
+      <li>YouTube und Vorträge</li>
+      <li>Bücher und Papers</li>
+      <li>Artikel und andere Wissensquellen</li>
+      <li>Evidenz, Gegenargumente und alternative Erklärungen</li>
+    </ul>
+    {% if research_summary %}
+    <dl class="metadata research-metrics">
+      <div><dt>Treffer</dt><dd>{{ research_summary.result_count }}</dd></div>
+      <div><dt>Quellen</dt><dd>{{ research_summary.source_count }}</dd></div>
+      <div><dt>Gegenpositionen</dt><dd>{{ research_summary.counterevidence_count }}</dd></div>
+    </dl>
+    {% if research_summary.selected_sources %}
+    <details><summary>Verwendete externe Quellen</summary>
+      {% for source in research_summary.selected_sources %}
+      <article class="suggestion">
+        <strong>{{ source.title }}</strong> · <span class="badge">{{ source.role }}</span>
+        <p>{{ source.inclusion_reason }}</p>
+        <p class="muted" dir="rtl">{{ source.relevant_claim }}</p>
+      </article>
+      {% endfor %}
+      {% if research_summary.rejected_count %}<p class="muted">{{ research_summary.rejected_count }} schwache, doppelte oder zu einseitige Treffer wurden nicht übernommen.</p>{% endif %}
+    </details>
+    {% endif %}
+    <details><summary>Recherchebereiche</summary><ul>{% for label in research_summary.query_labels %}<li>{{ label }}</li>{% endfor %}</ul></details>
+    {% if 'NO_EXTERNAL_EVIDENCE_FOUND' in research_summary.issues %}
+    <p class="warning">Keine passenden externen Belege gefunden. Es wurde nichts ergänzt oder erfunden.</p>
+    {% endif %}
+    {% endif %}
+    <p class="muted">Veröffentlichte Skripte werden erst nach dem Entwurf auf Wiederholung und Widerspruch geprüft.</p>
+    {% if lesson_package %}
+    <form method="post" action="/workspace/{{ project.id }}/research">
+      <label>Optionaler Recherchefokus
+        <textarea name="owner_focus" rows="3" aria-describedby="research-focus-help" placeholder="Zum Beispiel: historische Perspektiven oder empirische Gegenargumente"></textarea>
+      </label>
+      <small id="research-focus-help">Wird ausschließlich in der externen Wissensbasis gesucht.</small>
+      <button class="button" type="submit">{{ 'Externe Recherche aktualisieren' if research_summary else 'Externe Recherche starten' }}</button>
+    </form>
+    {% else %}
+    <p class="muted">Die automatische lektionsgebundene Recherche steht nur für Projekte aus dem 100-Lektionen-Kanon zur Verfügung.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Persische Entwürfe</h2>
+  <p>Der kanonische Lektionsinhalt und die externe Forschung bleiben getrennt. Das vollständige Ayin-Buch wird für den normalen Entwurf nicht abgerufen.</p>
+  <form method="post" action="/workspace/{{ project.id }}/persian/drafts">
+    {% if lesson_metadata %}
+    <input type="hidden" name="lesson_id" value="{{ lesson_metadata.lesson_id }}">
+    <p><strong>Ayin-Kern:</strong> Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</p>
+    {% else %}
+    <label>Kanonischer Ayin-Kern für diesen Lauf
+      <select name="lesson_id" required>{% for lesson in lessons %}<option value="{{ lesson.lesson_id }}">{{ lesson.lesson_id }} · {{ lesson.title_fa }}</option>{% else %}<option disabled>Kein Lektionskanon verfügbar</option>{% endfor %}</select>
+    </label>
+    {% endif %}
+
+    {% if lesson_metadata %}
+      {% if masters %}
+      <input type="hidden" name="semantic_master_id" value="{{ masters[0].id }}">
+      <p class="notice"><strong>Externe Recherche verbunden:</strong> {{ research_summary.result_count }} Treffer aus {{ research_summary.source_count }} Quellen. Nur dieses lektionsgebundene Paket wird verwendet.</p>
+      {% else %}
+      <p class="warning">Vor dem Schreiben muss die externe Recherche oben erfolgreich abgeschlossen werden.</p>
+      {% endif %}
+    {% else %}
+    <label>Semantic Master mit externer Forschung
+      <select name="semantic_master_id" required>{% for master in masters %}<option value="{{ master.id }}">{{ master.central_human_question }} · {{ master.status }}</option>{% else %}<option disabled>Kein READY Semantic Master vorhanden</option>{% endfor %}</select>
+    </label>
+    {% endif %}
+
+    <label>Zieldauer<input name="target_duration_minutes" type="number" min="5" max="180" value="15"></label>
+    <label>Anzahl Entwürfe<select name="draft_count"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
+    <label>Eigene Anweisung<textarea name="owner_prompt" dir="auto"></textarea></label>
+    <button class="button" type="submit" {% if not masters or (not lesson_metadata and not lessons) %}disabled{% endif %}>Persische Entwürfe erstellen</button>
+  </form>
+</section>
+
+{% if drafts %}
+<section class="card">
+  <h2>Entwurfsversionen</h2>
+  {% for draft in drafts %}
+  <article class="suggestion" dir="rtl">
+    <h3>Entwurf {{ draft.variant_index }} · Version {{ draft.version_number }}</h3>
+    <p dir="ltr">{{ draft.actual_word_count }} Wörter · ca. {{ (draft.estimated_duration_seconds // 60) }}:{{ "%02d"|format(draft.estimated_duration_seconds % 60) }} · {{ draft.status }}</p>
+    {% set findings = review_findings.get(draft.id, []) %}
+    {% if findings %}
+    <details dir="ltr"><summary>Prüfergebnisse ({{ findings|length }})</summary><ul>{% for finding in findings %}<li><strong>{{ finding.severity }}</strong> · {{ finding.message }}</li>{% endfor %}</ul></details>
+    {% endif %}
+    <form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/edit"><textarea name="text" dir="rtl" rows="12">{{ draft.text }}</textarea><button class="button" type="submit">Als neue Version speichern</button></form>
+    <form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/review"><button class="button secondary" type="submit">Semantisch prüfen</button></form>
+    <form method="post" action="/workspace/{{ project.id }}/persian/drafts/{{ draft.id }}/approve"><button class="button" type="submit">Persische Version freigeben</button></form>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
 {% set approved = drafts|selectattr("status", "equalto", "PERSIAN_APPROVED")|list %}
-<section class="card"><h2>Übersetzungen</h2><p>Die vier Sprachspuren entstehen ausschließlich aus einer freigegebenen persischen Version.</p>{% if approved %}<form method="post" action="/workspace/{{ project.id }}/translations"><label>Freigegebene persische Version<select name="draft_id" required>{% for draft in approved %}<option value="{{ draft.id }}">Version {{ draft.version_number }} · {{ draft.actual_word_count }} Wörter</option>{% endfor %}</select></label><div><label><input type="checkbox" name="languages" value="fa" checked> Persisch</label> <label><input type="checkbox" name="languages" value="de" checked> Deutsch</label> <label><input type="checkbox" name="languages" value="en" checked> English</label> <label><input type="checkbox" name="languages" value="ar" checked> العربية</label></div><button class="button" type="submit">Übersetzungen erstellen</button></form>{% else %}<p class="muted">Zuerst eine persische Version freigeben.</p>{% endif %}{% for track in tracks %}<article class="suggestion"><h3>{{ track.language|upper }} · Version {{ track.version_number }}</h3><p>{{ track.actual_word_count }} Wörter · ca. {{ (track.estimated_duration_seconds // 60) }}:{{ "%02d"|format(track.estimated_duration_seconds % 60) }} · {{ track.status }} · Semantik: {{ track.semantic_validation_status }}</p><details><summary>Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.display_text }}</pre></details>{% if track.semantic_validation_status != "PASSED" %}<p class="muted">Semantische Prüfung erforderlich, bevor Voice-Text vorbereitet werden kann.</p>{% elif not track.voice_ready_text %}<form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/voice"><button class="button secondary" type="submit">Voice-Version vorbereiten</button></form>{% else %}<details><summary>Voice-Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.voice_ready_text }}</pre></details><form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/voice"><button class="button secondary" type="submit">Voice-Version aktualisieren</button></form>{% if not track.elevenlabs_performance_text or track.elevenlabs_performance_text == track.voice_ready_text %}<form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/performance"><button class="button secondary" type="submit">{% if track.elevenlabs_performance_text %}ElevenLabs-Text aktualisieren{% else %}ElevenLabs-Text vorbereiten{% endif %}</button></form>{% else %}<details><summary>ElevenLabs-Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.elevenlabs_performance_text }}</pre></details>{% endif %}{% endif %}</article>{% endfor %}</section>
+{% if not lesson_metadata %}
+<section class="card">
+  <h2>Übersetzungen</h2>
+  <p>Die vier Sprachspuren entstehen ausschließlich aus einer freigegebenen persischen Version.</p>
+  {% if approved %}
+  <form method="post" action="/workspace/{{ project.id }}/translations">
+    <label>Freigegebene persische Version<select name="draft_id" required>{% for draft in approved %}<option value="{{ draft.id }}">Version {{ draft.version_number }} · {{ draft.actual_word_count }} Wörter</option>{% endfor %}</select></label>
+    <div><label><input type="checkbox" name="languages" value="fa" checked> Persisch</label> <label><input type="checkbox" name="languages" value="de" checked> Deutsch</label> <label><input type="checkbox" name="languages" value="en" checked> English</label> <label><input type="checkbox" name="languages" value="ar" checked> العربية</label></div>
+    <button class="button" type="submit">Übersetzungen erstellen</button>
+  </form>
+  {% else %}<p class="muted">Zuerst eine persische Version freigeben.</p>{% endif %}
+  {% for track in tracks %}
+  <article class="suggestion">
+    <h3>{{ track.language|upper }} · Version {{ track.version_number }}</h3>
+    <p>{{ track.actual_word_count }} Wörter · ca. {{ (track.estimated_duration_seconds // 60) }}:{{ "%02d"|format(track.estimated_duration_seconds % 60) }} · {{ track.status }} · Semantik: {{ track.semantic_validation_status }}</p>
+    <details><summary>Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.display_text }}</pre></details>
+    {% if track.semantic_validation_status != "PASSED" %}
+    <p class="muted">Semantische Prüfung erforderlich, bevor Voice-Text vorbereitet werden kann.</p>
+    {% elif not track.voice_ready_text %}
+    <form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/voice"><button class="button secondary" type="submit">Voice-Version vorbereiten</button></form>
+    {% else %}
+    <details><summary>Voice-Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.voice_ready_text }}</pre></details>
+    <form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/voice"><button class="button secondary" type="submit">Voice-Version aktualisieren</button></form>
+    {% if not track.elevenlabs_performance_text or track.elevenlabs_performance_text == track.voice_ready_text %}
+    <form method="post" action="/workspace/{{ project.id }}/tracks/{{ track.id }}/performance"><button class="button secondary" type="submit">{% if track.elevenlabs_performance_text %}ElevenLabs-Text aktualisieren{% else %}ElevenLabs-Text vorbereiten{% endif %}</button></form>
+    {% else %}<details><summary>ElevenLabs-Text anzeigen</summary><pre dir="auto" style="white-space: pre-wrap">{{ track.elevenlabs_performance_text }}</pre></details>{% endif %}
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="card">
+  <h2>Checkpoint abgeschlossen</h2>
+  <p>Dieser Produktionsschritt endet mit dem geprüften und ausdrücklich freigegebenen persischen Text. Übersetzungen sowie Voice-, Audio- und Video-Vorbereitung gehören nicht zu diesem Checkpoint.</p>
+</section>
+{% endif %}
 {% endblock %}

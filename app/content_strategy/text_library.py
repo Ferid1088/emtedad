@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from hashlib import sha256
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,11 +16,16 @@ from app.content_strategy.lesson_workflow import (
     lesson_project_metadata,
 )
 from app.content_strategy.models import (
+    ChannelLedgerEntry,
     ContentTopic,
     EditorialLanguageTrack,
     EditorialProject,
     PersianDraft,
     TopicStrategyNode,
+)
+from app.content_strategy.persian_pipeline import (
+    extract_ledger_examples,
+    extract_open_promises,
 )
 
 STATUS_LABELS = {
@@ -329,20 +335,58 @@ async def publish_project(session: AsyncSession, project_id: UUID) -> EditorialP
     if project is None:
         raise ValueError("editorial project not found")
     approved = await session.scalar(
-        select(PersianDraft).where(
+        select(PersianDraft)
+        .where(
             PersianDraft.editorial_project_id == project_id,
             PersianDraft.status == "PERSIAN_APPROVED",
         )
+        .order_by(PersianDraft.version_number.desc())
     )
     if approved is None:
         raise ValueError("publication requires an approved Persian text")
     snapshot = deepcopy(project.strategy_topic_snapshot) or {}
+    published_at = datetime.now(UTC)
     snapshot["publication"] = {
-        "published_at": datetime.now(UTC).isoformat(),
+        "published_at": published_at.isoformat(),
         "published_title": project.title,
     }
     project.strategy_topic_snapshot = snapshot
     project.status = "PUBLISHED"
+    existing_ledger = await session.scalar(
+        select(ChannelLedgerEntry).where(
+            ChannelLedgerEntry.editorial_project_id == project.id
+        )
+    )
+    if existing_ledger is None:
+        package = snapshot.get("lesson_content_package_snapshot", {})
+        package = package if isinstance(package, dict) else {}
+        raw_registry = package.get("core_concept_registry", [])
+        registry = raw_registry if isinstance(raw_registry, list) else []
+        session.add(
+            ChannelLedgerEntry(
+                editorial_project_id=project.id,
+                published_draft_id=approved.id,
+                lesson_id=str(snapshot.get("lesson_id") or "") or None,
+                published_title=project.title,
+                concept_keys=[
+                    str(item) for item in package.get("core_concepts", [])
+                ],
+                canonical_definitions=[
+                    item for item in registry if isinstance(item, dict)
+                ],
+                examples=extract_ledger_examples(approved.text),
+                open_promises=extract_open_promises(approved.text),
+                fulfilled_promises=[],
+                title_history=[project.title],
+                coverage_summary={
+                    "lesson_id": snapshot.get("lesson_id"),
+                    "lesson_canon_hash": snapshot.get("lesson_canon_hash"),
+                    "word_count": approved.actual_word_count,
+                },
+                content_hash=sha256(approved.text.encode()).hexdigest(),
+                published_at=published_at,
+            )
+        )
     return project
 
 

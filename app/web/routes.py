@@ -20,6 +20,10 @@ from app.content_strategy.lesson_catalog import (
     filter_lesson_catalog,
     load_lesson_catalog,
 )
+from app.content_strategy.lesson_research import (
+    LessonResearchService,
+    lesson_research_summary,
+)
 from app.content_strategy.lesson_workflow import (
     create_lesson_project,
     lesson_package_from_project,
@@ -30,6 +34,7 @@ from app.content_strategy.models import (
     EditorialLanguageTrack,
     EditorialProject,
     PersianDraft,
+    PersianReviewFinding,
     TopicSuggestionBatch,
 )
 from app.content_strategy.multilingual_service import MultilingualEditorialService
@@ -59,7 +64,9 @@ from app.knowledge.models import (
     SourceVersion,
     Work,
 )
+from app.lecture.domain import MasterStatus
 from app.lecture.models import LectureMasterVersion
+from app.retrieval.embeddings import EmbeddingProvider
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
@@ -804,7 +811,11 @@ async def use_strategy_topic(node_id: UUID) -> RedirectResponse:
 
 
 @router.get("/workspace/{project_id}", response_class=HTMLResponse)
-async def editorial_workspace(request: Request, project_id: UUID) -> HTMLResponse:
+async def editorial_workspace(
+    request: Request,
+    project_id: UUID,
+    research: str | None = None,
+) -> HTMLResponse:
     try:
         lesson_canon = LessonCanonRepository()
         lesson_summaries = lesson_canon.summaries()
@@ -821,6 +832,21 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
                 .order_by(PersianDraft.variant_index, PersianDraft.version_number)
             )
         )
+        draft_ids = [draft.id for draft in drafts]
+        finding_rows = (
+            list(
+                await session.scalars(
+                    select(PersianReviewFinding)
+                    .where(PersianReviewFinding.draft_id.in_(draft_ids))
+                    .order_by(PersianReviewFinding.created_at)
+                )
+            )
+            if draft_ids
+            else []
+        )
+        review_findings: dict[UUID, list[PersianReviewFinding]] = {}
+        for finding in finding_rows:
+            review_findings.setdefault(finding.draft_id, []).append(finding)
         tracks = list(
             await session.scalars(
                 select(EditorialLanguageTrack)
@@ -831,19 +857,59 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
                 )
             )
         )
-        masters = list(
-            await session.scalars(
-                select(LectureMasterVersion).order_by(
-                    LectureMasterVersion.created_at.desc()
-                )
-            )
-        )
         workspace_items = await load_library_items(session, status=None)
         workspace_item = next(
             (item for item in workspace_items if item.project.id == project.id), None
         )
         lesson_metadata = lesson_project_metadata(project)
         lesson_package = lesson_package_from_project(project)
+        research_summary = await lesson_research_summary(session, project)
+        if lesson_metadata is not None:
+            masters = (
+                list(
+                    await session.scalars(
+                        select(LectureMasterVersion).where(
+                            LectureMasterVersion.id == project.semantic_master_id,
+                            LectureMasterVersion.research_package_id
+                            == project.research_package_id,
+                            LectureMasterVersion.status == MasterStatus.READY,
+                        )
+                    )
+                )
+                if research_summary is not None
+                and research_summary.ready_for_writing
+                and project.semantic_master_id is not None
+                and project.research_package_id is not None
+                else []
+            )
+        else:
+            masters = list(
+                await session.scalars(
+                    select(LectureMasterVersion)
+                    .where(LectureMasterVersion.status == MasterStatus.READY)
+                    .order_by(LectureMasterVersion.created_at.desc())
+                )
+            )
+    research_messages = {
+        "ready": "Die externe Recherche ist eingefroren und bereit für den Entwurf.",
+        "empty": (
+            "Die Recherche wurde ausgeführt, fand aber keine passenden externen "
+            "Treffer. Der Kanon wurde nicht mit erfundenem Material ergänzt."
+        ),
+        "review": (
+            "Externe Treffer wurden gespeichert, der Semantic Master benötigt "
+            "jedoch eine Prüfung."
+        ),
+        "missing-index": (
+            "Die externe Wissensbasis ist noch nicht suchbereit. Bitte Quellen "
+            "zuerst indexieren."
+        ),
+        "invalid": "Diese Recherche kann für das Projekt nicht gestartet werden.",
+        "failed": (
+            "Die externe Recherche konnte nicht abgeschlossen werden. "
+            "Die vorhandenen Projektdaten blieben unverändert."
+        ),
+    }
     return await _render(
         request,
         "editorial_workspace.html",
@@ -855,9 +921,70 @@ async def editorial_workspace(request: Request, project_id: UUID) -> HTMLRespons
         lessons=lesson_summaries,
         lesson_metadata=lesson_metadata,
         lesson_package=lesson_package,
+        research_summary=research_summary,
+        research_message=research_messages.get(research or ""),
+        research_message_is_error=research in {"missing-index", "invalid", "failed"},
+        review_findings=review_findings,
+        studio_progress={
+            "lesson": lesson_package is not None,
+            "research": research_summary is not None,
+            "package": bool(
+                research_summary and research_summary.ready_for_writing
+            ),
+            "persian": bool(drafts),
+            "review": any(
+                draft.provenance.get("review_completed") is True for draft in drafts
+            ),
+            "approval": any(
+                draft.status == "PERSIAN_APPROVED" for draft in drafts
+            ),
+        },
         project_status_label=(
             workspace_item.status_label if workspace_item else "In Arbeit"
         ),
+    )
+
+
+@router.post("/workspace/{project_id}/research")
+async def run_lesson_research(request: Request, project_id: UUID) -> RedirectResponse:
+    """Create the lesson-scoped external package before any script generation."""
+
+    form = await request.form()
+    owner_focus = str(form.get("owner_focus", "")).strip() or None
+    provider = cast(EmbeddingProvider, request.app.state.embedding_provider)
+    try:
+        result = await LessonResearchService(_database(request), provider).run(
+            project_id, owner_focus=owner_focus
+        )
+    except ValueError as exc:
+        logger.warning(
+            "lesson_research.rejected",
+            extra={"project_id": str(project_id), "reason": str(exc)},
+        )
+        code = (
+            "missing-index"
+            if "Wissensindex" in str(exc) or "indexiert" in str(exc)
+            else "invalid"
+        )
+        return RedirectResponse(
+            f"/workspace/{project_id}?research={code}", status_code=303
+        )
+    except Exception:
+        logger.exception(
+            "lesson_research.failed", extra={"project_id": str(project_id)}
+        )
+        return RedirectResponse(
+            f"/workspace/{project_id}?research=failed", status_code=303
+        )
+    state = (
+        "ready"
+        if result.ready_for_writing
+        else "empty"
+        if result.result_count == 0
+        else "review"
+    )
+    return RedirectResponse(
+        f"/workspace/{project_id}?research={state}", status_code=303
     )
 
 
