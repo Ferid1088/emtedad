@@ -43,7 +43,7 @@ class SpeechStructureService:
         coverage_threshold: float = 0.95,
     ) -> None:
         self.database = database
-        self.provider = provider or ClaudeCodeFailoverProvider.from_environment()
+        self.provider = provider or ClaudeCodeFailoverProvider.from_settings()
         self.model = model
         self.window_seconds = window_seconds
         self.overlap_seconds = overlap_seconds
