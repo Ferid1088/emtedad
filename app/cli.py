@@ -67,6 +67,7 @@ from app.ritual.models import SafetyValidationResult
 from app.ritual.safety import VALIDATOR_VERSION, RitualSafetyValidator
 from app.ritual.service import RitualReadService
 from app.ritual.validator import RitualStructuralValidator
+from app.speech_structure.service import SpeechStructureService
 from app.storage.local import LocalObjectStore
 
 
@@ -283,6 +284,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="perform the destructive reset; without it only a preview is shown",
     )
+    speech_structure = domains.add_parser("speech-structure")
+    speech_commands = speech_structure.add_subparsers(dest="command", required=True)
+    backfill = speech_commands.add_parser("backfill")
+    backfill.add_argument("--limit", type=int)
+    backfill.add_argument("--force", action="store_true")
     return parser
 
 
@@ -322,6 +328,12 @@ async def _run(args: argparse.Namespace) -> int:
             return await _run_lecture(args, database)
         if args.domain == "strategy":
             return await _run_strategy(args, database)
+        if args.domain == "speech-structure":
+            speech_output = await SpeechStructureService(database).backfill_all(
+                limit=args.limit, force=args.force
+            )
+            print(_json(speech_output))
+            return 0
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(

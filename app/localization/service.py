@@ -26,6 +26,7 @@ from app.localization.models import (
     LocalizationVersion,
     PronunciationLexiconEntry,
 )
+from app.localization.prompts import native_realization_instruction
 from app.localization.pronunciation import prepare_pronunciation
 from app.localization.validators import LocalizationQualityGate
 
@@ -74,12 +75,10 @@ class LocalizationService:
             for claim in export.claims
         ]
         prompt = (
-            f"Create an independent {language.value} spoken-lecture realization. "
-            "Translate each semantic proposition naturally and precisely. "
-            "This is not chained translation. Preserve Ayin terms by transliteration "
-            "when no approved equivalent is present. Preserve uncertainty, proposed "
-            "dialogue status, non-equivalence, and open questions. Do not add facts. "
-            "Return exactly one statement for every claim ID, with no omissions."
+            native_realization_instruction(language)
+            + "\n\nReturn exactly one native statement for every claim ID, "
+            "with no omissions. "
+            "Preserve the claim IDs as metadata, never as visible prose."
         )
         result = cast(
             _RealizationBatch,

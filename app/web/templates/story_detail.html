@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Story Bank · {{ story.category }}</p>
+    <h1 dir="rtl">{{ story.title_fa }}</h1>
+    <p class="lede">{{ story.title_en }} · {{ story.years }} · {{ story.place }}</p>
+  </div>
+  <a class="button secondary" href="/stories">Zurück zu Geschichten</a>
+</div>
+<div class="context-grid">
+  <section class="card context-panel">
+    <h2>Erzählung</h2>
+    <p dir="rtl" class="prose">{{ story.narrative_fa }}</p>
+    <h3>Aufhänger</h3>
+    <p dir="rtl">{{ story.hook_fa }}</p>
+    <h3>Personen</h3>
+    <p>{{ story.key_people|join(', ') }}</p>
+  </section>
+  <section class="card research-panel">
+    <h2>Quellen und Einordnung</h2>
+    <p>{{ story.sources|length }} Quellen hinterlegt. Diese Geschichte ist externes Anschauungsmaterial, nicht Ayin-Provenienz.</p>
+    <ul>{% for source in story.sources %}<li><a href="{{ source }}" rel="noreferrer">{{ source }}</a></li>{% endfor %}</ul>
+    <h3>Unsicherheit / Mythos</h3>
+    <p dir="rtl">{{ story.uncertain_or_myth_fa }}</p>
+  </section>
+</div>
+<section class="card">
+  <h2>Verknüpfte Lektionen</h2>
+  <ul class="relation-list">{% for relation in story.related_lessons %}<li class="relation-item"><a href="/lessons/{{ relation.lesson_id }}"><strong>Lektion {{ relation.lesson_id }}</strong> · <span dir="rtl">{{ relation.lesson_title_fa }}</span></a><p dir="rtl">{{ relation.relation_fa }}</p></li>{% else %}<li class="muted">Keine redaktionelle Lektion-Verknüpfung hinterlegt.</li>{% endfor %}</ul>
+</section>
+{% endblock %}

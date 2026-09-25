@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.content_strategy.story_library import StoryLibrary
 from app.core.config import Settings
 from app.main import create_app
 from app.web.routes import router as owner_router
@@ -33,6 +34,8 @@ def test_owner_routes_are_registered(test_settings: Settings) -> None:
         "/topics",
         "/lessons",
         "/lessons/{lesson_id}",
+        "/stories",
+        "/stories/{story_id}",
         "/archive",
         "/workspace/{project_id}/research",
     } <= paths
@@ -45,6 +48,28 @@ def test_primary_navigation_uses_lessons_not_strategy_tree() -> None:
 
     assert "('/lessons', 'Lektionen')" in template
     assert "('/strategy', 'Themenbaum')" not in template
+
+
+def test_story_library_is_curated_and_lesson_filterable() -> None:
+    library = StoryLibrary()
+
+    assert library.count == 50
+    assert library.categories
+    linked = library.for_lesson("8.8")
+    assert linked
+    assert all(
+        any(relation.lesson_id == "8.8" for relation in story.related_lessons)
+        for story in linked
+    )
+    assert library.search(query="اسپنکس")[0].story_id == "S01"
+
+
+def test_story_bank_is_external_material_not_ayin_provenance() -> None:
+    story = StoryLibrary().story("S07")
+
+    assert story.uncertain_or_myth_fa
+    assert story.sources
+    assert "Ayin" not in story.narrative_fa
 
 
 def test_legacy_strategy_templates_are_removed() -> None:

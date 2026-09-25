@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead"><h1>Vortragsstruktur</h1><p class="muted">Hierarchische Lesestruktur über unveränderten Transkripten.</p></div>
+<table><tr><th>Titel</th><th>Sprache</th><th>Transkript</th><th>Status</th><th>Version</th><th></th></tr>
+{% for source in sources %}{% set structure = structures.get(source.id) %}<tr>
+<td><a dir="auto" href="/speech-structures/{{ source.id }}">{{ source.title }}</a></td><td>{{ source.language }}</td>
+<td>bereit</td><td>{{ structure.status if structure else 'Noch nicht erstellt' }}</td><td>{{ structure.version if structure else '—' }}</td>
+<td>{% if structure %}<a class="button" href="/speech-structures/{{ source.id }}">Struktur ansehen</a>{% else %}<form method="post" action="/speech-structures/{{ source.id }}/generate"><button>Struktur erstellen</button></form>{% endif %}</td>
+</tr>{% else %}<tr><td colspan="6" class="muted">Keine Quellen mit Transkript.</td></tr>{% endfor %}</table>
+{% endblock %}

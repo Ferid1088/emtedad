@@ -39,6 +39,7 @@ from app.content_strategy.models import (
 )
 from app.content_strategy.multilingual_service import MultilingualEditorialService
 from app.content_strategy.persian_service import PersianEditorialService
+from app.content_strategy.story_library import StoryLibrary
 from app.content_strategy.strategy_service import TopicStrategyService
 from app.content_strategy.text_library import (
     TRACK_STATUS_LABELS,
@@ -393,6 +394,54 @@ async def lessons(
     )
 
 
+@router.get("/stories", response_class=HTMLResponse)
+async def stories(
+    request: Request,
+    q: str = "",
+    category: str = "",
+    lesson_id: str = "",
+) -> HTMLResponse:
+    """Render curated external stories as research material, not canon."""
+
+    try:
+        library = StoryLibrary()
+        selected = library.search(query=q, category=category, lesson_id=lesson_id)
+        error = None
+    except (FileNotFoundError, ValueError) as exc:
+        logger.exception("story library unavailable")
+        library = None
+        selected = ()
+        error = str(exc)
+    return await _render(
+        request,
+        "stories.html",
+        title="Geschichten",
+        stories=selected,
+        total=library.count if library else 0,
+        categories=library.categories if library else (),
+        q=q,
+        category=category,
+        lesson_id=lesson_id,
+        error=error,
+    )
+
+
+@router.get("/stories/{story_id}", response_class=HTMLResponse)
+async def story_detail(request: Request, story_id: str) -> HTMLResponse:
+    try:
+        story = StoryLibrary().story(story_id)
+    except FileNotFoundError:
+        return HTMLResponse("Story Bank nicht gefunden", status_code=503)
+    except ValueError:
+        return HTMLResponse("Geschichte nicht gefunden", status_code=404)
+    return await _render(
+        request,
+        "story_detail.html",
+        title=story.title_fa,
+        story=story,
+    )
+
+
 @router.get("/lessons/concepts", response_class=HTMLResponse)
 async def lesson_concepts(request: Request) -> HTMLResponse:
     try:
@@ -460,6 +509,13 @@ async def lesson_detail(request: Request, lesson_id: str) -> HTMLResponse:
                 },
             )
 
+    try:
+        related_stories = StoryLibrary().for_lesson(lesson_id)
+        stories_error = None
+    except (FileNotFoundError, ValueError) as exc:
+        related_stories = ()
+        stories_error = str(exc)
+
     async with _database(request).transaction() as session:
         catalog, _ = await load_lesson_catalog(session, repository)
         item = next(entry for entry in catalog if entry.package.lesson_id == lesson_id)
@@ -478,6 +534,8 @@ async def lesson_detail(request: Request, lesson_id: str) -> HTMLResponse:
         prerequisites_view=prerequisites_view,
         prepares_view=prepares_view,
         related_view=list(related.values()),
+        related_stories=related_stories,
+        stories_error=stories_error,
     )
 
 

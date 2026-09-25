@@ -52,6 +52,8 @@ class ScriptOutline(BaseModel):
     transition_logic: list[str]
     ending_open_question: str
     diversity_profile: dict[str, str]
+    selected_example_id: str | None = None
+    selected_example_title: str | None = None
 
     @property
     def content_hash(self) -> str:

@@ -19,6 +19,50 @@ Your task is to inspect the existing repository and IMPLEMENT a production-quali
 Do not merely describe the architecture. Inspect the repository, preserve useful code, implement the system phase-by-phase, create migrations, tests, documentation, and runnable commands.
 
 ======================================================================
+0A. APPROVED LESSON-PRODUCTION RETRIEVAL REVISION
+======================================================================
+
+For ordinary production of the approved 100 lessons, the Lesson Canon packages
+the Ayin intellectual origin for writing. The full Ayin book remains stored,
+versioned, searchable, and auditable, but it is not generative RAG input.
+
+Generation input is exactly:
+
+CANONICAL LESSON CONTENT
++ CORE CONCEPT REGISTRY
++ EXTERNAL RESEARCH
+
+Review input is exactly:
+
+CHANNEL LEDGER
++ PUBLISHED SCRIPT ARCHIVE
++ LESSON RELATIONS
+
+Do not mix these stages. Load the canonical Lesson Content Package directly;
+do not vector-retrieve the complete Ayin book during ordinary script generation.
+If the lesson already supplies a complete conceptual explanation, that text is
+the AYIN CORE. Do not ask a model to recreate another Ayin seed. The writer may
+transform the core into natural prose but may not redefine it.
+
+`EXTERNAL_KNOWLEDGE` is the only generative retrieval space for normal lesson
+research. It contributes evidence, perspectives, examples, disagreement,
+history, alternatives, and counterarguments without redefining Ayin.
+
+The Published Script Archive is review-only. It may be queried after drafting
+for repetition, duplicate examples, similarity, contradiction, continuity, and
+previous promises, but its prose must never enter the writer context.
+
+Each lesson retains supplied Ayin source-version, passage/page, concept, and
+distinction provenance. Missing provenance is a review item, never an invitation
+to invent a source mapping. The Ayin book remains available for provenance,
+audit, inspection, lesson verification, canon revision, citations, and future
+research tools.
+
+This section supersedes later statements that require Ayin-book retrieval or a
+full-book-derived Ayin Spine as ordinary 100-lesson writer input. Those
+facilities remain valid for explicit specialist research and canon governance.
+
+======================================================================
 0. WHY THIS V2 EXISTS — CORRECTIONS TO THE PREVIOUS DESIGN
 ======================================================================
 
@@ -470,7 +514,7 @@ Examples:
 - jan
 - awareness
 - self_awareness
-- tahigah
+- tohigah
 - conditions
 - factor
 - pattern
@@ -1179,9 +1223,11 @@ They have different roles.
 
 Implement a multi-lane retrieval system.
 
-LANE A — AYIN CANON RETRIEVAL
+LANE A — AYIN CANON RETRIEVAL (SPECIALIST / VERIFICATION ONLY)
 Purpose:
-determine what Ayin actually says.
+determine what Ayin actually says during audit, lesson verification, canon
+revision, citation inspection, or explicit specialist research. Do not invoke
+this lane for ordinary 100-lesson script generation.
 
 Methods:
 - exact concept lookup
@@ -1256,10 +1302,28 @@ Return complete provenance:
 - reranker score
 
 ======================================================================
-25. AYIN SPINE — REQUIRED FOR EVERY AYIN LECTURE
+25. LESSON CONTENT PACKAGE FOR PRODUCTION; AYIN SPINE FOR SPECIALIST RESEARCH
 ======================================================================
 
-Before external research, generate a typed AyinSpine.
+Before ordinary lesson research, directly load and validate the approved typed
+Lesson Content Package. Pin its lesson ID, package version, complete snapshot,
+and content hash. Its canonical explanation is the Ayin core.
+
+The package contains, where supplied:
+
+- canonical lesson title and central question;
+- canonical lesson explanation;
+- core concepts, required distinctions, and conceptual boundaries;
+- prerequisites and typed lesson relations;
+- what the lesson develops and what must remain open;
+- Ayin source-version, passage/page, concept, and distinction provenance.
+
+Select relevant locked definitions from the Core Concept Registry directly.
+Do not use vector retrieval against the Ayin book and do not generate another
+Ayin seed.
+
+For audit, lesson verification, canon revision, citation inspection, or
+explicit specialist research, build a typed AyinSpine.
 
 content.ayin_spines:
 - id
@@ -1290,9 +1354,9 @@ Pydantic conceptual example:
   "prohibited_conflations": [...]
 }
 
-No Ayin lecture proceeds to external research unless the Ayin Spine is valid.
-
-Ayin Spine must be grounded in canonical Ayin passages.
+No ordinary lesson proceeds to external research unless its Lesson Content
+Package is valid. No specialist Ayin inquiry proceeds unless its Ayin Spine is
+valid and grounded in canonical passages.
 
 ======================================================================
 26. LECTURE TYPES
@@ -1344,7 +1408,7 @@ A. AYIN CONCEPT
 - Jan
 - awareness
 - self-awareness
-- Tahigah
+- Tohigah
 - conditions
 - pattern
 - direction
@@ -1420,9 +1484,11 @@ Do NOT automatically equate the seven ritual stages with lecture progression.
 28. RESEARCH PLANNER
 ======================================================================
 
-Given AyinSpine, create ResearchPlan:
+Given the pinned Lesson Content Package for ordinary production, create an
+external ResearchPlan. An explicit specialist workflow may instead begin from
+an AyinSpine.
 
-- what must be established from Ayin canon?
+- what the direct lesson package already establishes as its Ayin core;
 - what empirical questions arise?
 - what philosophical questions arise?
 - what external concepts may be analogous?
@@ -1458,13 +1524,42 @@ Create a typed immutable snapshot:
 content.research_packages
 - id
 - lecture_project_id
-- ayin_spine_id
+- lesson_id nullable for specialist-only packages; required for ordinary lessons
+- lesson_canon_hash nullable for specialist-only packages
+- lesson_content_package_version nullable for specialist-only packages
+- lesson_content_package_snapshot nullable for specialist-only packages
+- ayin_spine_id nullable; specialist research and canon verification only
 - canon_version_id
 - ritual_version_id nullable
 - retrieval_config_version
 - created_at
 
 ResearchPackage should contain:
+
+- pinned lesson ID, Lesson Content Package version, and content hash
+- supplied lesson-to-Ayin provenance references
+- external passages
+- external people
+- external works
+- external claims
+- empirical evidence
+- counterevidence
+- alternative explanations
+- conceptual parallels
+- tensions
+- ritual links
+- media assets
+- citation records
+- unresolved issues
+- retrieval metadata
+
+The canonical lesson explanation and Core Concept Registry are direct inputs,
+not retrieved ResearchPackage passages. For specialist research packages, Ayin
+canonical passages, concepts, distinctions, principles, and open questions may
+still be pinned for audit or verification, but raw book passages do not enter
+the ordinary production writer.
+
+Historical ResearchPackages may contain:
 
 - Ayin canonical passages
 - Ayin concepts
@@ -1519,13 +1614,18 @@ Create a semantic master BEFORE language realization.
 content.lecture_master_versions:
 - id
 - lecture_project_id
-- ayin_spine_id
+- lesson_id / lesson_canon_hash for ordinary lesson production
+- ayin_spine_id nullable for specialist research
 - research_package_id
 - status
 - version
 - created_at
 
 The semantic master is structured, not a supposedly language-neutral essay.
+
+For ordinary 100-lesson production it is bounded by the pinned canonical Lesson
+Content Package and frozen external research. It must not recreate a second Ayin
+seed from raw book retrieval.
 
 It should contain:
 
@@ -1787,10 +1887,10 @@ Implement as LangGraph-compatible workflow, but avoid unnecessary autonomous age
 Nodes:
 
 1. TopicIntake
-2. AyinSpineBuilder
-3. AyinSpineValidator
+2. LessonContentPackageLoader
+3. LessonCanonValidator
 4. ResearchPlanner
-5. AyinCanonRetriever
+5. CoreConceptRegistrySelector
 6. ExternalEvidenceRetriever
 7. CounterEvidenceRetriever
 8. OptionalRitualRetriever
@@ -1809,6 +1909,10 @@ Nodes:
 21. LocalizationFidelityValidator
 22. OptionalRitualSafetyValidator
 23. FinalEditorialReport
+
+`AyinSpineBuilder`, `AyinSpineValidator`, and `AyinCanonRetriever` remain
+available to explicit specialist research and canon-verification workflows, not
+the ordinary lesson-production graph.
 
 These are workflow roles/nodes.
 They do NOT have to be 23 different model calls.
@@ -2444,7 +2548,8 @@ RETRIEVAL
 - filters
 
 LECTURE
-- Ayin Spine required
+- canonical Lesson Content Package required for ordinary 100-lesson production
+- Ayin Spine required only for explicit specialist research or verification
 - canonical grounding required
 - external source cannot redefine concept
 - counterargument retrieval
@@ -2543,25 +2648,21 @@ Include Mermaid architecture diagrams.
 
 Conceptually:
 
-                  AYIN CANONICAL CORE
-            concepts / distinctions / principles
-             ethics / open questions / terms
+                  AYIN SOURCE CORPUS
+          provenance / audit / revision / citations
                          │
-                         │ governs
+                         │ packaged and approved as
                          ▼
-              ┌──────────────────────┐
-              │     AYIN SPINE       │
-              └──────────┬───────────┘
+              ┌──────────────────────────┐
+              │ LESSON CONTENT PACKAGE   │
+              │ + CORE CONCEPT REGISTRY  │
+              └────────────┬─────────────┘
                          │
-                research questions
+                external research questions
                          │
-         ┌───────────────┼────────────────┐
-         ▼               ▼                ▼
-     MANASEK        EXTERNAL KNOWLEDGE  COUNTEREVIDENCE
-   experiential      papers/books/      criticism/
-   companions        creators/etc.      alternatives
-         │               │                │
-         └───────────────┼────────────────┘
+                         ▼
+              EXTERNAL KNOWLEDGE ONLY
+          evidence / criticism / alternatives
                          ▼
                  RESEARCH PACKAGE
                          ▼
@@ -2579,6 +2680,11 @@ Conceptually:
           └──────────────┼──────────────┘
                          ▼
                   PUBLICATION PACKAGE
+
+After drafting, and never as writer context:
+
+CHANNEL LEDGER + PUBLISHED SCRIPT ARCHIVE + LESSON RELATIONS
+→ repetition / continuity / promise / contradiction review
 
 External knowledge NEVER replaces Ayin Canon.
 Manasek NEVER becomes proof of Ayin.
@@ -2658,7 +2764,8 @@ PHASE 6 — AYIN↔EXTERNAL DIALOGUE
 - counterevidence support
 
 PHASE 7 — RESEARCH ENGINE
-- Ayin Spine
+- direct Lesson Content Package pin for ordinary production
+- Ayin Spine retained for specialist research and canon verification
 - ResearchPlan
 - retrieval orchestration
 - frozen/versioned ResearchPackage
@@ -2740,9 +2847,9 @@ D. RETRIEVAL
 
 E. LECTURE
 25. create lecture topic;
-26. build canonical Ayin Spine;
+26. pin and validate the canonical Lesson Content Package;
 27. produce ResearchPlan;
-28. retrieve external evidence + criticism;
+28. retrieve only external evidence + criticism for normal lesson production;
 29. create frozen ResearchPackage;
 30. produce semantic master;
 31. bind citations;

@@ -9,6 +9,7 @@ from app.content_strategy.lesson_research import (
     _matches_human_question,
 )
 from app.content_strategy.models import EditorialProject, PersianDraft
+from app.content_strategy.persian_pipeline import ScriptOutline
 from app.content_strategy.persian_service import PersianEditorialService
 from app.lecture.domain import PublicationLanguage
 from app.lecture.schemas import LectureValidationRead, SemanticLectureMasterExport
@@ -113,6 +114,50 @@ def test_historical_project_review_uses_the_draft_frozen_lesson_package() -> Non
     restored = PersianEditorialService._lesson_package_for_review(project, draft)
 
     assert restored == package
+
+
+def test_each_variant_gets_a_deterministic_lesson_linked_story_angle() -> None:
+    package = LessonCanonRepository().package("8.8")
+
+    first_story, first_angle = PersianEditorialService._select_story_example(
+        package.lesson_id, 1
+    )
+    second_story, second_angle = PersianEditorialService._select_story_example(
+        package.lesson_id, 3
+    )
+    assert first_story is not None
+    assert second_story is not None
+    assert first_story.story_id != second_story.story_id
+    assert first_angle or second_angle
+
+    outline = ScriptOutline(
+        canonical_title=package.canonical_lesson_title,
+        opening_human_situation="scene",
+        central_intellectual_movement="movement",
+        ayin_contribution="contribution",
+        external_perspective="perspective",
+        tension_or_counterposition="tension",
+        example_strategy="example",
+        transition_logic=["transition"],
+        ending_open_question="question",
+        diversity_profile={},
+    )
+    _, context = PersianEditorialService._context_with_story_example(
+        outline,
+        "{}",
+        first_story,
+        first_angle,
+    )
+    payload = json.loads(context)
+    assert payload["selected_story_example"]["story_id"] == first_story.story_id
+    assert first_story.title_fa in payload["script_outline"]["example_strategy"]
+
+
+def test_lessons_without_story_links_get_a_fresh_simple_example_instruction() -> None:
+    story, angle = PersianEditorialService._select_story_example("1.1", 1)
+
+    assert story is None
+    assert angle
 
 
 def test_default_lesson_research_questions_use_only_external_space() -> None:

@@ -37,5 +37,11 @@
   <div class="split-head"><h2>Texte</h2><form method="post" action="/lessons/{{ package.lesson_id }}/projects"><button class="button" type="submit">Neues Textprojekt</button></form></div>
   {% for project in projects %}<p><a href="/texts/{{ project.project.id }}">{{ project.project.title }}</a><small>{{ project.status_label }} · {{ project.updated_at.strftime('%d.%m.%Y') }}</small></p>{% else %}<p class="muted">Für diese Lektion gibt es noch kein Textprojekt.</p>{% endfor %}
 </section>
+<section class="card" id="geschichten">
+  <div class="split-head"><div><p class="eyebrow">Externe Wissensbasis</p><h2>Geschichten</h2></div><a class="button secondary" href="/stories?lesson_id={{ package.lesson_id }}">Alle passenden Geschichten</a></div>
+  <p class="muted">Kuratierte Beispiele für Recherche und Illustration. Sie erweitern die Lektion, definieren aber nicht den Ayin-Kern.</p>
+  {% if stories_error %}<p class="warning">Story Bank konnte nicht geladen werden: {{ stories_error }}</p>{% endif %}
+  <div class="relation-list">{% for story in related_stories %}<article class="relation-item"><a href="/stories/{{ story.story_id }}"><strong dir="rtl">{{ story.title_fa }}</strong></a><p dir="rtl">{{ story.hook_fa }}</p><small>{{ story.category }} · {{ story.years }} · {{ story.sources|length }} Quellen</small></article>{% else %}<p class="muted">Für diese Lektion sind noch keine Geschichten verknüpft.</p>{% endfor %}</div>
+</section>
 <section class="card" id="veroeffentlichung"><h2>Veröffentlichung</h2>{% if item.published %}<p class="notice">Mindestens ein Text dieser Lektion ist veröffentlicht und Teil des veröffentlichten Gedächtnisses.</p>{% else %}<p class="muted">Noch kein veröffentlichter Text. Entwürfe erscheinen nicht im Channel Memory.</p>{% endif %}</section>
 {% endblock %}

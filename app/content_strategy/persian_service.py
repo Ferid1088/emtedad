@@ -34,6 +34,7 @@ from app.content_strategy.persian_quality import (
     PersianDraftQualityValidator,
     clean_source_text,
 )
+from app.content_strategy.story_library import StoryLibrary, StoryRecord
 from app.db.session import Database
 from app.knowledge.llm.base import StructuredExtractionRequest
 from app.knowledge.llm.codex import CodexCliProvider
@@ -128,18 +129,28 @@ class PersianEditorialService:
             project.target_duration_minutes = target_minutes
             project.owner_prompt = owner_prompt
 
-        outline, context, evidence_texts = self._generation_context(
+        base_outline, base_context, evidence_texts = self._generation_context(
             export, lesson_package, target_minutes
         )
         result: list[UUID] = []
         for offset in range(1, draft_count + 1):
+            variant_number = existing_variants + offset
+            selected_story, example_angle = self._select_story_example(
+                lesson_package.lesson_id, variant_number
+            )
+            outline, context = self._context_with_story_example(
+                base_outline,
+                base_context,
+                selected_story,
+                example_angle,
+            )
             raw_text = await self._generate_text(
                 outline,
                 context,
                 owner_prompt,
                 target_min,
                 target_max,
-                existing_variants + offset,
+                variant_number,
             )
             initial_quality = self.quality.validate(raw_text, evidence_texts)
             review = review_bundle(
@@ -202,7 +213,7 @@ class PersianEditorialService:
                     editorial_project_id=project.id,
                     semantic_master_id=master.id,
                     version_number=1,
-                    variant_index=existing_variants + offset,
+                    variant_index=variant_number,
                     text=text,
                     status="REVIEW_REQUIRED" if blocking else "PROPOSED",
                     owner_prompt=owner_prompt,
@@ -238,6 +249,9 @@ class PersianEditorialService:
                             "LESSON_RELATIONS",
                         ],
                         "owner_prompt": owner_prompt,
+                        "selected_story_example": self._story_provenance(
+                            selected_story, example_angle
+                        ),
                         "generator": "codex-lesson-synthesis-v3",
                         "outline": outline.model_dump(mode="json"),
                         "outline_hash": outline.content_hash,
@@ -256,7 +270,7 @@ class PersianEditorialService:
                             for item in export.evidence
                             if str(item.get("evidence_kind", "")) == "EXTERNAL_CHUNK"
                         ],
-                        "variant_index": existing_variants + offset,
+                        "variant_index": variant_number,
                         "review_completed": True,
                         "published_archive_items_checked": (
                             review.published_items_checked
@@ -440,6 +454,93 @@ class PersianEditorialService:
         return outline, context, evidence_items
 
     @staticmethod
+    def _select_story_example(
+        lesson_id: str, variant: int
+    ) -> tuple[StoryRecord | None, str]:
+        """Choose a lesson-linked story and angle deterministically per text."""
+
+        angles = (
+            "یک صحنهٔ سادهٔ روزمره",
+            "یک تصمیم کوچک در محل کار یا خانه",
+            "یک لحظهٔ رابطه‌ای میان دو نفر",
+            "یک واکنش بدنی یا احساسی کوتاه",
+            "یک آزمایش کوچک که نتیجه‌اش روشن نیست",
+        )
+        digest = sha256(f"{lesson_id}:{variant}".encode()).digest()
+        angle = angles[digest[0] % len(angles)]
+        candidates = StoryLibrary().for_lesson(lesson_id)
+        if not candidates:
+            return None, angle
+        story = candidates[digest[1] % len(candidates)]
+        return story, angle
+
+    @classmethod
+    def _context_with_story_example(
+        cls,
+        outline: ScriptOutline,
+        context: str,
+        story: StoryRecord | None,
+        example_angle: str,
+    ) -> tuple[ScriptOutline, str]:
+        """Pin one external story example to this immutable generation run."""
+
+        if story is None:
+            selected: dict[str, object] | None = None
+            strategy = (
+                f"Use {example_angle} specific to this lesson; do not reuse a "
+                "published example."
+            )
+        else:
+            selected = {
+                "story_id": story.story_id,
+                "title_fa": story.title_fa,
+                "hook_fa": story.hook_fa,
+                "narrative_fa": story.narrative_fa,
+                "uncertain_or_myth_fa": story.uncertain_or_myth_fa,
+                "sources": story.sources,
+                "lesson_relation": next(
+                    (
+                        relation.relation_fa
+                        for relation in story.related_lessons
+                        if relation.lesson_id
+                    ),
+                    "",
+                ),
+                "example_angle": example_angle,
+            }
+            strategy = (
+                f"Use the curated story «{story.title_fa}» through {example_angle}; "
+                "compress it into one simple illustration and preserve its uncertainty."
+            )
+        selected_id = story.story_id if story else None
+        selected_title = story.title_fa if story else None
+        updated_outline = outline.model_copy(
+            update={
+                "example_strategy": strategy,
+                "selected_example_id": selected_id,
+                "selected_example_title": selected_title,
+            }
+        )
+        payload = json.loads(context)
+        payload["selected_story_example"] = selected
+        payload["script_outline"] = updated_outline.model_dump(mode="json")
+        return updated_outline, json.dumps(payload, ensure_ascii=False)
+
+    @staticmethod
+    def _story_provenance(
+        story: StoryRecord | None,
+        example_angle: str,
+    ) -> dict[str, object]:
+        if story is None:
+            return {"story_id": None, "example_angle": example_angle}
+        return {
+            "story_id": story.story_id,
+            "title_fa": story.title_fa,
+            "sources": story.sources,
+            "example_angle": example_angle,
+        }
+
+    @staticmethod
     def _diversity_plan(lesson_id: str) -> dict[str, str]:
         """Select a stable combination without imposing one series-wide template."""
 
@@ -524,6 +625,10 @@ class PersianEditorialService:
             "را حفظ کن. متن باید در بازه تقریبی "
             f"{target_min} تا {target_max} واژه فارسی باشد. "
             f"{style} "
+            "اگر در ورودی «selected_story_example» وجود دارد، آن را به یک مثال "
+            "ساده و کوتاه برای همین درس تبدیل کن؛ روایت را خلاصه کن، عدم‌قطعیت آن را "
+            "حفظ کن و داستان را جایگزین استدلال یا توضیح کانن نکن. اگر وجود ندارد، "
+            "یک موقعیت روزمرهٔ تازه و کوچک بساز و از مثال‌های منتشرشده تکرار نکن. "
             f"دستور صاحب اثر: {owner_prompt or 'بدون دستور اضافی'}\n\n"
             "طرح داخلی (هرگز آن را در خروجی بازگو نکن):\n"
             f"{json.dumps(outline.model_dump(mode='json'), ensure_ascii=False)}\n\n"

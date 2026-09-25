@@ -8,7 +8,7 @@
     {"stable_key":"jan","definition":"در موجود زنده، نام نسبت بُن با زنده‌بودن؛ نه مترادف هوش، آگاهی یا خودآگاهی و نه جایگزین زیست‌شناسی.","page":132,"anchor":"جان :در موجود زنده"},
     {"stable_key":"awareness","definition":"آگاهی زیسته: وجود تجربهٔ اول‌شخص؛ اینکه برای موجود چیزی «چگونه بودن» داشته باشد.","page":135,"anchor":"آگاهی زیسته :وجود"},
     {"stable_key":"self_awareness","definition":"توان بازنمایی بخشی از وضعیت، مرز، تاریخ، ظرفیت، عمل یا شناخت خود به شکلی که در پاسخ سهم داشته باشد.","page":135,"anchor":"خودآگاهی :توان"},
-    {"stable_key":"tahigah","definition":"جای باز پرسش «من چه هستم؟» که پاسخ آن از پیش توسط آیین یا دیگری پر نمی‌شود.","page":132,"anchor":"تهیگاه :جای باز"},
+    {"stable_key":"tohigah","definition":"جای باز پرسش «من چه هستم؟» که پاسخ آن از پیش توسط آیین یا دیگری پر نمی‌شود.","page":132,"anchor":"تهیگاه :جای باز"},
     {"stable_key":"conditions","definition":"میدان وسیع چیزهایی که در زندگی حضور دارند و می‌توانند زمینهٔ رخدادها و پاسخ‌ها باشند.","page":132,"anchor":"شرایط :میدان وسیع"},
     {"stable_key":"factor","definition":"چیزی که در یک موضوع مشخص با شکل‌گیری، فعال‌شدن یا ادامهٔ وضعیت یا الگو مرتبط دانسته می‌شود؛ ثبت عامل به‌خودی‌خود اثبات علیت علمی نیست.","page":132,"anchor":"عامل :چیزی که"},
     {"stable_key":"pattern","definition":"فرایند یا پاسخ تکرارشونده و قابل نمونه در موقعیت‌های مشخص.","page":133,"anchor":"الگو :فرایند"},
@@ -40,7 +40,7 @@
   "principles": [
     {"stable_key":"no_being_begins_from_itself","statement":"هیچ موجودی از خودش آغاز نشده است.","discourse_type":"CONCEPTUAL","page":136,"anchor":"هیچ موجودی از خودش"},
     {"stable_key":"bon_uniqueness_not_awareness_dependent","statement":"یگانگی بُن به آگاهی وابسته نیست.","discourse_type":"CONCEPTUAL","page":136,"anchor":"یگانگی ُب ن"},
-    {"stable_key":"tahigah_not_filled_for_another","statement":"تهیگاه را کسی به جای دیگری پر نمی‌کند.","discourse_type":"ETHICAL","page":136,"anchor":"تهیگاه را کسی"},
+    {"stable_key":"tohigah_not_filled_for_another","statement":"تهیگاه را کسی به جای دیگری پر نمی‌کند.","discourse_type":"ETHICAL","page":136,"anchor":"تهیگاه را کسی"},
     {"stable_key":"recognition_not_change","statement":"بازشناسی به‌تنهایی تغییر نیست.","discourse_type":"DESCRIPTIVE","page":136,"anchor":"بازشناسی به تنهایی"},
     {"stable_key":"change_within_causality","statement":"مجال آزادی از علت نیست؛ گشودگی عملی از انحصار یک الگو یا فشار است.","discourse_type":"CONCEPTUAL","page":136,"anchor":"مجال آزادی از علت"},
     {"stable_key":"not_all_suffering_solvable","statement":"هر رنجی مسئلهٔ قابل حل نیست.","discourse_type":"ETHICAL","page":136,"anchor":"هر رنجی مسئل"},
@@ -64,6 +64,6 @@
     {"stable_key":"jan","concept":"jan","page":132,"anchor":"جان :در موجود زنده","forms":[{"language":"fa","script":"Arab","form":"جان","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Jan","form_type":"transliteration","status":"review"}]},
     {"stable_key":"majal","concept":"majal","page":133,"anchor":"مجال :گشودگی","forms":[{"language":"fa","script":"Arab","form":"مجال","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Majal","form_type":"transliteration","status":"review"}]},
     {"stable_key":"between","concept":"between","page":134,"anchor":"میان :کیفیت","forms":[{"language":"fa","script":"Arab","form":"میان","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Miyan","form_type":"transliteration","status":"review"}]},
-    {"stable_key":"tahigah","concept":"tahigah","page":132,"anchor":"تهیگاه :جای باز","forms":[{"language":"fa","script":"Arab","form":"تهیگاه","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Tahigah","form_type":"transliteration","status":"review"}]}
+    {"stable_key":"tohigah","concept":"tohigah","page":132,"anchor":"تهیگاه :جای باز","forms":[{"language":"fa","script":"Arab","form":"تهیگاه","form_type":"preferred","status":"review"},{"language":"en","script":"Latn","form":"Tohigah","form_type":"transliteration","status":"review"}]}
   ]
 }
