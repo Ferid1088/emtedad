@@ -57,3 +57,14 @@ words. Both duration and speaking rate are configurable.
 The HTTP workflow is synchronous in this first implementation. The persisted stage
 model is designed so execution can later move to a worker/queue without changing the
 stored contracts.
+
+
+## Canon boundary
+
+This workflow is an **external-knowledge long-form generator**. It does not replace the
+Ayin lecture workflow, does not create Ayin Canon, and does not allow external sources to
+redefine Ayin concepts. Its generated scripts remain `GENERATED_CONTENT`.
+
+Canonical Ayin lesson production must continue to use the existing Lesson Content Package,
+ResearchPackage, Semantic Master, epistemic validators, and editorial approval flow. The
+semantic transcript tree added here improves retrieval context for external material only.
