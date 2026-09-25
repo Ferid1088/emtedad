@@ -53,7 +53,10 @@ AUDIT = """Audit the full draft without rewriting it. Report only meaningful rep
 abrupt transitions, concepts used before definition, contradictions, unsupported statements,
 missing logical steps, or conclusions that introduce new claims."""
 
-TModel = TypeVar("TModel", bound=BaseModel)\n\n\nREVISE = """Revise only the problems identified by the audit. Preserve the argument,
+TModel = TypeVar("TModel", bound=BaseModel)
+
+
+REVISE = """Revise only the problems identified by the audit. Preserve the argument,
 qualifications, and evidence boundary. Improve flow surgically and introduce no new facts."""
 
 
