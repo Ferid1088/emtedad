@@ -3,10 +3,10 @@
 from typing import cast
 from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from app.db.session import Database
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.codex import CodexCliProvider, CodexProviderError
 from app.retrieval.embeddings import EmbeddingProvider
 from app.semantic_content.generation import AutomatedContentService
 from app.semantic_content.schemas import (
@@ -34,7 +34,12 @@ async def build_semantic_structure(
     request: Request,
 ) -> SemanticTreeRead:
     service = SemanticStructureService(_database(request), CodexCliProvider())
-    return await service.build(source_version_id, payload)
+    try:
+        return await service.build(source_version_id, payload)
+    except CodexProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get(
