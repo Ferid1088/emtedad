@@ -76,28 +76,43 @@ class SemanticStructureService:
                     SemanticStructureRun.prompt_version == request.prompt_version,
                     SemanticStructureRun.provider == self._provider.name,
                     SemanticStructureRun.model == request.model,
-                    SemanticStructureRun.status
-                    == SemanticStructureStatus.SUCCEEDED.value,
                 )
             )
-            if existing is not None:
+            if (
+                existing is not None
+                and existing.status == SemanticStructureStatus.SUCCEEDED.value
+            ):
                 if request.make_preferred:
                     await self._set_preferred(session, source_version_id, existing.id)
                 return await self._read(session, existing)
-            run = SemanticStructureRun(
-                source_version_id=source_version_id,
-                input_hash=input_hash,
-                prompt_version=request.prompt_version,
-                provider=self._provider.name,
-                model=request.model,
-                configuration={
-                    "max_window_characters": request.max_window_characters,
-                    "overlap_segments": request.overlap_segments,
-                },
-                status=SemanticStructureStatus.RUNNING.value,
-            )
-            session.add(run)
-            await session.flush()
+
+            configuration = {
+                "max_window_characters": request.max_window_characters,
+                "overlap_segments": request.overlap_segments,
+            }
+            if existing is None:
+                run = SemanticStructureRun(
+                    source_version_id=source_version_id,
+                    input_hash=input_hash,
+                    prompt_version=request.prompt_version,
+                    provider=self._provider.name,
+                    model=request.model,
+                    configuration=configuration,
+                    status=SemanticStructureStatus.RUNNING.value,
+                )
+                session.add(run)
+                await session.flush()
+            else:
+                # Failed/stale runs keep their stable identity and are retried in place.
+                # This avoids violating uq_semantic_structure_run_identity on retry.
+                run = existing
+                run.configuration = configuration
+                run.status = SemanticStructureStatus.RUNNING.value
+                run.window_count = 0
+                run.node_count = 0
+                run.output_hash = None
+                run.error_message = None
+                run.completed_at = None
             run_id = run.id
 
         try:
