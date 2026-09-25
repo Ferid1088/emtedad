@@ -200,7 +200,8 @@ class SemanticStructureService:
             if repair_context is not None:
                 instructions += (
                     "\nThe previous hierarchy failed deterministic validation. "
-                    "Repair only the hierarchy/ranges; keep the source meaning, titles, "
+                    "Repair only the hierarchy/ranges; keep the source meaning, "
+                    "titles, "
                     "claims, examples, and qualifications grounded in the supplied "
                     "local outlines. Top-level sections must be source-ordered and "
                     "non-overlapping; every child must stay inside its parent."
