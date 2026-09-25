@@ -4,10 +4,11 @@ import json
 import os
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import psycopg
 import pytest
+from pydantic import BaseModel
 from alembic.config import Config
 from psycopg import sql
 from sqlalchemy import func, select
@@ -23,7 +24,7 @@ from app.knowledge.models import SourceSegment
 from app.retrieval.domain import QueryLanguage
 from app.semantic_content.generation import AutomatedContentService
 from app.semantic_content.ingestion import SemanticKnowledgePipeline
-from app.semantic_content.models import SemanticNode
+from app.semantic_content.models import GeneratedContentProject, SemanticNode
 from app.semantic_content.schemas import (
     CoherenceReportSpec,
     ContentOutlineSpec,
@@ -152,7 +153,7 @@ class _EmbeddingProvider:
 class _Provider:
     name = "fixture-llm"
 
-    async def extract(self, request: StructuredExtractionRequest):
+    async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
         if request.task == "external-knowledge-extraction":
             return WindowExtraction(mentions=[], claims=[])
         if request.task == "semantic-transcript-window":
@@ -361,12 +362,18 @@ async def test_semantic_ingestion_and_generation_preserve_source_data(
         assert generated.provenance_complete is True
         assert len(generated.sections) == 3
         assert generated.final_script is not None
-        semantic_family = generated.sections[0].evidence_pack["clusters"][0][
-            "references"
-        ]
-        assert semantic_family
-
         async with database.transaction() as session:
+            stored = await session.get(GeneratedContentProject, generated.id)
+            assert stored is not None
+            evidence = stored.retrieval_snapshot["evidence"]
+            assert isinstance(evidence, list) and evidence
+            first_evidence = evidence[0]
+            assert isinstance(first_evidence, dict)
+            semantic_family = first_evidence["semantic_family"]
+            assert isinstance(semantic_family, list)
+            assert len(semantic_family) >= 3
+            assert first_evidence["semantic_hit_path"] is not None
+            assert first_evidence["semantic_root_path"] in {"1", "2"}
             source_segment_count_after = int(
                 await session.scalar(select(func.count(SourceSegment.id))) or 0
             )
