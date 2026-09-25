@@ -154,7 +154,7 @@ class SpeechStructureService:
                     "speech_structure.failed",
                     extra={"source_id": str(source_id), "run_id": str(run.id)},
                 )
-                raise
+                return structure
             return structure
 
     async def regenerate(self, source_id: UUID) -> SpeechStructure:
