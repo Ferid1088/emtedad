@@ -67,6 +67,7 @@ from app.ritual.models import SafetyValidationResult
 from app.ritual.safety import VALIDATOR_VERSION, RitualSafetyValidator
 from app.ritual.service import RitualReadService
 from app.ritual.validator import RitualStructuralValidator
+from app.semantic_content.ingestion import SemanticKnowledgePipeline
 from app.storage.local import LocalObjectStore
 
 
@@ -645,17 +646,18 @@ async def _run_knowledge(
     args: argparse.Namespace, database: Database, store: LocalObjectStore
 ) -> int:
     if args.command == "ingest-youtube":
-        result = await ExternalKnowledgeImporter(
+        result = await SemanticKnowledgePipeline(
             database,
             YouTubeAdapter(),
             CodexCliProvider(),
+            SentenceTransformerEmbeddingProvider(),
             model=args.model,
-            window_size=args.window_size,
-            overlap=args.overlap,
+            extraction_window_size=args.window_size,
+            extraction_overlap=args.overlap,
             media_service=MediaService(database, store),
         ).ingest(args.locator)
         print(_json(asdict(result)))
-        return 0 if result.failed_windows == 0 else 1
+        return 0 if result.failed_extraction_windows == 0 else 1
     if args.command == "resolve-pending":
         resolution_result = await ResolutionService(
             database,
