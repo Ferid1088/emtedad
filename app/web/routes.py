@@ -257,17 +257,17 @@ async def _structure_page_rows(request: Request) -> list[dict[str, object]]:
 
         rows: list[dict[str, object]] = []
         for source in sources:
-            version = latest_by_source.get(source.id)
-            if version is None:
+            latest_version = latest_by_source.get(source.id)
+            if latest_version is None:
                 continue
-            pointer = pointers.get(version.id)
-            run = latest_runs.get(version.id)
+            preferred_pointer = pointers.get(latest_version.id)
+            latest_run = latest_runs.get(latest_version.id)
             rows.append(
                 {
                     "source": source,
-                    "version": version,
-                    "preferred": pointer is not None,
-                    "run": run,
+                    "version": latest_version,
+                    "preferred": preferred_pointer is not None,
+                    "run": latest_run,
                 }
             )
         return rows
