@@ -122,6 +122,9 @@ def _parser() -> argparse.ArgumentParser:
     ingest_youtube.add_argument("--model", default="configured-default")
     ingest_youtube.add_argument("--window-size", type=int, default=50)
     ingest_youtube.add_argument("--overlap", type=int, default=8)
+    prepare_semantic = knowledge_commands.add_parser("prepare-semantic-all")
+    prepare_semantic.add_argument("--model", default="configured-default")
+    prepare_semantic.add_argument("--include-historical", action="store_true")
     inspect_source = knowledge_commands.add_parser("inspect-source")
     inspect_source.add_argument("id", type=UUID)
     list_segments = knowledge_commands.add_parser("list-segments")
@@ -657,6 +660,16 @@ async def _run_knowledge(
         ).ingest(args.locator)
         print(_json(asdict(result)))
         return 0 if result.failed_extraction_windows == 0 else 1
+    if args.command == "prepare-semantic-all":
+        result = await SemanticKnowledgePipeline(
+            database,
+            YouTubeAdapter(),
+            CodexCliProvider(),
+            SentenceTransformerEmbeddingProvider(),
+            model=args.model,
+        ).backfill_existing(include_historical=args.include_historical)
+        print(_json(asdict(result)))
+        return 0 if not result.failed_source_version_ids else 1
     if args.command == "resolve-pending":
         resolution_result = await ResolutionService(
             database,
