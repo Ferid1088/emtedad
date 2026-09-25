@@ -1,6 +1,7 @@
 """Persistence for semantic source trees and generated long-form content."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -156,8 +157,8 @@ class SemanticNode(Base):
     qualifications: Mapped[list[str]] = mapped_column(JSONB, default=list)
     start_sequence: Mapped[int] = mapped_column(Integer)
     end_sequence: Mapped[int] = mapped_column(Integer)
-    start_seconds: Mapped[float] = mapped_column(Numeric(12, 3))
-    end_seconds: Mapped[float] = mapped_column(Numeric(12, 3))
+    start_seconds: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    end_seconds: Mapped[Decimal] = mapped_column(Numeric(12, 3))
     content_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
