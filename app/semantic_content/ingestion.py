@@ -17,7 +17,7 @@ from app.retrieval.embeddings import (
     EmbeddingProvider,
     EmbeddingService,
 )
-from app.semantic_content.schemas import SemanticStructureRequest
+from app.semantic_content.schemas import SemanticStructureRequest, SemanticTreeRead
 from app.semantic_content.structuring import SemanticStructureService
 
 
@@ -186,7 +186,7 @@ class SemanticKnowledgePipeline:
             embedding_model_id=embeddings.model_id,
         )
 
-    async def _structure_version(self, source_version_id: UUID):
+    async def _structure_version(self, source_version_id: UUID) -> SemanticTreeRead:
         return await SemanticStructureService(
             self._database, self._llm
         ).build(
