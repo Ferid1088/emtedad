@@ -24,7 +24,11 @@ from app.knowledge.models import SourceSegment
 from app.retrieval.domain import QueryLanguage
 from app.semantic_content.generation import AutomatedContentService
 from app.semantic_content.ingestion import SemanticKnowledgePipeline
-from app.semantic_content.models import GeneratedContentProject, SemanticNode
+from app.semantic_content.models import (
+    GeneratedContentProject,
+    SemanticNode,
+    SemanticStructureRun,
+)
 from app.semantic_content.schemas import (
     CoherenceReportSpec,
     ContentOutlineSpec,
@@ -124,6 +128,22 @@ class _Adapter:
             ),
             thumbnail_url=None,
         )
+
+
+class _FailOnceProvider(_Provider):
+    """Fail the first global merge to verify a persisted failed run can retry."""
+
+    def __init__(self) -> None:
+        self.failed_once = False
+
+    async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
+        if (
+            request.task == "semantic-transcript-global-tree"
+            and not self.failed_once
+        ):
+            self.failed_once = True
+            raise RuntimeError("fixture semantic merge failure")
+        return await super().extract(request)
 
 
 class _EmbeddingProvider:
@@ -310,6 +330,45 @@ class _Provider:
                 strengths_to_preserve=["پیوستگی سه بخش"],
             )
         raise AssertionError(f"unexpected task: {request.task}")
+
+
+@pytest.mark.asyncio
+async def test_failed_semantic_run_is_retried_in_place(
+    semantic_database_url: str,
+) -> None:
+    database = Database(semantic_database_url)
+    provider = _FailOnceProvider()
+    embedding = _EmbeddingProvider()
+    pipeline = SemanticKnowledgePipeline(
+        database,
+        _Adapter(),
+        provider,
+        embedding,
+        extraction_window_size=8,
+        extraction_overlap=0,
+        semantic_overlap_segments=0,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="fixture semantic merge failure"):
+            await pipeline.ingest("semantic-pilot")
+
+        prepared = await pipeline.ingest("semantic-pilot")
+        assert prepared.semantic_node_count == 6
+
+        async with database.transaction() as session:
+            run_count = int(
+                await session.scalar(select(func.count(SemanticStructureRun.id))) or 0
+            )
+            run = await session.scalar(select(SemanticStructureRun))
+            node_count = int(
+                await session.scalar(select(func.count(SemanticNode.id))) or 0
+            )
+        assert run_count == 1
+        assert run is not None
+        assert run.status == "SUCCEEDED"
+        assert node_count == 6
+    finally:
+        await database.dispose()
 
 
 @pytest.mark.asyncio
