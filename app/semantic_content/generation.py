@@ -358,9 +358,7 @@ class AutomatedContentService:
             state["defined_concepts"] = self._merge(
                 state["defined_concepts"], draft.concepts_defined
             )
-            state["claims_used"] = self._merge(
-                state["claims_used"], draft.claims_used
-            )
+            state["claims_used"] = self._merge(state["claims_used"], draft.claims_used)
             state["examples_used"] = self._merge(
                 state["examples_used"], draft.examples_used
             )
@@ -425,9 +423,7 @@ class AutomatedContentService:
         target_words: int,
     ) -> None:
         valid = {cluster.cluster_id for cluster in synthesis.clusters}
-        used = {
-            key for section in outline.sections for key in section.cluster_ids
-        }
+        used = {key for section in outline.sections for key in section.cluster_ids}
         if not used.issubset(valid):
             raise ValueError("outline references unknown synthesis cluster")
         assigned = sum(section.target_word_count for section in outline.sections)
@@ -435,9 +431,7 @@ class AutomatedContentService:
             raise ValueError("outline word budget is outside allowed tolerance")
 
     @staticmethod
-    def _validate_references(
-        synthesis: SynthesisSpec, evidence: object
-    ) -> None:
+    def _validate_references(synthesis: SynthesisSpec, evidence: object) -> None:
         if not isinstance(evidence, list):
             raise ValueError("invalid retrieval evidence")
         available = {
@@ -470,8 +464,7 @@ class AutomatedContentService:
                         expected = str(expected)
                     if actual[key] != expected:
                         raise ValueError(
-                            f"synthesis changed provenance for "
-                            f"{reference.candidate_id}"
+                            f"synthesis changed provenance for {reference.candidate_id}"
                         )
 
     @staticmethod
@@ -496,9 +489,7 @@ class AutomatedContentService:
     @staticmethod
     def _merge(existing: object, additions: list[str]) -> list[str]:
         values = (
-            [str(value) for value in existing]
-            if isinstance(existing, list)
-            else []
+            [str(value) for value in existing] if isinstance(existing, list) else []
         )
         seen = set(values)
         for value in additions:

@@ -141,9 +141,7 @@ class SemanticStructureService:
                 )
             )
             outline = GlobalOutline.model_validate(raw_tree)
-            self._validate_outline(
-                outline, segments[0].sequence, segments[-1].sequence
-            )
+            self._validate_outline(outline, segments[0].sequence, segments[-1].sequence)
             async with self._database.transaction() as session:
                 run = await session.get(SemanticStructureRun, run_id)
                 if run is None:
@@ -202,9 +200,7 @@ class SemanticStructureService:
             "max_window_characters": request.max_window_characters,
             "overlap_segments": request.overlap_segments,
         }
-        return hashlib.sha256(
-            json.dumps(payload, sort_keys=True).encode()
-        ).hexdigest()
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     @staticmethod
     def _windows(
@@ -236,9 +232,7 @@ class SemanticStructureService:
         return windows
 
     @staticmethod
-    def _validate_outline(
-        outline: GlobalOutline, minimum: int, maximum: int
-    ) -> None:
+    def _validate_outline(outline: GlobalOutline, minimum: int, maximum: int) -> None:
         if not outline.sections:
             raise ValueError("global semantic outline has no sections")
 
@@ -354,9 +348,7 @@ class SemanticStructureService:
     async def _set_preferred(
         session: AsyncSession, source_version_id: UUID, run_id: UUID
     ) -> None:
-        pointer = await session.get(
-            PreferredSemanticStructureRun, source_version_id
-        )
+        pointer = await session.get(PreferredSemanticStructureRun, source_version_id)
         if pointer is None:
             session.add(
                 PreferredSemanticStructureRun(

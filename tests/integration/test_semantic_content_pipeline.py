@@ -132,9 +132,7 @@ class _EmbeddingProvider:
     revision = "1"
     dimensions = 3
 
-    async def embed_documents(
-        self, texts: Sequence[str]
-    ) -> list[list[float]]:
+    async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return [self._vector(text) for text in texts]
 
     async def embed_query(self, text: str) -> list[float]:

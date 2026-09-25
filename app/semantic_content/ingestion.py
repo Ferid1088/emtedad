@@ -128,15 +128,13 @@ class SemanticKnowledgePipeline:
             failed_extraction_windows=imported.failed_windows,
         )
 
-    async def refresh_index(
-        self,
-    ) -> tuple[ChunkingResult, EmbeddingBuildResult]:
+    async def refresh_index(self) -> tuple[ChunkingResult, EmbeddingBuildResult]:
         """Rebuild logical chunks once; embedding cache prevents duplicate work."""
 
         chunks = await ChunkBuilder(self._database).build()
-        embeddings = await EmbeddingService(
-            self._database, self._embedding
-        ).build(chunks.run_id)
+        embeddings = await EmbeddingService(self._database, self._embedding).build(
+            chunks.run_id
+        )
         return chunks, embeddings
 
     async def backfill_existing(
@@ -187,9 +185,7 @@ class SemanticKnowledgePipeline:
         )
 
     async def _structure_version(self, source_version_id: UUID) -> SemanticTreeRead:
-        return await SemanticStructureService(
-            self._database, self._llm
-        ).build(
+        return await SemanticStructureService(self._database, self._llm).build(
             source_version_id,
             SemanticStructureRequest(
                 model=self._model,
