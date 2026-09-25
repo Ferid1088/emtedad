@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -25,6 +26,13 @@ class CodexCliProvider:
         return await asyncio.to_thread(self._extract_sync, request)
 
     def _extract_sync(self, request: StructuredExtractionRequest) -> BaseModel:
+        executable = shutil.which(self._executable)
+        if executable is None:
+            raise CodexProviderError(
+                "Codex CLI wurde nicht gefunden. Starte die App aus einer Shell, "
+                "in der 'codex --version' funktioniert."
+            )
+        raw_output = ""
         with tempfile.TemporaryDirectory(prefix="emtedad-codex-") as directory:
             root = Path(directory)
             schema_path = root / "schema.json"
@@ -34,12 +42,16 @@ class CodexCliProvider:
                 ),
                 encoding="utf-8",
             )
+            output_path = root / "final.json"
             prompt = (
+                "Do not use shell commands or tools. Analyze only the source material "
+                "included in this prompt and return exactly the requested structured "
+                "response.\n"
                 f"Task: {request.task}\nPrompt version: {request.prompt_version}\n"
                 f"{request.instructions}\n\nSource window:\n{request.input_text}"
             )
             command = [
-                self._executable,
+                executable,
                 "exec",
                 "-",
                 "--ephemeral",
@@ -51,6 +63,8 @@ class CodexCliProvider:
                 "never",
                 "--output-schema",
                 str(schema_path),
+                "--output-last-message",
+                str(output_path),
                 "--cd",
                 str(root),
             ]
@@ -68,10 +82,20 @@ class CodexCliProvider:
                 )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 raise CodexProviderError(type(exc).__name__) from exc
+            if output_path.exists():
+                try:
+                    raw_output = output_path.read_text(encoding="utf-8").strip()
+                except OSError:
+                    raw_output = ""
         if result.returncode != 0:
-            raise CodexProviderError(_safe_diagnostic(result.stderr))
+            diagnostic = _safe_diagnostic(result.stderr)
+            raise CodexProviderError(
+                f"codex exec failed (exit {result.returncode}): {diagnostic}"
+            )
+        if not raw_output:
+            raw_output = result.stdout.strip()
         try:
-            payload = json.loads(result.stdout)
+            payload = json.loads(raw_output)
             return request.output_model.model_validate(payload)
         except (json.JSONDecodeError, ValidationError) as exc:
             raise CodexProviderError(

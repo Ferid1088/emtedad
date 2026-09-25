@@ -20,6 +20,7 @@ from app.api.routes.lecture import router as lecture_router
 from app.api.routes.research import router as research_router
 from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.ritual import router as ritual_router
+from app.api.routes.semantic_content import router as semantic_content_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ApplicationError
 from app.db.health import DatabaseReadinessService, ReadinessService
@@ -90,6 +91,7 @@ def create_app(
     app.include_router(retrieval_router)
     app.include_router(research_router)
     app.include_router(dialogue_router)
+    app.include_router(semantic_content_router)
     app.include_router(web_router)
     app.mount(
         "/static",

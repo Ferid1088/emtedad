@@ -30,7 +30,6 @@ from app.dialogue.schemas import (
 )
 from app.dialogue.service import DialogueService
 from app.knowledge.adapters.youtube import YouTubeAdapter
-from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.codex import CodexCliProvider
 from app.knowledge.media import MediaService
 from app.knowledge.resolution import (
@@ -67,6 +66,7 @@ from app.ritual.models import SafetyValidationResult
 from app.ritual.safety import VALIDATOR_VERSION, RitualSafetyValidator
 from app.ritual.service import RitualReadService
 from app.ritual.validator import RitualStructuralValidator
+from app.semantic_content.ingestion import SemanticKnowledgePipeline
 from app.storage.local import LocalObjectStore
 
 
@@ -122,6 +122,9 @@ def _parser() -> argparse.ArgumentParser:
     ingest_youtube.add_argument("--model", default="configured-default")
     ingest_youtube.add_argument("--window-size", type=int, default=50)
     ingest_youtube.add_argument("--overlap", type=int, default=8)
+    prepare_semantic = knowledge_commands.add_parser("prepare-semantic-all")
+    prepare_semantic.add_argument("--model", default="configured-default")
+    prepare_semantic.add_argument("--include-historical", action="store_true")
     inspect_source = knowledge_commands.add_parser("inspect-source")
     inspect_source.add_argument("id", type=UUID)
     list_segments = knowledge_commands.add_parser("list-segments")
@@ -645,17 +648,28 @@ async def _run_knowledge(
     args: argparse.Namespace, database: Database, store: LocalObjectStore
 ) -> int:
     if args.command == "ingest-youtube":
-        result = await ExternalKnowledgeImporter(
+        prepared = await SemanticKnowledgePipeline(
             database,
             YouTubeAdapter(),
             CodexCliProvider(),
+            SentenceTransformerEmbeddingProvider(),
             model=args.model,
-            window_size=args.window_size,
-            overlap=args.overlap,
+            extraction_window_size=args.window_size,
+            extraction_overlap=args.overlap,
             media_service=MediaService(database, store),
         ).ingest(args.locator)
-        print(_json(asdict(result)))
-        return 0 if result.failed_windows == 0 else 1
+        print(_json(asdict(prepared)))
+        return 0 if prepared.failed_extraction_windows == 0 else 1
+    if args.command == "prepare-semantic-all":
+        backfill = await SemanticKnowledgePipeline(
+            database,
+            YouTubeAdapter(),
+            CodexCliProvider(),
+            SentenceTransformerEmbeddingProvider(),
+            model=args.model,
+        ).backfill_existing(include_historical=args.include_historical)
+        print(_json(asdict(backfill)))
+        return 0 if not backfill.failed_source_version_ids else 1
     if args.command == "resolve-pending":
         resolution_result = await ResolutionService(
             database,

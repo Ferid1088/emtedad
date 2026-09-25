@@ -21,6 +21,7 @@ from app.research import models as research_models  # noqa: F401
 from app.lecture import models as lecture_models  # noqa: F401
 from app.localization import models as localization_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
+from app.semantic_content import models as semantic_content_models  # noqa: F401
 
 config = context.config
 

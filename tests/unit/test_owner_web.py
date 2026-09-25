@@ -35,6 +35,8 @@ def test_owner_routes_are_registered(test_settings: Settings) -> None:
         "/lessons/{lesson_id}",
         "/archive",
         "/workspace/{project_id}/research",
+        "/generator",
+        "/generator/{project_id}",
     } <= paths
 
 
@@ -44,6 +46,7 @@ def test_primary_navigation_uses_lessons_not_strategy_tree() -> None:
     ).read_text(encoding="utf-8")
 
     assert "('/lessons', 'Lektionen')" in template
+    assert "('/generator', 'Generator')" in template
     assert "('/strategy', 'Themenbaum')" not in template
 
 
@@ -75,3 +78,17 @@ def test_overlap_is_deterministic() -> None:
         == 1.0
     )
     assert TopicSuggestionService._overlap("one", "two") == 0.0
+
+
+def test_generator_is_separate_external_knowledge_workflow() -> None:
+    template = (
+        Path(__file__).parents[2]
+        / "app"
+        / "web"
+        / "templates"
+        / "content_generator.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'action="/generator"' in template
+    assert "Wissensbasis" in template
+    assert "Research + Text automatisch erstellen" in template

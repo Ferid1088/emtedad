@@ -1,0 +1,67 @@
+name: semantic-content-ci
+
+on:
+  push:
+    branches:
+      - semantic-content-pipeline-v2
+  pull_request:
+    paths:
+      - "app/**"
+      - "alembic/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17
+        env:
+          POSTGRES_DB: emtedad
+          POSTGRES_USER: emtedad
+          POSTGRES_PASSWORD: test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U emtedad -d emtedad"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      EMTEDAD_ENVIRONMENT: test
+      EMTEDAD_DATABASE_URL: postgresql+psycopg://emtedad:test-only@127.0.0.1:5432/emtedad
+      EMTEDAD_STORAGE_ROOT: /tmp/emtedad-storage
+      EMTEDAD_LOG_LEVEL: INFO
+      EMTEDAD_LOG_JSON: "true"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.0"
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.13
+      - name: Sync locked environment
+        run: uv sync --all-groups --frozen
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+      - name: Alembic drift check
+        run: uv run alembic check
+      - name: Ruff lint
+        run: uv run ruff check app tests
+      - name: Ruff format
+        run: >-
+          uv run ruff format --check
+          app/semantic_content
+          app/api/routes/semantic_content.py
+          tests/unit/test_semantic_content.py
+          tests/integration/test_semantic_content_pipeline.py
+      - name: Strict mypy
+        run: uv run mypy app tests
+      - name: Semantic unit tests
+        run: uv run pytest -q tests/unit/test_semantic_content.py tests/unit/test_owner_web.py
+      - name: Semantic PostgreSQL integration
+        run: uv run pytest -q tests/integration/test_semantic_content_pipeline.py

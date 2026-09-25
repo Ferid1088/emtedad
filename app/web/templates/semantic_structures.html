@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Vortragsstruktur</h1>
+    <p class="lede">Hierarchische Lesestruktur über unveränderten Transkripten.</p>
+  </div>
+  <form method="post" action="/structures/build-missing">
+    <button class="button secondary" type="submit">Alle fehlenden Strukturen erstellen</button>
+  </form>
+</div>
+
+{% if created %}
+<p class="success">Die Vortragsstruktur wurde erstellt.</p>
+{% endif %}
+{% if batch == "ok" %}
+<p class="success">Alle fehlenden Vortragsstrukturen wurden erstellt und der Retrieval-Index wurde aktualisiert.</p>
+{% elif batch and batch.startswith("partial-") %}
+<p class="warning">Der Batch ist teilweise abgeschlossen. Fehlgeschlagene Quellen zeigen unten die konkrete Diagnose.</p>
+{% elif batch == "failed" %}
+<p class="error">Der Batch konnte nicht abgeschlossen werden. Die vorhandenen Transkripte wurden nicht verändert.</p>
+{% endif %}
+{% if failed %}
+<p class="error">Die Struktur konnte nicht erstellt werden. Details stehen in der betreffenden Zeile.</p>
+{% endif %}
+
+<table>
+  <thead>
+    <tr>
+      <th>Titel</th>
+      <th>Sprache</th>
+      <th>Transkript</th>
+      <th>Status</th>
+      <th>Version</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    {% set source = row.source %}
+    {% set version = row.version %}
+    {% set run = row.run %}
+    <tr>
+      <td><a href="/sources/{{ source.id }}" dir="auto">{{ source.title }}</a></td>
+      <td>{{ source.language }}</td>
+      <td>bereit</td>
+      <td>
+        {% if row.preferred %}
+          <span class="success">Bereit</span>
+        {% elif run and run.status == "RUNNING" %}
+          Wird erstellt
+        {% elif run and run.status == "FAILED" %}
+          <span class="error">Fehlgeschlagen</span>
+        {% else %}
+          Noch nicht erstellt
+        {% endif %}
+      </td>
+      <td>
+        {% if row.preferred and run %}
+          {{ run.prompt_version }}
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/structures/{{ version.id }}">
+          <button class="button secondary" type="submit">
+            {% if row.preferred %}Neu erstellen{% elif run and run.status == "FAILED" %}Erneut erstellen{% else %}Struktur erstellen{% endif %}
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% if run and run.status == "FAILED" and run.error_message %}
+    <tr>
+      <td colspan="6">
+        <div class="error" style="margin: 0">
+          <strong>Diagnose:</strong>
+          <span dir="auto">{{ run.error_message }}</span>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+  {% else %}
+    <tr><td colspan="6" class="muted">Keine Transkripte vorhanden.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
