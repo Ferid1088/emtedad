@@ -1,1 +1,67 @@
-{% extends "base.html" %}{% block content %}<h1>{{ source.title }}</h1><p><a href="{{ source.canonical_url }}">{{ source.canonical_url }}</a> · {{ source.language }} · {{ source.ingestion_status }}</p><h2>Transkript</h2>{% for segment in segments %}<article class="transcript"><a href="{{ source.canonical_url }}&t={{ segment.start_seconds|int }}s">{{ segment.start_seconds }}s</a><span>{{ segment.raw_text }}</span></article>{% else %}<p class="muted">Kein Transkript vorhanden.</p>{% endfor %}<div class="columns"><section><h2>Claims</h2>{% for claim in claims %}<p>{{ claim.claim_text }} <small>{{ claim.verification_status }}</small></p>{% else %}<p class="muted">Keine Claims.</p>{% endfor %}</section><section><h2>Erwähnungen</h2>{% for mention in mentions %}<p>{{ mention.surface_text }} <small>{{ mention.resolution_status }}</small></p>{% else %}<p class="muted">Keine Erwähnungen.</p>{% endfor %}</section></div><h2>Prüfungen</h2>{% for review in reviews %}<p class="warning">{{ review.message }} ({{ review.status }})</p>{% else %}<p class="muted">Keine offenen Prüfungen.</p>{% endfor %}{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>{{ source.title }}</h1>
+    <p><a href="{{ source.canonical_url }}">{{ source.canonical_url }}</a> · {{ source.language }} · {{ source.ingestion_status }}</p>
+  </div>
+  <a class="button secondary" href="/generator">Mit Wissensbasis schreiben</a>
+</div>
+
+{% if prepared %}
+<p class="success">Quelle ist importiert, semantisch strukturiert und im aktuellen Retrieval-Index vorbereitet.</p>
+{% endif %}
+
+<section class="card">
+  <h2>Semantische Struktur</h2>
+  {% for node in semantic_nodes %}
+  <article class="suggestion" style="margin-inline-start: {{ (node.depth - 1) * 1.25 }}rem">
+    <h3>{{ node.path }} · <span dir="auto">{{ node.title }}</span></h3>
+    <p dir="auto">{{ node.summary }}</p>
+    <small>{{ node.start_seconds }}s – {{ node.end_seconds }}s</small>
+  </article>
+  {% else %}
+  <p class="muted">Für diese Quelle ist noch keine bevorzugte semantische Struktur vorhanden.</p>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <h2>Transkript</h2>
+  {% for segment in segments %}
+  <article class="transcript">
+    <a href="{{ source.canonical_url }}&t={{ segment.start_seconds|int }}s">{{ segment.start_seconds }}s</a>
+    <span dir="auto">{{ segment.raw_text }}</span>
+  </article>
+  {% else %}
+  <p class="muted">Kein Transkript vorhanden.</p>
+  {% endfor %}
+</section>
+
+<div class="columns">
+  <section class="card">
+    <h2>Claims</h2>
+    {% for claim in claims %}
+    <p dir="auto">{{ claim.claim_text }} <small>{{ claim.verification_status }}</small></p>
+    {% else %}
+    <p class="muted">Keine Claims.</p>
+    {% endfor %}
+  </section>
+  <section class="card">
+    <h2>Erwähnungen</h2>
+    {% for mention in mentions %}
+    <p dir="auto">{{ mention.surface_text }} <small>{{ mention.resolution_status }}</small></p>
+    {% else %}
+    <p class="muted">Keine Erwähnungen.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Prüfungen</h2>
+  {% for review in reviews %}
+  <p class="warning">{{ review.message }} ({{ review.status }})</p>
+  {% else %}
+  <p class="muted">Keine offenen Prüfungen.</p>
+  {% endfor %}
+</section>
+{% endblock %}
