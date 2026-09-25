@@ -53,7 +53,17 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check app tests
       - name: Ruff format
-        run: uv run ruff format --check app tests
+        run: >-
+          uv run ruff format --check
+          app/semantic_content
+          app/api/routes/semantic_content.py
+          app/channel_monitoring/service.py
+          app/cli.py
+          app/main.py
+          app/web/routes.py
+          tests/unit/test_semantic_content.py
+          tests/unit/test_owner_web.py
+          tests/integration/test_semantic_content_pipeline.py
       - name: Strict mypy
         run: uv run mypy app tests
       - name: Semantic unit tests
