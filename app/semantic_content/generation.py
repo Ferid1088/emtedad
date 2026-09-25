@@ -333,7 +333,7 @@ class AutomatedContentService:
                 key: list(value) if isinstance(value, list) else value
                 for key, value in state.items()
             }
-            evidence_pack = {
+            evidence_pack: dict[str, object] = {
                 "section": section.model_dump(mode="json"),
                 "clusters": [item.model_dump(mode="json") for item in selected],
                 "global_state": state_snapshot,

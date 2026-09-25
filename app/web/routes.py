@@ -108,11 +108,14 @@ def _channel_service(request: Request) -> ChannelDiscoveryService:
 
 
 async def _latest_content_index(session: AsyncSession) -> EmbeddingRun | None:
-    return await session.scalar(
-        select(EmbeddingRun)
-        .where(EmbeddingRun.status == BuildStatus.SUCCEEDED)
-        .order_by(EmbeddingRun.completed_at.desc(), EmbeddingRun.created_at.desc())
-        .limit(1)
+    return cast(
+        EmbeddingRun | None,
+        await session.scalar(
+            select(EmbeddingRun)
+            .where(EmbeddingRun.status == BuildStatus.SUCCEEDED)
+            .order_by(EmbeddingRun.completed_at.desc(), EmbeddingRun.created_at.desc())
+            .limit(1)
+        ),
     )
 
 

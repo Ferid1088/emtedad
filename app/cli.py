@@ -648,7 +648,7 @@ async def _run_knowledge(
     args: argparse.Namespace, database: Database, store: LocalObjectStore
 ) -> int:
     if args.command == "ingest-youtube":
-        result = await SemanticKnowledgePipeline(
+        prepared = await SemanticKnowledgePipeline(
             database,
             YouTubeAdapter(),
             CodexCliProvider(),
@@ -658,18 +658,18 @@ async def _run_knowledge(
             extraction_overlap=args.overlap,
             media_service=MediaService(database, store),
         ).ingest(args.locator)
-        print(_json(asdict(result)))
-        return 0 if result.failed_extraction_windows == 0 else 1
+        print(_json(asdict(prepared)))
+        return 0 if prepared.failed_extraction_windows == 0 else 1
     if args.command == "prepare-semantic-all":
-        result = await SemanticKnowledgePipeline(
+        backfill = await SemanticKnowledgePipeline(
             database,
             YouTubeAdapter(),
             CodexCliProvider(),
             SentenceTransformerEmbeddingProvider(),
             model=args.model,
         ).backfill_existing(include_historical=args.include_historical)
-        print(_json(asdict(result)))
-        return 0 if not result.failed_source_version_ids else 1
+        print(_json(asdict(backfill)))
+        return 0 if not backfill.failed_source_version_ids else 1
     if args.command == "resolve-pending":
         resolution_result = await ResolutionService(
             database,

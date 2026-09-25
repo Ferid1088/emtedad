@@ -143,27 +143,31 @@ class SemanticStructureService:
             outline = GlobalOutline.model_validate(raw_tree)
             self._validate_outline(outline, segments[0].sequence, segments[-1].sequence)
             async with self._database.transaction() as session:
-                run = await session.get(SemanticStructureRun, run_id)
-                if run is None:
+                stored_run = await session.get(SemanticStructureRun, run_id)
+                if stored_run is None:
                     raise RuntimeError("semantic structure run disappeared")
-                await self._persist(session, run, outline, segments)
+                await self._persist(session, stored_run, outline, segments)
                 nodes = list(
                     await session.scalars(
                         select(SemanticNode)
-                        .where(SemanticNode.semantic_structure_run_id == run.id)
+                        .where(
+                            SemanticNode.semantic_structure_run_id == stored_run.id
+                        )
                         .order_by(SemanticNode.ordinal)
                     )
                 )
-                run.window_count = len(windows)
-                run.node_count = len(nodes)
-                run.output_hash = hashlib.sha256(
+                stored_run.window_count = len(windows)
+                stored_run.node_count = len(nodes)
+                stored_run.output_hash = hashlib.sha256(
                     "\n".join(node.content_hash for node in nodes).encode()
                 ).hexdigest()
-                run.status = SemanticStructureStatus.SUCCEEDED.value
-                run.completed_at = datetime.now(UTC)
+                stored_run.status = SemanticStructureStatus.SUCCEEDED.value
+                stored_run.completed_at = datetime.now(UTC)
                 if request.make_preferred:
-                    await self._set_preferred(session, source_version_id, run.id)
-                return await self._read(session, run)
+                    await self._set_preferred(
+                        session, source_version_id, stored_run.id
+                    )
+                return await self._read(session, stored_run)
         except Exception as exc:
             async with self._database.transaction() as session:
                 failed = await session.get(SemanticStructureRun, run_id)
