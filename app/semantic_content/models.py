@@ -173,6 +173,10 @@ class SemanticNodeSegment(Base):
         UniqueConstraint(
             "semantic_node_id", "position", name="uq_semantic_node_segment_position"
         ),
+        Index(
+            "ix_semantic_node_segments_source_segment_id",
+            "source_segment_id",
+        ),
         {"schema": KNOWLEDGE},
     )
 
