@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
 from app.knowledge.llm.base import LLMProvider
-from app.knowledge.llm.codex import CodexCliProvider
+from app.speech_structure.claude_provider import ClaudeCodeFailoverProvider
 from app.knowledge.models import Source, SourceSegment, SourceVersion
 from app.speech_structure.domain import SegmentRelation, StructureStatus
 from app.speech_structure.models import (
@@ -43,7 +43,7 @@ class SpeechStructureService:
         coverage_threshold: float = 0.95,
     ) -> None:
         self.database = database
-        self.provider = provider or CodexCliProvider()
+        self.provider = provider or ClaudeCodeFailoverProvider.from_environment()
         self.model = model
         self.window_seconds = window_seconds
         self.overlap_seconds = overlap_seconds
