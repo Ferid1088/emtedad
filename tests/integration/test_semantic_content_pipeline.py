@@ -322,7 +322,7 @@ async def test_semantic_ingestion_and_generation_preserve_source_data(
     provider = _Provider()
     embedding = _EmbeddingProvider()
     try:
-        prepared = await SemanticKnowledgePipeline(
+        pipeline = SemanticKnowledgePipeline(
             database,
             _Adapter(),
             provider,
@@ -330,7 +330,15 @@ async def test_semantic_ingestion_and_generation_preserve_source_data(
             extraction_window_size=8,
             extraction_overlap=0,
             semantic_overlap_segments=0,
-        ).ingest("semantic-pilot")
+        )
+        prepared = await pipeline.ingest("semantic-pilot")
+        backfilled = await pipeline.backfill_existing()
+
+        assert backfilled.attempted_source_versions == 1
+        assert backfilled.succeeded_source_versions == 1
+        assert backfilled.failed_source_version_ids == ()
+        assert backfilled.chunking_run_id == prepared.chunking_run_id
+        assert backfilled.embedding_model_id == prepared.embedding_model_id
 
         async with database.transaction() as session:
             source_segment_count_before = int(
