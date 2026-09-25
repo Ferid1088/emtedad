@@ -323,10 +323,7 @@ class _FailOnceProvider(_Provider):
         self.failed_once = False
 
     async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
-        if (
-            request.task == "semantic-transcript-global-tree"
-            and not self.failed_once
-        ):
+        if request.task == "semantic-transcript-global-tree" and not self.failed_once:
             self.failed_once = True
             raise RuntimeError("fixture semantic merge failure")
         return await super().extract(request)
