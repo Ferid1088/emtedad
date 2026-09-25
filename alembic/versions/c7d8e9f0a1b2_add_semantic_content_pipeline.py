@@ -55,11 +55,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "input_hash ~ '^[0-9a-f]{64}$'",
-            name="valid_input_hash",
+            name="ck_semantic_structure_runs_valid_input_hash",
         ),
         sa.CheckConstraint(
             "output_hash IS NULL OR output_hash ~ '^[0-9a-f]{64}$'",
-            name="valid_output_hash",
+            name="ck_semantic_structure_runs_valid_output_hash",
         ),
         schema="knowledge",
     )
@@ -147,23 +147,23 @@ def upgrade() -> None:
             "ordinal",
             name="uq_semantic_node_run_ordinal",
         ),
-        sa.CheckConstraint("depth > 0", name="positive_depth"),
-        sa.CheckConstraint("ordinal > 0", name="positive_ordinal"),
+        sa.CheckConstraint("depth > 0", name="ck_semantic_nodes_positive_depth"),
+        sa.CheckConstraint("ordinal > 0", name="ck_semantic_nodes_positive_ordinal"),
         sa.CheckConstraint(
             "start_sequence > 0",
-            name="positive_start_sequence",
+            name="ck_semantic_nodes_positive_start_sequence",
         ),
         sa.CheckConstraint(
             "end_sequence >= start_sequence",
-            name="valid_sequence_range",
+            name="ck_semantic_nodes_valid_sequence_range",
         ),
         sa.CheckConstraint(
             "end_seconds >= start_seconds",
-            name="valid_time_range",
+            name="ck_semantic_nodes_valid_time_range",
         ),
         sa.CheckConstraint(
             "content_hash ~ '^[0-9a-f]{64}$'",
-            name="valid_content_hash",
+            name="ck_semantic_nodes_valid_content_hash",
         ),
         schema="knowledge",
     )
@@ -244,11 +244,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.CheckConstraint(
             "target_duration_seconds >= 60",
-            name="valid_duration",
+            name="ck_generated_content_projects_valid_duration",
         ),
         sa.CheckConstraint(
             "target_word_count >= 100",
-            name="valid_word_count",
+            name="ck_generated_content_projects_valid_word_count",
         ),
         schema="content",
     )
@@ -277,10 +277,10 @@ def upgrade() -> None:
             "ordinal",
             name="uq_generated_content_section_ordinal",
         ),
-        sa.CheckConstraint("ordinal > 0", name="positive_ordinal"),
+        sa.CheckConstraint("ordinal > 0", name="ck_semantic_nodes_positive_ordinal"),
         sa.CheckConstraint(
             "target_word_count > 0",
-            name="positive_target_word_count",
+            name="ck_generated_content_sections_positive_target_word_count",
         ),
         schema="content",
     )
