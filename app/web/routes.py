@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
@@ -52,7 +53,6 @@ from app.content_strategy.text_library import (
 from app.core.ayin.models import CanonDocument
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
-from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.codex import CodexCliProvider
 from app.knowledge.models import (
     ExternalClaim,
@@ -66,7 +66,13 @@ from app.knowledge.models import (
 )
 from app.lecture.domain import MasterStatus
 from app.lecture.models import LectureMasterVersion
+from app.retrieval.domain import BuildStatus, QueryLanguage
 from app.retrieval.embeddings import EmbeddingProvider
+from app.retrieval.models import EmbeddingRun
+from app.semantic_content.generation import AutomatedContentService
+from app.semantic_content.ingestion import SemanticKnowledgePipeline
+from app.semantic_content.models import GeneratedContentProject
+from app.semantic_content.schemas import GenerateContentRequest
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
@@ -84,6 +90,26 @@ logger = logging.getLogger(__name__)
 
 def _database(request: Request) -> Database:
     return cast(Database, request.app.state.database)
+
+
+def _embedding_provider(request: Request) -> EmbeddingProvider:
+    return cast(EmbeddingProvider, request.app.state.embedding_provider)
+
+
+def _channel_service(request: Request) -> ChannelDiscoveryService:
+    return ChannelDiscoveryService(
+        _database(request),
+        embedding_provider=_embedding_provider(request),
+    )
+
+
+async def _latest_content_index(session: AsyncSession) -> EmbeddingRun | None:
+    return await session.scalar(
+        select(EmbeddingRun)
+        .where(EmbeddingRun.status == BuildStatus.SUCCEEDED)
+        .order_by(EmbeddingRun.completed_at.desc(), EmbeddingRun.created_at.desc())
+        .limit(1)
+    )
 
 
 async def _render(request: Request, name: str, **context: object) -> HTMLResponse:
@@ -188,10 +214,12 @@ async def add_source(request: Request) -> Response:
     locator = str(form.get("url", "")).strip()
     try:
         validate_youtube_url(locator)
-        importer = ExternalKnowledgeImporter(
-            _database(request), YouTubeAdapter(), CodexCliProvider()
-        )
-        await importer.ingest(locator)
+        result = await SemanticKnowledgePipeline(
+            _database(request),
+            YouTubeAdapter(),
+            CodexCliProvider(),
+            _embedding_provider(request),
+        ).ingest(locator)
     except ValueError as exc:
         return await _render(
             request, "source_new.html", title="Quelle hinzufügen", error=str(exc)
@@ -206,7 +234,10 @@ async def add_source(request: Request) -> Response:
                 "Bitte URL und Transkript prüfen."
             ),
         )
-    return RedirectResponse("/sources", status_code=303)
+    return RedirectResponse(
+        f"/sources/{result.source_id}?prepared=1",
+        status_code=303,
+    )
 
 
 @router.get("/sources/{source_id}", response_class=HTMLResponse)
@@ -1255,6 +1286,100 @@ async def studio(request: Request) -> HTMLResponse:
     return await _render(request, "studio.html", title="Studio", items=items)
 
 
+@router.get("/generator", response_class=HTMLResponse)
+async def content_generator(
+    request: Request,
+    error: str | None = None,
+) -> HTMLResponse:
+    async with _database(request).transaction() as session:
+        index = await _latest_content_index(session)
+        projects = list(
+            await session.scalars(
+                select(GeneratedContentProject)
+                .order_by(GeneratedContentProject.created_at.desc())
+                .limit(20)
+            )
+        )
+    messages = {
+        "no-index": (
+            "Die Wissensbasis ist noch nicht vollständig indexiert. "
+            "Importiere zuerst mindestens eine Quelle."
+        ),
+        "invalid": "Thema, Sprache oder Dauer sind ungültig.",
+        "failed": (
+            "Die Generierung konnte nicht abgeschlossen werden. "
+            "Bereits gespeicherte Wissensdaten blieben unverändert."
+        ),
+    }
+    return await _render(
+        request,
+        "content_generator.html",
+        title="Content Generator",
+        index=index,
+        projects=projects,
+        error=messages.get(error or ""),
+    )
+
+
+@router.post("/generator")
+async def generate_content_from_ui(request: Request) -> Response:
+    form = await request.form()
+    topic = str(form.get("topic", "")).strip()
+    language_value = str(form.get("language", "fa")).strip()
+    duration_value = str(form.get("duration_minutes", "20")).strip()
+    if (
+        len(topic) < 3
+        or language_value not in {item.value for item in QueryLanguage}
+        or not duration_value.isdigit()
+    ):
+        return RedirectResponse("/generator?error=invalid", status_code=303)
+    duration_minutes = int(duration_value)
+    if duration_minutes < 5 or duration_minutes > 60:
+        return RedirectResponse("/generator?error=invalid", status_code=303)
+    async with _database(request).transaction() as session:
+        index = await _latest_content_index(session)
+    if index is None:
+        return RedirectResponse("/generator?error=no-index", status_code=303)
+    try:
+        result = await AutomatedContentService(
+            _database(request),
+            _embedding_provider(request),
+            CodexCliProvider(),
+        ).generate(
+            GenerateContentRequest(
+                topic=topic,
+                language=QueryLanguage(language_value),
+                chunking_run_id=index.chunking_run_id,
+                embedding_model_id=index.embedding_model_id,
+                target_duration_seconds=duration_minutes * 60,
+            )
+        )
+    except Exception:
+        logger.exception("semantic_content.generation_failed")
+        return RedirectResponse("/generator?error=failed", status_code=303)
+    return RedirectResponse(f"/generator/{result.id}", status_code=303)
+
+
+@router.get("/generator/{project_id}", response_class=HTMLResponse)
+async def generated_content_detail(
+    request: Request, project_id: UUID
+) -> HTMLResponse:
+    try:
+        project = await AutomatedContentService(
+            _database(request),
+            _embedding_provider(request),
+            CodexCliProvider(),
+        ).project(project_id)
+    except ValueError:
+        return HTMLResponse("Generierter Inhalt nicht gefunden", status_code=404)
+    return await _render(
+        request,
+        "generated_content_detail.html",
+        title=project.topic,
+        project=project,
+    )
+
+
 @router.get("/studio/voice", response_class=HTMLResponse)
 async def studio_voice(request: Request) -> HTMLResponse:
     return await _render(
@@ -1338,7 +1463,7 @@ async def add_channel(request: Request) -> Response:
     form = await request.form()
     locator = str(form.get("url", "")).strip()
     try:
-        channel = await ChannelDiscoveryService(_database(request)).register(locator)
+        channel = await _channel_service(request).register(locator)
     except ValueError as exc:
         return await _render(
             request, "channel_new.html", title="Kanal hinzufügen", error=str(exc)
@@ -1355,7 +1480,7 @@ async def add_channel(request: Request) -> Response:
 
 @router.get("/channels/{channel_id}", response_class=HTMLResponse)
 async def channel_detail(request: Request, channel_id: UUID) -> HTMLResponse:
-    service = ChannelDiscoveryService(_database(request))
+    service = _channel_service(request)
     async with _database(request).transaction() as session:
         channel = await session.get(MonitoredChannel, channel_id)
     if channel is None:
@@ -1379,7 +1504,7 @@ async def channel_detail(request: Request, channel_id: UUID) -> HTMLResponse:
 @router.post("/channels/{channel_id}/check", response_class=HTMLResponse)
 async def check_channel(request: Request, channel_id: UUID) -> Response:
     try:
-        await ChannelDiscoveryService(_database(request)).discover(channel_id)
+        await _channel_service(request).discover(channel_id)
     except ValueError:
         return HTMLResponse("Kanal nicht gefunden", status_code=404)
     except Exception:
@@ -1393,7 +1518,7 @@ async def import_channel_candidates(request: Request, channel_id: UUID) -> Respo
     ignored = form.get("ignore_candidate")
     if ignored is not None:
         try:
-            await ChannelDiscoveryService(_database(request)).ignore(
+            await _channel_service(request).ignore(
                 channel_id, UUID(str(ignored))
             )
         except ValueError:
@@ -1404,10 +1529,10 @@ async def import_channel_candidates(request: Request, channel_id: UUID) -> Respo
         candidate_ids = [UUID(str(value)) for value in raw_ids]
     except ValueError:
         return HTMLResponse("Ungültige Videoauswahl", status_code=400)
-    results = await ChannelDiscoveryService(_database(request)).import_selected(
+    results = await _channel_service(request).import_selected(
         channel_id, candidate_ids
     )
-    service = ChannelDiscoveryService(_database(request))
+    service = _channel_service(request)
     async with _database(request).transaction() as session:
         channel = await session.get(MonitoredChannel, channel_id)
     if channel is None:
@@ -1432,13 +1557,13 @@ async def import_channel_candidates(request: Request, channel_id: UUID) -> Respo
 async def ignore_channel_candidate(
     request: Request, channel_id: UUID, candidate_id: UUID
 ) -> RedirectResponse:
-    await ChannelDiscoveryService(_database(request)).ignore(channel_id, candidate_id)
+    await _channel_service(request).ignore(channel_id, candidate_id)
     return RedirectResponse(f"/channels/{channel_id}", status_code=303)
 
 
 @router.post("/channels/{channel_id}/delete")
 async def delete_channel(request: Request, channel_id: UUID) -> Response:
-    deleted = await ChannelDiscoveryService(_database(request)).delete_channel(
+    deleted = await _channel_service(request).delete_channel(
         channel_id
     )
     if not deleted:
@@ -1448,7 +1573,7 @@ async def delete_channel(request: Request, channel_id: UUID) -> Response:
 
 @router.post("/channels/check-all", response_class=HTMLResponse)
 async def check_all_channels(request: Request) -> HTMLResponse:
-    service = ChannelDiscoveryService(_database(request))
+    service = _channel_service(request)
     channels_to_check = await service.active_channels()
     for channel in channels_to_check:
         try:
@@ -1493,7 +1618,7 @@ async def import_all_channel_candidates(request: Request) -> Response:
     grouped_ids: dict[UUID, list[UUID]] = {}
     for candidate in rows:
         grouped_ids.setdefault(candidate.channel_id, []).append(candidate.id)
-    service = ChannelDiscoveryService(_database(request))
+    service = _channel_service(request)
     for channel_id, candidate_ids in grouped_ids.items():
         await service.import_selected(channel_id, candidate_ids)
     return RedirectResponse("/channels", status_code=303)
