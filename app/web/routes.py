@@ -71,7 +71,11 @@ from app.retrieval.embeddings import EmbeddingProvider
 from app.retrieval.models import EmbeddingRun
 from app.semantic_content.generation import AutomatedContentService
 from app.semantic_content.ingestion import SemanticKnowledgePipeline
-from app.semantic_content.models import GeneratedContentProject
+from app.semantic_content.models import (
+    GeneratedContentProject,
+    PreferredSemanticStructureRun,
+    SemanticNode,
+)
 from app.semantic_content.schemas import GenerateContentRequest
 from app.topic_discovery import (
     TopicAnalysisService,
@@ -241,7 +245,11 @@ async def add_source(request: Request) -> Response:
 
 
 @router.get("/sources/{source_id}", response_class=HTMLResponse)
-async def source_detail(request: Request, source_id: UUID) -> HTMLResponse:
+async def source_detail(
+    request: Request,
+    source_id: UUID,
+    prepared: str | None = None,
+) -> HTMLResponse:
     async with _database(request).transaction() as session:
         source = await session.get(Source, source_id)
         if source is None:
@@ -298,6 +306,22 @@ async def source_detail(request: Request, source_id: UUID) -> HTMLResponse:
             if version_ids
             else []
         )
+        semantic_nodes: list[SemanticNode] = []
+        if versions:
+            preferred = await session.get(
+                PreferredSemanticStructureRun, versions[0].id
+            )
+            if preferred is not None:
+                semantic_nodes = list(
+                    await session.scalars(
+                        select(SemanticNode)
+                        .where(
+                            SemanticNode.semantic_structure_run_id
+                            == preferred.semantic_structure_run_id
+                        )
+                        .order_by(SemanticNode.ordinal)
+                    )
+                )
     return await _render(
         request,
         "source_detail.html",
@@ -307,6 +331,8 @@ async def source_detail(request: Request, source_id: UUID) -> HTMLResponse:
         mentions=mentions,
         claims=claims,
         reviews=reviews,
+        semantic_nodes=semantic_nodes,
+        prepared=prepared == "1",
     )
 
 
