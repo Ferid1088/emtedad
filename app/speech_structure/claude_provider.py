@@ -8,11 +8,11 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Final
 
 from pydantic import BaseModel, ValidationError
 
+from app.core.config import get_settings
 from app.knowledge.llm.base import StructuredExtractionRequest
 
 _FAILOVER_MARKERS: Final[tuple[str, ...]] = (
@@ -39,7 +39,7 @@ class ClaudeCodeFailoverError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class _Profile:
     name: str
-    config_dir: Path
+    oauth_token: str
 
 
 class ClaudeCodeFailoverProvider:
@@ -50,32 +50,37 @@ class ClaudeCodeFailoverProvider:
     def __init__(
         self,
         *,
-        primary_config_dir: Path,
-        secondary_config_dir: Path,
+        primary_oauth_token: str | None,
+        secondary_oauth_token: str | None,
         executable: str = "claude",
     ) -> None:
         self._executable = executable
-        self._profiles = (
-            _Profile("primary", primary_config_dir.expanduser()),
-            _Profile("secondary", secondary_config_dir.expanduser()),
+        self._profiles = tuple(
+            profile
+            for profile in (
+                _Profile("primary", primary_oauth_token or ""),
+                _Profile("secondary", secondary_oauth_token or ""),
+            )
+            if profile.oauth_token
         )
         self._disabled: set[str] = set()
 
     @classmethod
-    def from_environment(cls) -> "ClaudeCodeFailoverProvider":
+    def from_settings(cls) -> "ClaudeCodeFailoverProvider":
+        settings = get_settings()
+        primary = (
+            settings.claude_oauth_token_primary.get_secret_value()
+            if settings.claude_oauth_token_primary is not None
+            else None
+        )
+        secondary = (
+            settings.claude_oauth_token_secondary.get_secret_value()
+            if settings.claude_oauth_token_secondary is not None
+            else None
+        )
         return cls(
-            primary_config_dir=Path(
-                os.environ.get(
-                    "EMTEDAD_CLAUDE_PRIMARY_CONFIG_DIR",
-                    "~/.claude-emtedad-primary",
-                )
-            ),
-            secondary_config_dir=Path(
-                os.environ.get(
-                    "EMTEDAD_CLAUDE_SECONDARY_CONFIG_DIR",
-                    "~/.claude-emtedad-secondary",
-                )
-            ),
+            primary_oauth_token=primary,
+            secondary_oauth_token=secondary,
         )
 
     async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
@@ -86,6 +91,12 @@ class ClaudeCodeFailoverProvider:
         if executable is None:
             raise ClaudeCodeFailoverError(
                 "Claude Code CLI wurde nicht gefunden. Prüfe 'claude --version'."
+            )
+        if not self._profiles:
+            raise ClaudeCodeFailoverError(
+                "Keine Claude-Code-OAuth-Tokens konfiguriert. "
+                "Setze EMTEDAD_CLAUDE_OAUTH_TOKEN_PRIMARY und/oder "
+                "EMTEDAD_CLAUDE_OAUTH_TOKEN_SECONDARY in .env."
             )
 
         failures: list[str] = []
@@ -128,9 +139,9 @@ class ClaudeCodeFailoverProvider:
         )
 
         env = os.environ.copy()
-        env["CLAUDE_CONFIG_DIR"] = str(profile.config_dir)
         env.pop("ANTHROPIC_API_KEY", None)
         env.pop("ANTHROPIC_AUTH_TOKEN", None)
+        env["CLAUDE_CODE_OAUTH_TOKEN"] = profile.oauth_token
 
         command = [
             executable,
