@@ -130,22 +130,6 @@ class _Adapter:
         )
 
 
-class _FailOnceProvider(_Provider):
-    """Fail the first global merge to verify a persisted failed run can retry."""
-
-    def __init__(self) -> None:
-        self.failed_once = False
-
-    async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
-        if (
-            request.task == "semantic-transcript-global-tree"
-            and not self.failed_once
-        ):
-            self.failed_once = True
-            raise RuntimeError("fixture semantic merge failure")
-        return await super().extract(request)
-
-
 class _EmbeddingProvider:
     provider_name = "fixture"
     model_name = "fixture-e5"
@@ -330,6 +314,22 @@ class _Provider:
                 strengths_to_preserve=["پیوستگی سه بخش"],
             )
         raise AssertionError(f"unexpected task: {request.task}")
+
+
+class _FailOnceProvider(_Provider):
+    """Fail the first global merge to verify a persisted failed run can retry."""
+
+    def __init__(self) -> None:
+        self.failed_once = False
+
+    async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
+        if (
+            request.task == "semantic-transcript-global-tree"
+            and not self.failed_once
+        ):
+            self.failed_once = True
+            raise RuntimeError("fixture semantic merge failure")
+        return await super().extract(request)
 
 
 @pytest.mark.asyncio
