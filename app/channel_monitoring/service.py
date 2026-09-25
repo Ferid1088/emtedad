@@ -13,6 +13,8 @@ from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.codex import CodexCliProvider
 from app.knowledge.models import Source
+from app.retrieval.embeddings import EmbeddingProvider
+from app.semantic_content.ingestion import SemanticKnowledgePipeline
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,12 +34,22 @@ class ChannelDiscoveryService:
         *,
         adapter: YouTubeAdapter | None = None,
         importer: ExternalKnowledgeImporter | None = None,
+        embedding_provider: EmbeddingProvider | None = None,
+        pipeline: SemanticKnowledgePipeline | None = None,
     ) -> None:
         self.database = database
         self.adapter = adapter or YouTubeAdapter()
         self.importer = importer or ExternalKnowledgeImporter(
             database, self.adapter, CodexCliProvider()
         )
+        self.pipeline = pipeline
+        if self.pipeline is None and embedding_provider is not None:
+            self.pipeline = SemanticKnowledgePipeline(
+                database,
+                self.adapter,
+                CodexCliProvider(),
+                embedding_provider,
+            )
 
     async def register(self, locator: str) -> MonitoredChannel:
         snapshot = await self.adapter.resolve_channel(locator)
@@ -165,7 +177,12 @@ class ChannelDiscoveryService:
         results: list[CandidateImportResult] = []
         for candidate_id, video_id in work:
             try:
-                imported = await self.importer.ingest(video_id)
+                if self.pipeline is not None:
+                    prepared = await self.pipeline.ingest(video_id)
+                    imported_source_id = prepared.source_id
+                else:
+                    imported = await self.importer.ingest(video_id)
+                    imported_source_id = imported.source_id
             except Exception as exc:
                 message = "Import fehlgeschlagen; der Versuch kann wiederholt werden."
                 async with self.database.transaction() as session:
@@ -181,7 +198,7 @@ class ChannelDiscoveryService:
                     updated = await session.get(ChannelVideoCandidate, candidate_id)
                     if updated is not None:
                         updated.status = CandidateStatus.IMPORTED
-                        updated.imported_source_id = imported.source_id
+                        updated.imported_source_id = imported_source_id
                         updated.last_error = None
                 results.append(
                     CandidateImportResult(candidate_id, video_id, True, "importiert")
