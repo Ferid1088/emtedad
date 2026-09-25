@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.db.session import Database
 from app.knowledge.models import Source, SourceSegment, SourceVersion
-from app.speech_structure.models import SpeechStructure
+from app.speech_structure.models import SpeechStructure, SpeechStructureRun
 from app.speech_structure.service import SpeechStructureService
 
 router = APIRouter(tags=["owner-speech-structure"])
@@ -89,6 +89,13 @@ async def speech_structure_detail(
             .where(SpeechStructure.source_id == source_id)
             .order_by(SpeechStructure.version.desc())
         )
+        latest_run = None
+        if structure is not None:
+            latest_run = await session.scalar(
+                select(SpeechStructureRun)
+                .where(SpeechStructureRun.speech_structure_id == structure.id)
+                .order_by(SpeechStructureRun.created_at.desc())
+            )
     tree = []
     report = None
     selected = None
@@ -108,6 +115,7 @@ async def speech_structure_detail(
             "title": "Vortragsstruktur",
             "source": source,
             "structure": structure,
+            "latest_run": latest_run,
             "tree": tree,
             "report": report,
             "selected": selected,
