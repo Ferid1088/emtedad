@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import TypeVar
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.db.session import Database
@@ -51,7 +53,7 @@ AUDIT = """Audit the full draft without rewriting it. Report only meaningful rep
 abrupt transitions, concepts used before definition, contradictions, unsupported statements,
 missing logical steps, or conclusions that introduce new claims."""
 
-REVISE = """Revise only the problems identified by the audit. Preserve the argument,
+TModel = TypeVar("TModel", bound=BaseModel)\n\n\nREVISE = """Revise only the problems identified by the audit. Preserve the argument,
 qualifications, and evidence boundary. Improve flow surgically and introduce no new facts."""
 
 
@@ -378,9 +380,9 @@ class AutomatedContentService:
         model: str,
         instructions: str,
         payload: dict[str, object],
-        output_model: type,
+        output_model: type[TModel],
         timeout: int = 180,
-    ):
+    ) -> TModel:
         result = await self._llm.extract(
             StructuredExtractionRequest(
                 task=task,
