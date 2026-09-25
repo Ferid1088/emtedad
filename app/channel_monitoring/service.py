@@ -218,7 +218,8 @@ class ChannelDiscoveryService:
                         candidate_id,
                         video_id,
                         False,
-                        "Quelle gespeichert; Wissensindex konnte nicht erneuert werden.",
+                        "Quelle gespeichert; Wissensindex konnte nicht " \
+                        "erneuert werden.",
                     )
             else:
                 async with self.database.transaction() as session:
