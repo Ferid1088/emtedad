@@ -150,9 +150,7 @@ class SemanticStructureService:
                 nodes = list(
                     await session.scalars(
                         select(SemanticNode)
-                        .where(
-                            SemanticNode.semantic_structure_run_id == stored_run.id
-                        )
+                        .where(SemanticNode.semantic_structure_run_id == stored_run.id)
                         .order_by(SemanticNode.ordinal)
                     )
                 )
@@ -164,9 +162,7 @@ class SemanticStructureService:
                 stored_run.status = SemanticStructureStatus.SUCCEEDED.value
                 stored_run.completed_at = datetime.now(UTC)
                 if request.make_preferred:
-                    await self._set_preferred(
-                        session, source_version_id, stored_run.id
-                    )
+                    await self._set_preferred(session, source_version_id, stored_run.id)
                 return await self._read(session, stored_run)
         except Exception as exc:
             async with self._database.transaction() as session:
