@@ -54,16 +54,16 @@ class ClaudeCodeFailoverProvider:
     def __init__(
         self,
         *,
-        primary_oauth_token: str | None,
-        secondary_oauth_token: str | None,
+        work_oauth_token: str | None,
+        personal_oauth_token: str | None,
         executable: str = "claude",
     ) -> None:
         self._executable = executable
         self._profiles = tuple(
             profile
             for profile in (
-                _Profile("primary", primary_oauth_token or ""),
-                _Profile("secondary", secondary_oauth_token or ""),
+                _Profile("work", work_oauth_token or ""),
+                _Profile("personal", personal_oauth_token or ""),
             )
             if profile.oauth_token
         )
@@ -72,19 +72,19 @@ class ClaudeCodeFailoverProvider:
     @classmethod
     def from_settings(cls) -> "ClaudeCodeFailoverProvider":
         settings = get_settings()
-        primary = (
-            settings.claude_oauth_token_primary.get_secret_value()
-            if settings.claude_oauth_token_primary is not None
+        work = (
+            settings.claude_oauth_token_work.get_secret_value()
+            if settings.claude_oauth_token_work is not None
             else None
         )
-        secondary = (
-            settings.claude_oauth_token_secondary.get_secret_value()
-            if settings.claude_oauth_token_secondary is not None
+        personal = (
+            settings.claude_oauth_token_personal.get_secret_value()
+            if settings.claude_oauth_token_personal is not None
             else None
         )
         return cls(
-            primary_oauth_token=primary,
-            secondary_oauth_token=secondary,
+            work_oauth_token=work,
+            personal_oauth_token=personal,
         )
 
     async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
@@ -99,8 +99,8 @@ class ClaudeCodeFailoverProvider:
         if not self._profiles:
             raise ClaudeCodeFailoverError(
                 "Keine Claude-Code-OAuth-Tokens konfiguriert. "
-                "Setze EMTEDAD_CLAUDE_OAUTH_TOKEN_PRIMARY und/oder "
-                "EMTEDAD_CLAUDE_OAUTH_TOKEN_SECONDARY in .env."
+                "Setze EMTEDAD_CLAUDE_OAUTH_TOKEN_WORK und/oder "
+                "EMTEDAD_CLAUDE_OAUTH_TOKEN_PERSONAL in .env."
             )
 
         failures: list[str] = []
