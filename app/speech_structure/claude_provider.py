@@ -29,6 +29,10 @@ _FAILOVER_MARKERS: Final[tuple[str, ...]] = (
     "login expired",
     "please run /login",
     "invalid authentication credentials",
+    "invalid bearer token",
+    "failed to authenticate",
+    "authentication_error",
+    "401",
 )
 
 
@@ -107,7 +111,7 @@ class ClaudeCodeFailoverProvider:
                 return self._run_profile(executable, profile, request)
             except ClaudeCodeFailoverError as exc:
                 message = str(exc)
-                failures.append(f"{profile.name}: {message}")
+                failures.append(message)
                 if self._should_failover(message):
                     self._disabled.add(profile.name)
                     continue
