@@ -7,7 +7,7 @@ import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
@@ -106,6 +106,11 @@ class SemanticStructureService:
                 # Failed/stale runs keep their stable identity and are retried in place.
                 # This avoids violating uq_semantic_structure_run_identity on retry.
                 run = existing
+                await session.execute(
+                    delete(SemanticNode).where(
+                        SemanticNode.semantic_structure_run_id == run.id
+                    )
+                )
                 run.configuration = configuration
                 run.status = SemanticStructureStatus.RUNNING.value
                 run.window_count = 0
