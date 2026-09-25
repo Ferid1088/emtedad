@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     storage_root: Path
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     log_json: bool = True
-    claude_oauth_token_primary: SecretStr | None = None
-    claude_oauth_token_secondary: SecretStr | None = None
+    claude_oauth_token_work: SecretStr | None = None
+    claude_oauth_token_personal: SecretStr | None = None
 
     @field_validator("database_url")
     @classmethod
