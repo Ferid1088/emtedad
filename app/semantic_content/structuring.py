@@ -129,19 +129,13 @@ class SemanticStructureService:
                 },
                 ensure_ascii=False,
             )
-            raw_tree = await self._provider.extract(
-                StructuredExtractionRequest(
-                    task="semantic-transcript-global-tree",
-                    prompt_version=request.prompt_version,
-                    model=request.model,
-                    instructions=GLOBAL_INSTRUCTIONS,
-                    input_text=merge_input,
-                    output_model=GlobalOutline,
-                    timeout_seconds=240,
-                )
+            outline = await self._build_valid_global_outline(
+                merge_input=merge_input,
+                source_title=source.title,
+                minimum_sequence=segments[0].sequence,
+                maximum_sequence=segments[-1].sequence,
+                request=request,
             )
-            outline = GlobalOutline.model_validate(raw_tree)
-            self._validate_outline(outline, segments[0].sequence, segments[-1].sequence)
             async with self._database.transaction() as session:
                 stored_run = await session.get(SemanticStructureRun, run_id)
                 if stored_run is None:
@@ -186,6 +180,66 @@ class SemanticStructureService:
             if run is None:
                 raise RuntimeError("preferred semantic structure run disappeared")
             return await self._read(session, run)
+
+    async def _build_valid_global_outline(
+        self,
+        *,
+        merge_input: str,
+        source_title: str,
+        minimum_sequence: int,
+        maximum_sequence: int,
+        request: SemanticStructureRequest,
+    ) -> GlobalOutline:
+        """Retry only the global merge when the model returns an invalid hierarchy."""
+
+        repair_context: dict[str, object] | None = None
+        last_error: ValueError | None = None
+        for attempt in range(1, 4):
+            instructions = GLOBAL_INSTRUCTIONS
+            input_text = merge_input
+            if repair_context is not None:
+                instructions += (
+                    "\nThe previous hierarchy failed deterministic validation. "
+                    "Repair only the hierarchy/ranges; keep the source meaning, titles, "
+                    "claims, examples, and qualifications grounded in the supplied "
+                    "local outlines. Top-level sections must be source-ordered and "
+                    "non-overlapping; every child must stay inside its parent."
+                )
+                input_text = json.dumps(repair_context, ensure_ascii=False)
+            raw_tree = await self._provider.extract(
+                StructuredExtractionRequest(
+                    task="semantic-transcript-global-tree",
+                    prompt_version=f"{request.prompt_version}-merge-{attempt}",
+                    model=request.model,
+                    instructions=instructions,
+                    input_text=input_text,
+                    output_model=GlobalOutline,
+                    timeout_seconds=240,
+                )
+            )
+            outline = GlobalOutline.model_validate(raw_tree)
+            try:
+                self._validate_outline(
+                    outline,
+                    minimum_sequence,
+                    maximum_sequence,
+                )
+                return outline
+            except ValueError as exc:
+                last_error = exc
+                repair_context = {
+                    "source_title": source_title,
+                    "valid_sequence_range": [
+                        minimum_sequence,
+                        maximum_sequence,
+                    ],
+                    "validation_error": str(exc),
+                    "invalid_outline": outline.model_dump(mode="json"),
+                    "local_outline_context": json.loads(merge_input),
+                }
+        raise ValueError(
+            f"semantic hierarchy remained invalid after repair attempts: {last_error}"
+        )
 
     @staticmethod
     def _input_hash(
