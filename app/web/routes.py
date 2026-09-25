@@ -53,7 +53,7 @@ from app.content_strategy.text_library import (
 from app.core.ayin.models import CanonDocument
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.codex import CodexCliProvider, CodexProviderError
 from app.knowledge.models import (
     ExternalClaim,
     Mention,
@@ -75,8 +75,13 @@ from app.semantic_content.models import (
     GeneratedContentProject,
     PreferredSemanticStructureRun,
     SemanticNode,
+    SemanticStructureRun,
 )
-from app.semantic_content.schemas import GenerateContentRequest
+from app.semantic_content.schemas import (
+    GenerateContentRequest,
+    SemanticStructureRequest,
+)
+from app.semantic_content.structuring import SemanticStructureService
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
@@ -206,6 +211,142 @@ async def sources(request: Request) -> HTMLResponse:
         segment_counts=segment_counts,
         error=None,
     )
+
+
+async def _structure_page_rows(request: Request) -> list[dict[str, object]]:
+    """Build one row per source using its newest immutable transcript version."""
+
+    async with _database(request).transaction() as session:
+        sources = list(
+            await session.scalars(select(Source).order_by(Source.created_at.desc()))
+        )
+        versions = list(
+            await session.scalars(
+                select(SourceVersion).order_by(
+                    SourceVersion.source_id,
+                    SourceVersion.acquired_at.desc(),
+                    SourceVersion.created_at.desc(),
+                )
+            )
+        )
+        latest_by_source: dict[UUID, SourceVersion] = {}
+        for version in versions:
+            latest_by_source.setdefault(version.source_id, version)
+        version_ids = [version.id for version in latest_by_source.values()]
+        pointers: dict[UUID, PreferredSemanticStructureRun] = {}
+        latest_runs: dict[UUID, SemanticStructureRun] = {}
+        if version_ids:
+            for pointer in await session.scalars(
+                select(PreferredSemanticStructureRun).where(
+                    PreferredSemanticStructureRun.source_version_id.in_(version_ids)
+                )
+            ):
+                pointers[pointer.source_version_id] = pointer
+            runs = list(
+                await session.scalars(
+                    select(SemanticStructureRun)
+                    .where(SemanticStructureRun.source_version_id.in_(version_ids))
+                    .order_by(
+                        SemanticStructureRun.source_version_id,
+                        SemanticStructureRun.created_at.desc(),
+                    )
+                )
+            )
+            for run in runs:
+                latest_runs.setdefault(run.source_version_id, run)
+
+        rows: list[dict[str, object]] = []
+        for source in sources:
+            version = latest_by_source.get(source.id)
+            if version is None:
+                continue
+            pointer = pointers.get(version.id)
+            run = latest_runs.get(version.id)
+            rows.append(
+                {
+                    "source": source,
+                    "version": version,
+                    "preferred": pointer is not None,
+                    "run": run,
+                }
+            )
+        return rows
+
+
+@router.get("/structures", response_class=HTMLResponse)
+@router.get("/vortragsstruktur", response_class=HTMLResponse)
+async def semantic_structures(
+    request: Request,
+    failed: str | None = None,
+    created: str | None = None,
+    batch: str | None = None,
+) -> HTMLResponse:
+    return await _render(
+        request,
+        "semantic_structures.html",
+        title="Vortragsstruktur",
+        rows=await _structure_page_rows(request),
+        failed=failed,
+        created=created,
+        batch=batch,
+    )
+
+
+@router.post("/structures/{source_version_id}")
+async def build_semantic_structure_from_ui(
+    request: Request,
+    source_version_id: UUID,
+) -> RedirectResponse:
+    try:
+        await SemanticStructureService(
+            _database(request),
+            CodexCliProvider(),
+        ).build(
+            source_version_id,
+            SemanticStructureRequest(),
+        )
+    except (CodexProviderError, ValueError):
+        logger.exception(
+            "semantic_structure.ui_build_failed",
+            extra={"source_version_id": str(source_version_id)},
+        )
+        return RedirectResponse(
+            f"/structures?failed={source_version_id}",
+            status_code=303,
+        )
+    except Exception:
+        logger.exception(
+            "semantic_structure.ui_unexpected_failure",
+            extra={"source_version_id": str(source_version_id)},
+        )
+        return RedirectResponse(
+            f"/structures?failed={source_version_id}",
+            status_code=303,
+        )
+    return RedirectResponse(
+        f"/structures?created={source_version_id}",
+        status_code=303,
+    )
+
+
+@router.post("/structures/build-missing")
+async def build_missing_semantic_structures(request: Request) -> RedirectResponse:
+    try:
+        result = await SemanticKnowledgePipeline(
+            _database(request),
+            YouTubeAdapter(),
+            CodexCliProvider(),
+            _embedding_provider(request),
+        ).backfill_existing()
+    except Exception:
+        logger.exception("semantic_structure.backfill_failed")
+        return RedirectResponse("/structures?batch=failed", status_code=303)
+    state = (
+        "ok"
+        if not result.failed_source_version_ids
+        else f"partial-{len(result.failed_source_version_ids)}"
+    )
+    return RedirectResponse(f"/structures?batch={state}", status_code=303)
 
 
 @router.get("/sources/new", response_class=HTMLResponse)
