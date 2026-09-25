@@ -8,9 +8,9 @@ from uuid import uuid4
 
 import psycopg
 import pytest
-from pydantic import BaseModel
 from alembic.config import Config
 from psycopg import sql
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.engine import URL, make_url
 

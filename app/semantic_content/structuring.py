@@ -35,10 +35,11 @@ Use only ideas supported by the supplied segments. Every node must use exact inc
 segment sequence numbers. Prefer conceptual boundaries over equal token sizes. Merge
 repetition. Do not invent claims, examples, names, or references."""
 
-GLOBAL_INSTRUCTIONS = """Merge the local outlines into one coherent nested agenda for the
-whole speech. Preserve source order and exact segment ranges. Remove overlap introduced
-by windows. Children must stay inside parent ranges. Prefer 3-8 top-level sections and
-create deeper children only when the source genuinely has conceptual substructure."""
+GLOBAL_INSTRUCTIONS = """Merge the local outlines into one coherent nested
+agenda for the whole speech. Preserve source order and exact segment ranges. Remove
+overlap introduced by windows. Children must stay inside parent ranges. Prefer 3-8
+top-level sections and create deeper children only when the source genuinely has
+conceptual substructure."""
 
 
 class SemanticStructureService:

@@ -495,7 +495,11 @@ class AutomatedContentService:
 
     @staticmethod
     def _merge(existing: object, additions: list[str]) -> list[str]:
-        values = (\n            [str(value) for value in existing]\n            if isinstance(existing, list)\n            else []\n        )
+        values = (
+            [str(value) for value in existing]
+            if isinstance(existing, list)
+            else []
+        )
         seen = set(values)
         for value in additions:
             if value not in seen:
