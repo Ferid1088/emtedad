@@ -174,31 +174,102 @@ class ChannelDiscoveryService:
             work = [
                 (candidate.id, candidate.youtube_video_id) for candidate in candidates
             ]
+
+        if self.pipeline is None:
+            return await self._import_without_semantic_pipeline(work)
+
+        # Semantic extraction is source-specific, but chunk/embedding refresh is global.
+        # Batch imports therefore refresh the retrieval index only once.
+        prepared: list[tuple[UUID, str, UUID]] = []
+        results: dict[UUID, CandidateImportResult] = {}
+        for candidate_id, video_id in work:
+            try:
+                source = await self.pipeline.ingest_source(video_id)
+            except Exception as exc:
+                async with self.database.transaction() as session:
+                    updated = await session.get(ChannelVideoCandidate, candidate_id)
+                    if updated is not None:
+                        updated.status = CandidateStatus.FAILED
+                        updated.last_error = type(exc).__name__
+                results[candidate_id] = CandidateImportResult(
+                    candidate_id,
+                    video_id,
+                    False,
+                    "Import fehlgeschlagen; der Versuch kann wiederholt werden.",
+                )
+            else:
+                prepared.append((candidate_id, video_id, source.source_id))
+
+        if prepared:
+            try:
+                await self.pipeline.refresh_index()
+            except Exception as exc:
+                async with self.database.transaction() as session:
+                    for candidate_id, _video_id, source_id in prepared:
+                        updated = await session.get(
+                            ChannelVideoCandidate, candidate_id
+                        )
+                        if updated is not None:
+                            updated.status = CandidateStatus.FAILED
+                            updated.imported_source_id = source_id
+                            updated.last_error = f"index:{type(exc).__name__}"
+                for candidate_id, video_id, _source_id in prepared:
+                    results[candidate_id] = CandidateImportResult(
+                        candidate_id,
+                        video_id,
+                        False,
+                        "Quelle gespeichert; Wissensindex konnte nicht erneuert werden.",
+                    )
+            else:
+                async with self.database.transaction() as session:
+                    for candidate_id, _video_id, source_id in prepared:
+                        updated = await session.get(
+                            ChannelVideoCandidate, candidate_id
+                        )
+                        if updated is not None:
+                            updated.status = CandidateStatus.IMPORTED
+                            updated.imported_source_id = source_id
+                            updated.last_error = None
+                for candidate_id, video_id, _source_id in prepared:
+                    results[candidate_id] = CandidateImportResult(
+                        candidate_id, video_id, True, "importiert"
+                    )
+
+        return [
+            results[candidate_id]
+            for candidate_id, _video_id in work
+            if candidate_id in results
+        ]
+
+    async def _import_without_semantic_pipeline(
+        self, work: list[tuple[UUID, str]]
+    ) -> list[CandidateImportResult]:
+        """Compatibility path for tests and callers that do not provide embeddings."""
+
         results: list[CandidateImportResult] = []
         for candidate_id, video_id in work:
             try:
-                if self.pipeline is not None:
-                    prepared = await self.pipeline.ingest(video_id)
-                    imported_source_id = prepared.source_id
-                else:
-                    imported = await self.importer.ingest(video_id)
-                    imported_source_id = imported.source_id
+                imported = await self.importer.ingest(video_id)
             except Exception as exc:
-                message = "Import fehlgeschlagen; der Versuch kann wiederholt werden."
                 async with self.database.transaction() as session:
                     updated = await session.get(ChannelVideoCandidate, candidate_id)
                     if updated is not None:
                         updated.status = CandidateStatus.FAILED
                         updated.last_error = type(exc).__name__
                 results.append(
-                    CandidateImportResult(candidate_id, video_id, False, message)
+                    CandidateImportResult(
+                        candidate_id,
+                        video_id,
+                        False,
+                        "Import fehlgeschlagen; der Versuch kann wiederholt werden.",
+                    )
                 )
             else:
                 async with self.database.transaction() as session:
                     updated = await session.get(ChannelVideoCandidate, candidate_id)
                     if updated is not None:
                         updated.status = CandidateStatus.IMPORTED
-                        updated.imported_source_id = imported_source_id
+                        updated.imported_source_id = imported.source_id
                         updated.last_error = None
                 results.append(
                     CandidateImportResult(candidate_id, video_id, True, "importiert")
