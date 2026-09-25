@@ -30,7 +30,6 @@ from app.dialogue.schemas import (
 )
 from app.dialogue.service import DialogueService
 from app.knowledge.adapters.youtube import YouTubeAdapter
-from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.codex import CodexCliProvider
 from app.knowledge.media import MediaService
 from app.knowledge.resolution import (
