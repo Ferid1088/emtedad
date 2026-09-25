@@ -61,6 +61,23 @@ class ClaudeCodeFailoverProvider:
         )
         self._disabled: set[str] = set()
 
+    @classmethod
+    def from_environment(cls) -> "ClaudeCodeFailoverProvider":
+        return cls(
+            primary_config_dir=Path(
+                os.environ.get(
+                    "EMTEDAD_CLAUDE_PRIMARY_CONFIG_DIR",
+                    "~/.claude-emtedad-primary",
+                )
+            ),
+            secondary_config_dir=Path(
+                os.environ.get(
+                    "EMTEDAD_CLAUDE_SECONDARY_CONFIG_DIR",
+                    "~/.claude-emtedad-secondary",
+                )
+            ),
+        )
+
     async def extract(self, request: StructuredExtractionRequest) -> BaseModel:
         return await asyncio.to_thread(self._extract_sync, request)
 
