@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Automatisch erzeugter Inhalt</p>
+    <h1 dir="auto">{{ project.topic }}</h1>
+    <p class="lede">{{ project.target_duration_seconds // 60 }} Minuten · Ziel ca. {{ project.target_word_count }} Wörter · {{ project.status }}</p>
+  </div>
+  <a class="button secondary" href="/generator">Neuer Inhalt</a>
+</div>
+
+<section class="card">
+  <h2>Pipeline</h2>
+  <p>
+    Research{% if project.plan %} ✓{% endif %}
+    → Synthese{% if project.synthesis %} ✓{% endif %}
+    → Outline{% if project.outline %} ✓{% endif %}
+    → Schreiben{% if project.sections %} ✓{% endif %}
+    → Kohärenz{% if project.coherence_report %} ✓{% endif %}
+  </p>
+  <p class="muted">Provenienz vollständig: {{ "ja" if project.provenance_complete else "nein" }}</p>
+</section>
+
+{% if project.outline %}
+<section class="card">
+  <h2>Struktur</h2>
+  {% for section in project.outline.get("sections", []) %}
+  <article class="suggestion">
+    <h3>{{ loop.index }}. {{ section.get("title", "") }}</h3>
+    <p>{{ section.get("purpose", "") }}</p>
+    {% if section.get("transition_from_previous") %}<p class="muted">{{ section.get("transition_from_previous") }}</p>{% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Abschnitte und Evidence Packs</h2>
+  {% for section in project.sections %}
+  <article class="suggestion">
+    <h3>{{ section.ordinal }}. {{ section.title }}</h3>
+    <p>{{ section.purpose }}</p>
+    {% if section.transition_from_previous %}<p class="muted">Übergang: {{ section.transition_from_previous }}</p>{% endif %}
+    {% if section.draft_text %}
+    <details>
+      <summary>Abschnitt anzeigen</summary>
+      <div dir="auto" style="white-space: pre-wrap">{{ section.draft_text }}</div>
+    </details>
+    {% endif %}
+    <details>
+      <summary>Evidence Pack anzeigen</summary>
+      <pre dir="auto" style="white-space: pre-wrap">{{ section.evidence_pack | tojson(indent=2) }}</pre>
+    </details>
+  </article>
+  {% else %}
+  <p class="muted">Noch keine Abschnitte gespeichert.</p>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <h2>Finaler Text</h2>
+  {% if project.final_script %}
+  <div dir="auto" style="white-space: pre-wrap">{{ project.final_script }}</div>
+  {% else %}
+  <p class="muted">Noch kein finaler Text verfügbar.</p>
+  {% endif %}
+</section>
+
+{% if project.coherence_report %}
+<section class="card">
+  <h2>Kohärenzprüfung</h2>
+  <pre dir="auto" style="white-space: pre-wrap">{{ project.coherence_report | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+{% endblock %}
