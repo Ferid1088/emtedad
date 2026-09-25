@@ -32,6 +32,7 @@ class CodexCliProvider:
                 "Codex CLI wurde nicht gefunden. Starte die App aus einer Shell, "
                 "in der 'codex --version' funktioniert."
             )
+        raw_output = ""
         with tempfile.TemporaryDirectory(prefix="emtedad-codex-") as directory:
             root = Path(directory)
             schema_path = root / "schema.json"
@@ -81,17 +82,16 @@ class CodexCliProvider:
                 )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 raise CodexProviderError(type(exc).__name__) from exc
+            if output_path.exists():
+                try:
+                    raw_output = output_path.read_text(encoding="utf-8").strip()
+                except OSError:
+                    raw_output = ""
         if result.returncode != 0:
             diagnostic = _safe_diagnostic(result.stderr)
             raise CodexProviderError(
                 f"codex exec failed (exit {result.returncode}): {diagnostic}"
             )
-        raw_output = ""
-        try:
-            if output_path.exists():
-                raw_output = output_path.read_text(encoding="utf-8").strip()
-        except OSError:
-            raw_output = ""
         if not raw_output:
             raw_output = result.stdout.strip()
         try:
