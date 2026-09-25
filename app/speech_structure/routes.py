@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from app.db.session import Database
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.codex import CodexCliProvider, CodexProviderError
 from app.knowledge.models import Source, SourceSegment, SourceVersion
 from app.speech_structure.models import SpeechStructure
 from app.speech_structure.service import SpeechStructureService
@@ -63,7 +63,13 @@ async def generate_speech_structure(
     request: Request, source_id: UUID
 ) -> RedirectResponse:
     service = SpeechStructureService(_database(request), CodexCliProvider())
-    await service.create_for_source(source_id)
+    try:
+        await service.create_for_source(source_id)
+    except (CodexProviderError, ValueError):
+        return RedirectResponse(
+            f"/speech-structures/{source_id}?generation_error=1",
+            status_code=303,
+        )
     return RedirectResponse(f"/speech-structures/{source_id}", status_code=303)
 
 
