@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Automatische Produktion</p>
+    <h1>Content Generator</h1>
+    <p class="lede">Thema eingeben → Recherche → Synthese → Struktur → Entwurf → Kohärenzprüfung.</p>
+  </div>
+</div>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>Neuen Inhalt erzeugen</h2>
+  {% if index %}
+  <p class="muted">Wissensindex ist bereit. Die Generierung verwendet nur die aktuelle externe Wissensbasis und deren Provenienz.</p>
+  <form method="post" action="/generator">
+    <label>Thema oder Leitfrage
+      <textarea name="topic" rows="4" required placeholder="z. B. چگونه خودآگاهی در رابطه با دیگری شکل می‌گیرد؟"></textarea>
+    </label>
+    <div class="columns">
+      <label>Sprache
+        <select name="language">
+          <option value="fa" selected>فارسی</option>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+      </label>
+      <label>Dauer
+        <select name="duration_minutes">
+          <option value="10">10 Minuten</option>
+          <option value="15">15 Minuten</option>
+          <option value="20" selected>20 Minuten</option>
+          <option value="30">30 Minuten</option>
+          <option value="45">45 Minuten</option>
+          <option value="60">60 Minuten</option>
+        </select>
+      </label>
+    </div>
+    <button class="button" type="submit">Research + Text automatisch erstellen</button>
+  </form>
+  {% else %}
+  <p class="warning">Noch kein fertiger Wissensindex. Importiere zuerst eine YouTube-Quelle; Transkript, semantische Struktur, Chunks und Embeddings werden danach automatisch vorbereitet.</p>
+  <a class="button" href="/sources/new">Quelle hinzufügen</a>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Letzte Generierungen</h2>
+  {% for project in projects %}
+  <article class="suggestion">
+    <div class="topic-card-head">
+      <span class="badge">{{ project.language|upper }}</span>
+      <span class="badge">{{ project.status }}</span>
+    </div>
+    <h3><a href="/generator/{{ project.id }}">{{ project.topic }}</a></h3>
+    <p>{{ project.target_duration_seconds // 60 }} Minuten · Ziel ca. {{ project.target_word_count }} Wörter</p>
+  </article>
+  {% else %}
+  <p class="muted">Noch keine automatischen Inhalte erzeugt.</p>
+  {% endfor %}
+</section>
+{% endblock %}
