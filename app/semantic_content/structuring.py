@@ -86,7 +86,7 @@ class SemanticStructureService:
                     await self._set_preferred(session, source_version_id, existing.id)
                 return await self._read(session, existing)
 
-            configuration = {
+            configuration: dict[str, object] = {
                 "max_window_characters": request.max_window_characters,
                 "overlap_segments": request.overlap_segments,
             }
