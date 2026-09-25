@@ -31,33 +31,37 @@ from app.semantic_content.schemas import (
     SynthesisSpec,
 )
 
-PLAN = """Design 4-8 narrow research queries for one coherent long-form spoken script.
-Do not write the script. Cover the central question from complementary angles and include
-tension, limits, or counterpoints when relevant."""
+PLAN = """Design 4-8 narrow research queries for one coherent long-form
+spoken script. Do not write the script. Cover the central question from
+complementary angles and include tension, limits, or counterpoints when relevant."""
 
-SYNTHESIZE = """Synthesize retrieved candidates into a compact knowledge map. Deduplicate
-repeated ideas, cluster related material, preserve disagreement and uncertainty, and never
-invent or alter candidate IDs or source metadata. Semantic families are context, not proof
-that every sentence in the family supports every claim."""
+SYNTHESIZE = """Synthesize retrieved candidates into a compact knowledge map.
+Deduplicate repeated ideas, cluster related material, preserve disagreement and
+uncertainty, and never invent or alter candidate IDs or source metadata. Semantic
+families are context, not proof that every sentence in the family supports every
+claim."""
 
 ARCHITECT = """Create one coherent 4-6 section spoken-content outline when possible.
-Every section must advance the central question and transition naturally from the previous
-section. Use only supplied cluster IDs and distribute the target word budget across sections."""
+Every section must advance the central question and transition naturally from the
+previous section. Use only supplied cluster IDs and distribute the target word
+budget across sections."""
 
-WRITE = """Write only this section of a spoken script. The evidence pack is the factual
-boundary. Explain difficult ideas simply, preserve uncertainty, and avoid repeating concepts
-already covered. Do not mention retrieval, chunks, prompts, or candidate IDs. Do not invent
-facts, people, studies, quotations, or examples."""
+WRITE = """Write only this section of a spoken script. The evidence pack is the
+factual boundary. Explain difficult ideas simply, preserve uncertainty, and avoid
+repeating concepts already covered. Do not mention retrieval, chunks, prompts, or
+candidate IDs. Do not invent facts, people, studies, quotations, or examples."""
 
-AUDIT = """Audit the full draft without rewriting it. Report only meaningful repetition,
-abrupt transitions, concepts used before definition, contradictions, unsupported statements,
-missing logical steps, or conclusions that introduce new claims."""
+AUDIT = """Audit the full draft without rewriting it. Report only meaningful
+repetition, abrupt transitions, concepts used before definition, contradictions,
+unsupported statements, missing logical steps, or conclusions that introduce new
+claims."""
 
 TModel = TypeVar("TModel", bound=BaseModel)
 
 
-REVISE = """Revise only the problems identified by the audit. Preserve the argument,
-qualifications, and evidence boundary. Improve flow surgically and introduce no new facts."""
+REVISE = """Revise only the problems identified by the audit. Preserve the
+argument, qualifications, and evidence boundary. Improve flow surgically and
+introduce no new facts."""
 
 
 class AutomatedContentService:
@@ -128,7 +132,7 @@ class AutomatedContentService:
                     "evidence_candidates": snapshot["evidence"],
                 },
                 SynthesisSpec,
-                timeout=300,
+                timeout_seconds=300,
             )
             self._validate_references(synthesis, snapshot["evidence"])
             await self._update(
@@ -165,7 +169,7 @@ class AutomatedContentService:
                 AUDIT,
                 {"draft": draft},
                 CoherenceReportSpec,
-                timeout=240,
+                timeout_seconds=240,
             )
             if audit.issues:
                 revision = await self._structured(
@@ -179,7 +183,7 @@ class AutomatedContentService:
                         "draft": draft,
                     },
                     FinalRevisionSpec,
-                    timeout=300,
+                    timeout_seconds=300,
                 )
                 final_script = revision.revised_script.strip()
             else:
@@ -347,7 +351,7 @@ class AutomatedContentService:
                 WRITE + f"\nWrite in language code: {request.language.value}.",
                 evidence_pack,
                 SectionDraftSpec,
-                timeout=240,
+                timeout_seconds=240,
             )
             text = draft.text.strip()
             texts.append(text)
@@ -384,7 +388,7 @@ class AutomatedContentService:
         instructions: str,
         payload: dict[str, object],
         output_model: type[TModel],
-        timeout: int = 180,
+        timeout_seconds: int = 180,
     ) -> TModel:
         result = await self._llm.extract(
             StructuredExtractionRequest(
@@ -394,7 +398,7 @@ class AutomatedContentService:
                 instructions=instructions,
                 input_text=json.dumps(payload, ensure_ascii=False),
                 output_model=output_model,
-                timeout_seconds=timeout,
+                timeout_seconds=timeout_seconds,
             )
         )
         return output_model.model_validate(result)
@@ -491,7 +495,7 @@ class AutomatedContentService:
 
     @staticmethod
     def _merge(existing: object, additions: list[str]) -> list[str]:
-        values = [str(value) for value in existing] if isinstance(existing, list) else []
+        values = (\n            [str(value) for value in existing]\n            if isinstance(existing, list)\n            else []\n        )
         seen = set(values)
         for value in additions:
             if value not in seen:
