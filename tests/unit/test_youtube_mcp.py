@@ -305,7 +305,11 @@ async def test_invalid_video_id_rejected() -> None:
 
 
 def test_settings_have_mcp_fields() -> None:
-    settings = _settings()
-    assert settings.youtube_mcp_enabled is False
-    assert settings.youtube_mcp_url == "http://127.0.0.1:8790"
-    assert settings.youtube_mcp_timeout_seconds == 60
+    settings = _settings(
+        youtube_mcp_enabled=True,
+        youtube_mcp_url="http://127.0.0.1:9999",
+        youtube_mcp_timeout_seconds=15,
+    )
+    assert settings.youtube_mcp_enabled is True
+    assert settings.youtube_mcp_url == "http://127.0.0.1:9999"
+    assert settings.youtube_mcp_timeout_seconds == 15

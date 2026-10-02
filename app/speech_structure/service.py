@@ -48,7 +48,7 @@ class SpeechStructureService:
         coverage_threshold: float = 0.95,
     ) -> None:
         self.database = database
-        self.provider = provider or resolve_llm_provider("codex")
+        self.provider = provider or resolve_llm_provider()
         self.model = model
         self.window_seconds = window_seconds
         self.overlap_seconds = overlap_seconds

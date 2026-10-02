@@ -64,7 +64,7 @@ class ProposeRequest(BaseModel):
     embedding_model_id: UUID | None = None
     model: str = "configured-default"
     max_candidates: int = Field(default=5, ge=1, le=10)
-    created_by: str = Field(default="codex-cli", min_length=1, max_length=255)
+    created_by: str = Field(default="devin-api", min_length=1, max_length=255)
 
 
 class ProposalResult(BaseModel):

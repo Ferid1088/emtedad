@@ -1,7 +1,5 @@
 """Deterministic unit tests for Phase 4 provider boundaries."""
 
-import json
-import subprocess
 from decimal import Decimal
 from io import BytesIO
 from uuid import uuid4
@@ -11,9 +9,6 @@ from pypdf import PdfWriter
 
 from app.knowledge.adapters.youtube import parse_youtube_video_id
 from app.knowledge.domain import EntityType, ResolutionProvider
-from app.knowledge.extraction_schema import WindowExtraction
-from app.knowledge.llm.base import StructuredExtractionRequest
-from app.knowledge.llm.codex import CodexCliProvider, CodexProviderError
 from app.knowledge.media import MediaValidationError, validate_and_render_pdf
 from app.knowledge.normalization import normalize_external_text
 from app.knowledge.resolution import ProviderCandidate, candidate_score
@@ -55,53 +50,6 @@ def test_windows_preserve_order_and_overlap() -> None:
         [4, 5, 6],
     ]
     assert windows[0].content_hash != windows[1].content_hash
-
-
-@pytest.mark.asyncio
-async def test_codex_provider_uses_schema_timeout_and_no_shell(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: dict[str, object] = {}
-
-    def fake_run(
-        command: list[str], **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        observed.update(command=command, **kwargs)
-        return subprocess.CompletedProcess(
-            command, 0, json.dumps({"mentions": [], "claims": []}), ""
-        )
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    request = StructuredExtractionRequest(
-        task="test",
-        prompt_version="v1",
-        model="configured-default",
-        instructions="extract",
-        input_text="[1] text",
-        output_model=WindowExtraction,
-        timeout_seconds=17,
-    )
-    output = await CodexCliProvider().extract(request)
-    assert output == WindowExtraction(mentions=[], claims=[])
-    assert observed["shell"] is False
-    assert observed["timeout"] == 17
-    command = observed["command"]
-    assert isinstance(command, list)
-    assert "--output-schema" in command
-
-
-@pytest.mark.asyncio
-async def test_codex_provider_rejects_non_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, "not-json", ""),
-    )
-    request = StructuredExtractionRequest(
-        "test", "v1", "configured-default", "extract", "text", WindowExtraction
-    )
-    with pytest.raises(CodexProviderError):
-        await CodexCliProvider().extract(request)
 
 
 def test_candidate_score_and_media_validation() -> None:

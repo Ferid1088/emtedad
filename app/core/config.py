@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     storage_root: Path
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     log_json: bool = True
-    llm_provider: Literal["codex", "devin"] | None = None
+    llm_provider: Literal["devin"] | None = None
     devin_api_key: SecretStr | None = None
     speech_structure_concurrency: int = 2
     speech_structure_scan_interval_seconds: int = 300

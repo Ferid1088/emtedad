@@ -83,9 +83,9 @@ repository, service, and workflow boundaries without premature microservices.
 
 ## Agent production system
 
-Claude Code content-production agents live in `.claude/agents/` and are
-orchestrated by `/produce-lesson` (`.claude/commands/produce-lesson.md`).
-`CLAUDE.md` and `.claude/settings.json` hold the boundaries. Agent-facing
+Content production runs through the Devin Cloud API
+(`app/knowledge/llm/devin.py`); all structured extraction and editorial
+workflows resolve providers via `resolve_llm_provider()`. Programmatic
 lesson access goes through `python -m app.cli lessons
 status|package|project|research|draft|ledger`; the owner-approval gate in the
 orchestration is mandatory before any packaging step.

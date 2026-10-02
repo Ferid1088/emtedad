@@ -284,27 +284,16 @@ async def test_devin_provider_requires_api_key(
         await DevinCloudProvider().extract(_request())
 
 
-def test_factory_selects_devin(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app.knowledge.llm.factory as factory
+def test_factory_resolves_devin() -> None:
     from app.knowledge.llm.factory import resolve_llm_provider
 
-    class _FactorySettings:
-        llm_provider = "devin"
-
-    monkeypatch.setattr(factory, "get_settings", lambda: _FactorySettings())
     assert isinstance(resolve_llm_provider(), DevinCloudProvider)
 
 
-def test_factory_default_is_codex(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app.knowledge.llm.factory as factory
-    from app.knowledge.llm.codex import CodexCliProvider
+def test_factory_ignores_legacy_default_arg() -> None:
     from app.knowledge.llm.factory import resolve_llm_provider
 
-    class _FactorySettings:
-        llm_provider = None
-
-    monkeypatch.setattr(factory, "get_settings", lambda: _FactorySettings())
-    assert isinstance(resolve_llm_provider(), CodexCliProvider)
+    assert isinstance(resolve_llm_provider("codex"), DevinCloudProvider)
 
 
 def test_json_recovery_helper() -> None:

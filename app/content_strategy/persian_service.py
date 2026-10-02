@@ -252,7 +252,7 @@ class PersianEditorialService:
                         "selected_story_example": self._story_provenance(
                             selected_story, example_angle
                         ),
-                        "generator": "codex-lesson-synthesis-v3",
+                        "generator": "devin-lesson-synthesis-v3",
                         "outline": outline.model_dump(mode="json"),
                         "outline_hash": outline.content_hash,
                         "raw_draft_hash": sha256(raw_text.encode()).hexdigest(),
@@ -401,7 +401,7 @@ class PersianEditorialService:
                         "LESSON_RELATIONS",
                     ],
                     "owner_prompt": project.owner_prompt,
-                    "generator": "claude-agent-pipeline",
+                    "generator": "emtedad-persian-pipeline",
                     "external_text_registration": True,
                     "variant_index": variant_number,
                     "review_completed": False,
