@@ -56,3 +56,11 @@ class ChannelVideoSnapshot:
 class SourceAdapter(Protocol):
     async def acquire(self, locator: str) -> ExternalSourceSnapshot:
         """Acquire one immutable provider snapshot."""
+
+    async def resolve_channel(self, locator: str) -> ChannelSnapshot:
+        """Resolve a channel URL to its stable provider identity."""
+
+    async def list_channel_videos(
+        self, locator: str
+    ) -> tuple[ChannelVideoSnapshot, ...]:
+        """List public channel videos without importing them."""

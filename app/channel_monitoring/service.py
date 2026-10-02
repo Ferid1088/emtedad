@@ -9,11 +9,12 @@ from sqlalchemy import func, select
 from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.db.session import Database
+from app.knowledge.adapters.base import SourceAdapter
 from app.knowledge.adapters.youtube import (
-    YouTubeAdapter,
     YouTubeRateLimitedError,
     YouTubeTranscriptUnavailableError,
 )
+from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import Source
@@ -35,11 +36,11 @@ class ChannelDiscoveryService:
         self,
         database: Database,
         *,
-        adapter: YouTubeAdapter | None = None,
+        adapter: SourceAdapter | None = None,
         importer: ExternalKnowledgeImporter | None = None,
     ) -> None:
         self.database = database
-        self.adapter = adapter or YouTubeAdapter()
+        self.adapter = adapter or resolve_youtube_adapter()
         self.importer = importer or ExternalKnowledgeImporter(
             database, self.adapter, resolve_llm_provider()
         )

@@ -39,7 +39,7 @@ from app.dialogue.schemas import (
     ReviewRequest,
 )
 from app.dialogue.service import DialogueService
-from app.knowledge.adapters.youtube import YouTubeAdapter
+from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.media import MediaService
@@ -697,7 +697,7 @@ async def _run_knowledge(
     if args.command == "ingest-youtube":
         result = await ExternalKnowledgeImporter(
             database,
-            YouTubeAdapter(),
+            resolve_youtube_adapter(),
             resolve_llm_provider(),
             model=args.model,
             window_size=args.window_size,

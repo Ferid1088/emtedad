@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     speech_structure_max_attempts: int = 3
     speech_structure_retry_backoff_seconds: int = 300
     speech_structure_quota_backoff_seconds: int = 1800
+    youtube_mcp_enabled: bool = False
+    youtube_mcp_url: str = "http://127.0.0.1:8790"
+    youtube_mcp_timeout_seconds: int = 60
 
     @field_validator("database_url")
     @classmethod

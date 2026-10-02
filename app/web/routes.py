@@ -52,8 +52,12 @@ from app.content_strategy.text_library import (
     restore_project,
 )
 from app.core.ayin.models import CanonDocument
+from app.core.config import get_settings
 from app.db.session import Database
-from app.knowledge.adapters.youtube import YouTubeAdapter
+from app.knowledge.adapters.youtube_mcp import (
+    YouTubeMcpClient,
+    resolve_youtube_adapter,
+)
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import (
@@ -207,8 +211,20 @@ async def sources(request: Request) -> HTMLResponse:
 
 @router.get("/sources/new", response_class=HTMLResponse)
 async def source_form(request: Request) -> HTMLResponse:
+    mcp_status: str | None = None
+    settings = get_settings()
+    if settings.youtube_mcp_enabled:
+        client = YouTubeMcpClient(
+            settings.youtube_mcp_url,
+            timeout_seconds=min(settings.youtube_mcp_timeout_seconds, 10),
+        )
+        mcp_status = "verbunden" if await client.health() else "nicht erreichbar"
     return await _render(
-        request, "source_new.html", title="Quelle hinzufügen", error=None
+        request,
+        "source_new.html",
+        title="Quelle hinzufügen",
+        error=None,
+        mcp_status=mcp_status,
     )
 
 
@@ -219,7 +235,7 @@ async def add_source(request: Request) -> Response:
     try:
         validate_youtube_url(locator)
         importer = ExternalKnowledgeImporter(
-            _database(request), YouTubeAdapter(), resolve_llm_provider()
+            _database(request), resolve_youtube_adapter(), resolve_llm_provider()
         )
         imported = await importer.ingest(locator)
         schedule_structure_analysis(_database(request), imported.source_id)
