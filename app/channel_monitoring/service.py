@@ -9,10 +9,15 @@ from sqlalchemy import func, select
 from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.db.session import Database
-from app.knowledge.adapters.youtube import YouTubeAdapter
+from app.knowledge.adapters.youtube import (
+    YouTubeAdapter,
+    YouTubeRateLimitedError,
+    YouTubeTranscriptUnavailableError,
+)
 from app.knowledge.importer import ExternalKnowledgeImporter
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import Source
+from app.speech_structure.scheduler import schedule_structure_analysis
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +41,7 @@ class ChannelDiscoveryService:
         self.database = database
         self.adapter = adapter or YouTubeAdapter()
         self.importer = importer or ExternalKnowledgeImporter(
-            database, self.adapter, CodexCliProvider()
+            database, self.adapter, resolve_llm_provider()
         )
 
     async def register(self, locator: str) -> MonitoredChannel:
@@ -167,7 +172,20 @@ class ChannelDiscoveryService:
             try:
                 imported = await self.importer.ingest(video_id)
             except Exception as exc:
-                message = "Import fehlgeschlagen; der Versuch kann wiederholt werden."
+                if isinstance(exc, YouTubeTranscriptUnavailableError):
+                    message = (
+                        "Video hat kein abrufbares Transkript; "
+                        "automatischer Import nicht möglich."
+                    )
+                elif isinstance(exc, YouTubeRateLimitedError):
+                    message = (
+                        "YouTube drosselt diese IP vorübergehend; "
+                        "später erneut versuchen."
+                    )
+                else:
+                    message = (
+                        "Import fehlgeschlagen; der Versuch kann wiederholt werden."
+                    )
                 async with self.database.transaction() as session:
                     updated = await session.get(ChannelVideoCandidate, candidate_id)
                     if updated is not None:
@@ -183,6 +201,7 @@ class ChannelDiscoveryService:
                         updated.status = CandidateStatus.IMPORTED
                         updated.imported_source_id = imported.source_id
                         updated.last_error = None
+                schedule_structure_analysis(self.database, imported.source_id)
                 results.append(
                     CandidateImportResult(candidate_id, video_id, True, "importiert")
                 )

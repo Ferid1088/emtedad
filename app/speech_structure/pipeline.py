@@ -1,6 +1,7 @@
 """Deterministic orchestration around a small number of structured LLM calls."""
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
@@ -87,14 +88,24 @@ class SpeechStructurePipeline:
         return windows
 
     async def analyze(
-        self, source: Source, segments: list[SourceSegment], input_hash: str
+        self,
+        source: Source,
+        segments: list[SourceSegment],
+        input_hash: str,
+        *,
+        on_progress: Callable[[str], None] | None = None,
     ) -> PipelineResult:
         windows = self.build_windows(segments)
         all_topics: list[dict[str, Any]] = []
-        known_ids = {segment.id for segment in segments}
-        for window in windows:
+        for window_index, window in enumerate(windows, start=1):
+            # The model never sees raw UUIDs; it references `s<sequence>`
+            # labels, which we resolve against this window's segments.
+            window_ids = {
+                f"s{segment.sequence}": segment.id for segment in window.segments
+            }
             payload = "\n".join(
-                f"[{segment.id}] {segment.start_seconds}-{segment.end_seconds}: "
+                f"[s{segment.sequence}] "
+                f"{segment.start_seconds}-{segment.end_seconds}: "
                 f"{segment.raw_text}"
                 for segment in window.segments
             )
@@ -107,11 +118,13 @@ class SpeechStructurePipeline:
                 output_model=LocalTopicAnalysis,
             )
             result = await self.provider.extract(request)
+            if on_progress is not None:
+                on_progress(f"topics:{window_index}/{len(windows)}")
             analysis = LocalTopicAnalysis.model_validate(result.model_dump())
             for topic in analysis.topics:
-                unknown = [item for item in topic.segment_ids if item not in known_ids]
+                unknown = [item for item in topic.segment_ids if item not in window_ids]
                 if unknown:
-                    raise ValueError(f"unknown source segment IDs: {unknown}")
+                    raise ValueError(f"unknown source segment labels: {unknown}")
                 all_topics.append(
                     {
                         "id": f"w{window.index}:{topic.temporary_id}",
@@ -119,9 +132,11 @@ class SpeechStructurePipeline:
                         "role": topic.role,
                         "description": topic.description,
                         "confidence": topic.confidence,
-                        "segment_ids": topic.segment_ids,
+                        "segment_ids": [window_ids[item] for item in topic.segment_ids],
                     }
                 )
+        if on_progress is not None:
+            on_progress("outline")
         topics_text = json.dumps(all_topics, ensure_ascii=False, default=str)
         outline_request = StructuredExtractionRequest(
             task="speech_structure_global_outline",

@@ -37,7 +37,7 @@ from app.content_strategy.persian_quality import (
 from app.content_strategy.story_library import StoryLibrary, StoryRecord
 from app.db.session import Database
 from app.knowledge.llm.base import StructuredExtractionRequest
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.lecture.models import LectureMasterVersion
 from app.lecture.schemas import SemanticLectureMasterExport
 from app.lecture.service import LectureMasterService
@@ -59,7 +59,7 @@ class PersianEditorialService:
     def __init__(self, database: Database) -> None:
         self.database = database
         self.masters = LectureMasterService(database)
-        self.provider = CodexCliProvider()
+        self.provider = resolve_llm_provider()
         self.optimizer = PersianNativeOptimizer(self.provider)
         self.quality = PersianDraftQualityValidator()
         self.lesson_canon = LessonCanonRepository()
@@ -306,6 +306,112 @@ class PersianEditorialService:
                 project.status = "PERSIAN_REVIEW"
                 result.append(draft.id)
         return result
+
+    async def register_external_draft(
+        self,
+        project_id: UUID,
+        text: str,
+        *,
+        target_minutes: int,
+    ) -> UUID:
+        """Register externally authored text as a new draft variant.
+
+        Used by the agent pipeline after the owner approves a draft outside the
+        app. The text is stored verbatim and still has to pass the deterministic
+        `review` checks and the owner approval gate like generated drafts.
+        """
+        if not 1 <= target_minutes <= 180:
+            raise ValueError("invalid duration")
+        if not text.strip():
+            raise ValueError("draft text is empty")
+        async with self.database.transaction() as session:
+            project = await session.get(EditorialProject, project_id)
+            if project is None:
+                raise ValueError("editorial project not found")
+            lesson_package = lesson_package_from_project(project)
+            if lesson_package is None:
+                raise ValueError(
+                    "only canonical lesson projects accept external drafts"
+                )
+            if (
+                project.semantic_master_id is None
+                or project.research_package_id is None
+            ):
+                raise ValueError("run lesson research before registering a draft")
+            master = await session.get(LectureMasterVersion, project.semantic_master_id)
+            research_package = await session.get(
+                ResearchPackage, project.research_package_id
+            )
+            if (
+                master is None
+                or research_package is None
+                or master.research_package_id != research_package.id
+                or research_package.lesson_id != lesson_package.lesson_id
+                or research_package.lesson_canon_hash
+                != lesson_package.lesson_canon_hash
+            ):
+                raise ValueError(
+                    "external research does not match the pinned lesson canon"
+                )
+            variant_number = (
+                int(
+                    await session.scalar(
+                        select(
+                            func.coalesce(func.max(PersianDraft.variant_index), 0)
+                        ).where(PersianDraft.editorial_project_id == project.id)
+                    )
+                    or 0
+                )
+                + 1
+            )
+            target_min = round(target_minutes * 99)
+            target_max = round(target_minutes * 121)
+            count = _word_count(text)
+            draft = PersianDraft(
+                editorial_project_id=project.id,
+                semantic_master_id=master.id,
+                version_number=1,
+                variant_index=variant_number,
+                text=text,
+                status="REVIEW_REQUIRED",
+                owner_prompt=project.owner_prompt,
+                target_duration_minutes=target_minutes,
+                target_word_count_min=target_min,
+                target_word_count_max=target_max,
+                actual_word_count=count,
+                estimated_duration_seconds=round(count / 110 * 60),
+                provenance={
+                    "research_package_id": str(research_package.id),
+                    "semantic_master_id": str(master.id),
+                    "lesson_id": lesson_package.lesson_id,
+                    "lesson_canon_hash": lesson_package.lesson_canon_hash,
+                    "lesson_content_package_version": (lesson_package.package_version),
+                    "lesson_content_package": lesson_package.model_dump(mode="json"),
+                    "canonical_title": lesson_package.canonical_lesson_title,
+                    "lesson_provenance_complete": (lesson_package.provenance_complete),
+                    "lesson_review_items": lesson_package.review_items,
+                    "generation_context_roles": [
+                        "CANONICAL_LESSON_CONTENT",
+                        "CORE_CONCEPT_REGISTRY",
+                        "EXTERNAL_RESEARCH",
+                    ],
+                    "review_only_roles": [
+                        "CHANNEL_LEDGER",
+                        "PUBLISHED_SCRIPT_ARCHIVE",
+                        "LESSON_RELATIONS",
+                    ],
+                    "owner_prompt": project.owner_prompt,
+                    "generator": "claude-agent-pipeline",
+                    "external_text_registration": True,
+                    "variant_index": variant_number,
+                    "review_completed": False,
+                    "duration_in_target_range": target_min <= count <= target_max,
+                },
+            )
+            session.add(draft)
+            project.status = "PERSIAN_REVIEW"
+            await session.flush()
+            return draft.id
 
     def _generation_context(
         self,

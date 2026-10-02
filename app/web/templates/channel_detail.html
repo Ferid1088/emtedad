@@ -44,7 +44,7 @@
   <section class="card"><h2>Importiert</h2>{% for item in grouped.get('IMPORTED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Noch keine importierten Kandidaten.</p>{% endfor %}</section>
   <section class="card"><h2>Ignoriert</h2>{% for item in grouped.get('IGNORED', []) %}<p>{{ item.title }}</p>{% else %}<p class="muted">Keine ignorierten Videos.</p>{% endfor %}</section>
 </div>
-<section class="card"><h2>Fehlgeschlagen</h2>{% for item in grouped.get('FAILED', []) %}<p class="warning">{{ item.title }} — kann erneut ausgewählt werden.</p>{% else %}<p class="muted">Keine fehlgeschlagenen Importe.</p>{% endfor %}</section>
+<section class="card"><h2>Fehlgeschlagen</h2>{% for item in grouped.get('FAILED', []) %}<p class="warning">{{ item.title }} — {% if item.last_error == 'YouTubeTranscriptUnavailableError' %}kein Transkript verfügbar, automatischer Import nicht möglich.{% elif item.last_error == 'YouTubeRateLimitedError' %}YouTube drosselt diese IP vorübergehend — später erneut versuchen.{% else %}kann erneut ausgewählt werden.{% endif %}</p>{% else %}<p class="muted">Keine fehlgeschlagenen Importe.</p>{% endfor %}</section>
 
 <script>
 (() => {

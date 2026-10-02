@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Aussprache</p>
+    <h1>Aussprache-Lexikon</h1>
+    <p class="lede">Freigegebene Ausspracheformen für die Voice-Vorbereitung. Nur freigegebene Einträge verändern den Voice-Text; Display-Text und Kanon bleiben unverändert. Es wird kein Audio erzeugt.</p>
+  </div>
+</div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<section class="card">
+  <h2>Neuer Eintrag</h2>
+  <p class="muted">Neue Einträge starten als Vorschlag und wirken erst nach Freigabe.</p>
+  <form class="filters" method="post" action="/lexicon">
+    <label>Sprache<select name="language">{% for code in languages %}<option value="{{ code }}">{{ code|upper }}</option>{% endfor %}</select></label>
+    <label>Schreibweise<input name="written_form" required dir="auto"></label>
+    <label>Aussprache<input name="preferred_pronunciation" required dir="auto"></label>
+    <label>Transliteration<input name="transliteration"></label>
+    <label>IPA<input name="ipa"></label>
+    <label>ElevenLabs-Variante<input name="provider_form" dir="auto" placeholder="optional"></label>
+    <label>Kritikalität<select name="criticality">{% for key, label in criticality_labels.items() %}<option value="{{ key }}" {% if key == "IMPORTANT" %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="wide">Notiz<input name="notes"></label>
+    <div class="filter-action"><button class="button" type="submit">Vorschlagen</button></div>
+  </form>
+</section>
+<section class="card">
+  <h2>Vorschau</h2>
+  <p class="muted">Prüft die aktuell freigegebenen Einträge an einem Beispieltext.</p>
+  <form method="post" action="/lexicon/preview">
+    <label>Sprache<select name="language">{% for code in languages %}<option value="{{ code }}" {% if preview_language == code %}selected{% endif %}>{{ code|upper }}</option>{% endfor %}</select></label>
+    <label>Text<textarea name="text" rows="4" dir="auto" required>{{ preview_text }}</textarea></label>
+    <button class="button secondary" type="submit">Vorschau berechnen</button>
+  </form>
+  {% if preview %}
+  <div class="grid two">
+    <div><h3>Display</h3><pre dir="auto" style="white-space: pre-wrap">{{ preview.display_text }}</pre></div>
+    <div><h3>Voice Ready</h3><pre dir="auto" style="white-space: pre-wrap">{{ preview.voice_text }}</pre></div>
+  </div>
+  {% endif %}
+</section>
+<section class="card filter-panel">
+  <form class="filters" method="get" action="/lexicon">
+    <label>Sprache<select name="language"><option value="">Alle</option>{% for code in languages %}<option value="{{ code }}" {% if selected_language == code %}selected{% endif %}>{{ code|upper }}</option>{% endfor %}</select></label>
+    <label>Status<select name="status"><option value="">Alle</option>{% for key, label in status_labels.items() %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <div class="filter-action"><button class="button" type="submit">Filtern</button></div>
+  </form>
+</section>
+<p class="muted">{{ entries|length }} Einträge in dieser Auswahl</p>
+{% for entry in entries %}
+<section class="card">
+  <div class="pagehead">
+    <div>
+      <h2 dir="auto">{{ entry.written_form }} → {{ entry.preferred_pronunciation }}</h2>
+      <p>
+        <span class="badge">{{ entry.language|upper }}</span>
+        <span class="badge {% if entry.status == 'APPROVED' %}success{% elif entry.status == 'DEPRECATED' %}warning{% endif %}">{{ status_labels.get(entry.status, entry.status) }}</span>
+        <span class="badge">{{ criticality_labels.get(entry.criticality, entry.criticality) }}</span>
+        <span class="muted">Version {{ entry.version }}</span>
+      </p>
+      <small>
+        {% if entry.transliteration %}Transliteration: {{ entry.transliteration }} · {% endif %}
+        {% if entry.ipa %}IPA: {{ entry.ipa }} · {% endif %}
+        {% for provider, form in (entry.provider_representation or {}).items() %}{{ provider }}: <span dir="auto">{{ form }}</span> · {% endfor %}
+        {% if entry.reviewer_notes %}Notiz: {{ entry.reviewer_notes }}{% endif %}
+      </small>
+    </div>
+    <div class="button-row">
+      {% if entry.status == "PROPOSED" %}<form method="post" action="/lexicon/{{ entry.id }}/approve"><button class="button" type="submit">Freigeben</button></form>{% endif %}
+      {% if entry.status != "DEPRECATED" %}<form method="post" action="/lexicon/{{ entry.id }}/deprecate"><button class="button secondary" type="submit">Verwerfen</button></form>{% endif %}
+    </div>
+  </div>
+</section>
+{% else %}
+<p class="muted">Noch keine Einträge.</p>
+{% endfor %}
+{% endblock %}

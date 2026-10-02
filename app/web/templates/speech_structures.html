@@ -1,10 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="pagehead"><h1>Vortragsstruktur</h1><p class="muted">Hierarchische Lesestruktur über unveränderten Transkripten.</p></div>
-<table><tr><th>Titel</th><th>Sprache</th><th>Transkript</th><th>Status</th><th>Version</th><th></th></tr>
-{% for source in sources %}{% set structure = structures.get(source.id) %}<tr>
+<div class="pagehead"><div><h1>Vortragsstruktur</h1><p class="muted">Hierarchische Lesestruktur über unveränderten Transkripten. Neue Importe werden automatisch strukturiert.</p></div>
+<div class="button-row">
+<form method="post" action="/speech-structures/scan"><button class="secondary">Fehlende einplanen</button></form>
+{% if counts.get('FAILED') %}<form method="post" action="/speech-structures/retry-failed"><button class="secondary">Fehlgeschlagene erneut versuchen ({{ counts['FAILED'] }})</button></form>{% endif %}
+</div></div>
+<p class="status-row">
+{% if counts.get('READY') %}<span class="badge success">✅ {{ counts['READY'] }} fertig</span>{% endif %}
+{% if counts.get('RUNNING') %}<span class="badge published">🔄 {{ counts['RUNNING'] }} läuft</span>{% endif %}
+{% if counts.get('PENDING') %}<span class="badge open">⏳ {{ counts['PENDING'] }} wartet</span>{% endif %}
+{% if counts.get('STALE') %}<span class="badge warning">◌ {{ counts['STALE'] }} veraltet</span>{% endif %}
+{% if counts.get('FAILED') %}<span class="badge danger">⚠️ {{ counts['FAILED'] }} fehlgeschlagen</span>{% endif %}
+</p>
+<table><tr><th>Titel</th><th>Sprache</th><th>Vortragsstruktur</th><th>Version</th><th>Zuletzt fertig</th><th></th></tr>
+{% for source in sources %}{% set structure = structures.get(source.id) %}{% set info = infos.get(source.id) %}{% set state = states.get(source.id) %}{% set phase = scheduler.phase_of(source.id) %}<tr>
 <td><a dir="auto" href="/speech-structures/{{ source.id }}">{{ source.title }}</a></td><td>{{ source.language }}</td>
-<td>bereit</td><td>{{ structure.status if structure else 'Noch nicht erstellt' }}</td><td>{{ structure.version if structure else '—' }}</td>
-<td>{% if structure %}<a class="button" href="/speech-structures/{{ source.id }}">Struktur ansehen</a>{% else %}<form method="post" action="/speech-structures/{{ source.id }}/generate"><button>Struktur erstellen</button></form>{% endif %}</td>
-</tr>{% else %}<tr><td colspan="6" class="muted">Keine Quellen mit Transkript.</td></tr>{% endfor %}</table>
+<td>
+{% if state and state.status.value == 'RUNNING' %}<span class="badge published">🔄 {{ {'topics': 'Themen erkennen', 'outline': 'Struktur ordnen', 'validate': 'Prüfen'}.get(phase.split(':')[0] if phase else '', 'wird erstellt') }}{% if phase and ':' in phase %} ({{ phase.split(':')[1] }}){% endif %}</span>
+{% elif state and state.status.value == 'PENDING' %}<span class="badge open">⏳ wartet{% if info and info.failed_attempts %} · Versuch {{ info.failed_attempts + 1 }}{% endif %}</span>
+{% elif state and state.status.value == 'READY' %}<span class="badge success">✅ fertig</span>
+{% elif state and state.status.value == 'STALE' %}<span class="badge warning">◌ veraltet — Neuaufbau geplant</span>
+{% elif state and state.status.value == 'FAILED' %}<span class="badge danger">⚠️ fehlgeschlagen</span>
+{% elif state and state.status.value == 'UNAVAILABLE' %}<span class="badge open">— kein Transkript</span>
+{% else %}<span class="badge open">⏳ wartet</span>{% endif %}
+</td>
+<td>{{ structure.version if structure else '—' }}</td>
+<td>{% if structure and structure.completed_at and structure.status in ['READY','REVIEW'] %}{{ structure.completed_at.strftime('%d.%m.%Y %H:%M') }}{% else %}—{% endif %}</td>
+<td>{% if state and state.status.value == 'READY' %}<a class="button" href="/speech-structures/{{ source.id }}">Struktur ansehen</a>
+{% elif state and state.status.value == 'FAILED' %}<form method="post" action="/speech-structures/{{ source.id }}/generate"><button>Erneut versuchen</button></form>
+{% elif state and state.status.value in ['STALE'] %}<form method="post" action="/speech-structures/{{ source.id }}/regenerate"><button>Jetzt neu erstellen</button></form>
+{% elif not structure and state and state.status.value == 'UNAVAILABLE' %}<span class="muted">—</span>
+{% endif %}</td>
+</tr>{% else %}<tr><td colspan="6" class="muted">Keine Quellen.</td></tr>{% endfor %}</table>
 {% endblock %}

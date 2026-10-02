@@ -2,7 +2,8 @@
 
 LOCAL_INSTRUCTIONS = (
     "Return JSON only. Identify meaningful conceptual topics in this window.\n"
-    "Use only the supplied segment IDs. Distinguish TOPIC/SUBTOPIC from EXAMPLE, "
+    "Reference segments only by their supplied segment labels (e.g. s12); "
+    "never invent labels. Distinguish TOPIC/SUBTOPIC from EXAMPLE, "
     "STORY, ARGUMENT, EXPLANATION, REFERENCE and DIGRESSION. Group non-contiguous "
     "discussion when it clearly returns to the same topic; do not create a chapter "
     "for every anecdote."

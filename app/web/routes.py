@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -54,7 +55,7 @@ from app.core.ayin.models import CanonDocument
 from app.db.session import Database
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import (
     ExternalClaim,
     Mention,
@@ -65,9 +66,27 @@ from app.knowledge.models import (
     SourceVersion,
     Work,
 )
-from app.lecture.domain import MasterStatus
+from app.lecture.domain import MasterStatus, PublicationLanguage
 from app.lecture.models import LectureMasterVersion
+from app.localization.lexicon import (
+    CRITICALITY_LABELS,
+    DEFAULT_PROVIDER_PROFILE,
+    LANGUAGES,
+    STATUS_LABELS,
+    PronunciationLexiconService,
+    load_approved_lexicon,
+)
+from app.localization.pronunciation import (
+    PronunciationPreparation,
+    prepare_pronunciation,
+)
 from app.retrieval.embeddings import EmbeddingProvider
+from app.speech_structure.scheduler import (
+    collect_source_infos,
+    get_scheduler,
+    schedule_structure_analysis,
+    summarize_states,
+)
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
@@ -134,6 +153,15 @@ async def dashboard(request: Request) -> HTMLResponse:
             }
         except (FileNotFoundError, ValueError):
             logger.exception("lesson canon unavailable for dashboard")
+        structure_states = summarize_states(
+            await collect_source_infos(session),
+            get_scheduler(_database(request)),
+            now=datetime.now(UTC),
+        )
+    structure_counts: dict[str, int] = {}
+    for state in structure_states.values():
+        key = state.status.value
+        structure_counts[key] = structure_counts.get(key, 0) + 1
     return await _render(
         request,
         "dashboard.html",
@@ -144,6 +172,7 @@ async def dashboard(request: Request) -> HTMLResponse:
         pending_channels=pending_channels,
         lesson_progress=lesson_progress,
         lesson_health=lesson_health,
+        structure_counts=structure_counts,
     )
 
 
@@ -190,9 +219,10 @@ async def add_source(request: Request) -> Response:
     try:
         validate_youtube_url(locator)
         importer = ExternalKnowledgeImporter(
-            _database(request), YouTubeAdapter(), CodexCliProvider()
+            _database(request), YouTubeAdapter(), resolve_llm_provider()
         )
-        await importer.ingest(locator)
+        imported = await importer.ingest(locator)
+        schedule_structure_analysis(_database(request), imported.source_id)
     except ValueError as exc:
         return await _render(
             request, "source_new.html", title="Quelle hinzufügen", error=str(exc)
@@ -986,16 +1016,12 @@ async def editorial_workspace(
         studio_progress={
             "lesson": lesson_package is not None,
             "research": research_summary is not None,
-            "package": bool(
-                research_summary and research_summary.ready_for_writing
-            ),
+            "package": bool(research_summary and research_summary.ready_for_writing),
             "persian": bool(drafts),
             "review": any(
                 draft.provenance.get("review_completed") is True for draft in drafts
             ),
-            "approval": any(
-                draft.status == "PERSIAN_APPROVED" for draft in drafts
-            ),
+            "approval": any(draft.status == "PERSIAN_APPROVED" for draft in drafts),
         },
         project_status_label=(
             workspace_item.status_label if workspace_item else "In Arbeit"
@@ -1329,7 +1355,7 @@ async def studio_voice_prepare(request: Request) -> HTMLResponse:
     form = await request.form()
     language = str(form.get("language", "fa"))
     text = str(form.get("text", ""))
-    if language not in {"fa", "de", "en", "ar"} or not text.strip():
+    if language not in LANGUAGES or not text.strip():
         return await _render(
             request,
             "studio_voice.html",
@@ -1337,10 +1363,16 @@ async def studio_voice_prepare(request: Request) -> HTMLResponse:
             result=None,
             error="Sprache und Text sind erforderlich.",
         )
-    from app.lecture.domain import PublicationLanguage
-    from app.localization.pronunciation import prepare_pronunciation
-
-    result = prepare_pronunciation(PublicationLanguage(language), text, [])
+    publication_language = PublicationLanguage(language)
+    async with _database(request).transaction() as session:
+        lexicon = await load_approved_lexicon(session, publication_language)
+    result = prepare_pronunciation(
+        publication_language,
+        text,
+        lexicon.entries,
+        lexicon_version=lexicon.version,
+        provider_profile=DEFAULT_PROVIDER_PROFILE,
+    )
     return await _render(
         request,
         "studio_voice.html",
@@ -1348,6 +1380,121 @@ async def studio_voice_prepare(request: Request) -> HTMLResponse:
         result=result,
         error=None,
     )
+
+
+async def _render_lexicon(
+    request: Request,
+    *,
+    language: str = "",
+    status: str = "",
+    error: str | None = None,
+    preview: PronunciationPreparation | None = None,
+    preview_language: str = "fa",
+    preview_text: str = "",
+) -> HTMLResponse:
+    service = PronunciationLexiconService(_database(request))
+    try:
+        entries = await service.entries(
+            language=language or None, status=status or None
+        )
+        filter_error = None
+    except ValueError:
+        entries, filter_error = [], "Ungültige Filterauswahl."
+    return await _render(
+        request,
+        "lexicon.html",
+        title="Aussprache-Lexikon",
+        entries=entries,
+        languages=LANGUAGES,
+        status_labels=STATUS_LABELS,
+        criticality_labels=CRITICALITY_LABELS,
+        selected_language=language,
+        selected_status=status,
+        error=error or filter_error,
+        preview=preview,
+        preview_language=preview_language,
+        preview_text=preview_text,
+    )
+
+
+@router.get("/lexicon", response_class=HTMLResponse)
+async def lexicon(
+    request: Request, language: str = "", status: str = ""
+) -> HTMLResponse:
+    return await _render_lexicon(request, language=language, status=status)
+
+
+@router.post("/lexicon", response_class=HTMLResponse)
+async def propose_lexicon_entry(request: Request) -> Response:
+    form = await request.form()
+    try:
+        await PronunciationLexiconService(_database(request)).propose(
+            language=str(form.get("language", "")),
+            written_form=str(form.get("written_form", "")),
+            preferred_pronunciation=str(form.get("preferred_pronunciation", "")),
+            transliteration=str(form.get("transliteration", "")),
+            ipa=str(form.get("ipa", "")),
+            provider_form=str(form.get("provider_form", "")),
+            criticality=str(form.get("criticality", "IMPORTANT")),
+            notes=str(form.get("notes", "")),
+        )
+    except ValueError as exc:
+        return await _render_lexicon(request, error=str(exc))
+    return RedirectResponse("/lexicon", status_code=303)
+
+
+@router.post("/lexicon/preview", response_class=HTMLResponse)
+async def lexicon_preview(request: Request) -> HTMLResponse:
+    form = await request.form()
+    language = str(form.get("language", "fa"))
+    text = str(form.get("text", ""))
+    if language not in LANGUAGES or not text.strip():
+        return await _render_lexicon(
+            request,
+            error="Sprache und Text sind erforderlich.",
+            preview_language=language,
+            preview_text=text,
+        )
+    publication_language = PublicationLanguage(language)
+    async with _database(request).transaction() as session:
+        approved = await load_approved_lexicon(session, publication_language)
+    result = prepare_pronunciation(
+        publication_language,
+        text,
+        approved.entries,
+        lexicon_version=approved.version,
+        provider_profile=DEFAULT_PROVIDER_PROFILE,
+    )
+    return await _render_lexicon(
+        request,
+        preview=result,
+        preview_language=language,
+        preview_text=text,
+    )
+
+
+@router.post("/lexicon/{entry_id}/approve")
+async def approve_lexicon_entry(request: Request, entry_id: UUID) -> Response:
+    form = await request.form()
+    try:
+        await PronunciationLexiconService(_database(request)).approve(
+            entry_id, notes=str(form.get("notes", ""))
+        )
+    except ValueError:
+        return HTMLResponse("Lexikon-Eintrag nicht freigebbar", status_code=400)
+    return RedirectResponse("/lexicon", status_code=303)
+
+
+@router.post("/lexicon/{entry_id}/deprecate")
+async def deprecate_lexicon_entry(request: Request, entry_id: UUID) -> Response:
+    form = await request.form()
+    try:
+        await PronunciationLexiconService(_database(request)).deprecate(
+            entry_id, notes=str(form.get("notes", ""))
+        )
+    except ValueError:
+        return HTMLResponse("Lexikon-Eintrag nicht verwerfbar", status_code=400)
+    return RedirectResponse("/lexicon", status_code=303)
 
 
 @router.get("/channels", response_class=HTMLResponse)

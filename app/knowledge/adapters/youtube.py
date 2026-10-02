@@ -7,7 +7,16 @@ import subprocess
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import (
+    IpBlocked,
+    NoTranscriptFound,
+    PoTokenRequired,
+    RequestBlocked,
+    TranscriptsDisabled,
+    VideoUnavailable,
+    VideoUnplayable,
+    YouTubeTranscriptApi,
+)
 
 from app.knowledge.adapters.base import (
     ChannelSnapshot,
@@ -23,6 +32,14 @@ _CHANNEL_ID = re.compile(r"^UC[A-Za-z0-9_-]{22}$")
 
 class YouTubeAdapterError(RuntimeError):
     """Raised when provider metadata or transcript acquisition fails."""
+
+
+class YouTubeTranscriptUnavailableError(YouTubeAdapterError):
+    """Raised when a video has no transcript at all — retrying cannot help."""
+
+
+class YouTubeRateLimitedError(YouTubeAdapterError):
+    """Raised when YouTube blocks this IP on the transcript endpoint — retry later."""
 
 
 def parse_youtube_video_id(locator: str) -> str:
@@ -188,6 +205,19 @@ class YouTubeAdapter:
         entries = payload.get("entries", [])
         if not isinstance(entries, list):
             raise YouTubeAdapterError("YouTube channel returned no video list")
+        if not any(
+            isinstance(entry, dict)
+            and _VIDEO_ID.fullmatch(_optional_string(entry.get("id")) or "")
+            for entry in entries
+        ):
+            # The channel landing page can resolve to tab playlists
+            # (Videos/Live/Shorts) instead of uploads; retry the videos tab.
+            payload = await asyncio.to_thread(
+                self._channel_metadata, f"{url}/videos", 100
+            )
+            entries = payload.get("entries", [])
+            if not isinstance(entries, list):
+                raise YouTubeAdapterError("YouTube channel returned no video list")
         videos: list[ChannelVideoSnapshot] = []
         for entry in entries:
             if not isinstance(entry, dict):
@@ -290,6 +320,19 @@ class YouTubeAdapter:
             fetched = preferred.fetch(preserve_formatting=True)
         except YouTubeAdapterError:
             raise
+        except (IpBlocked, RequestBlocked, PoTokenRequired) as exc:
+            raise YouTubeRateLimitedError(
+                f"transcript endpoint rate-limited: {type(exc).__name__}"
+            ) from exc
+        except (
+            TranscriptsDisabled,
+            NoTranscriptFound,
+            VideoUnavailable,
+            VideoUnplayable,
+        ) as exc:
+            raise YouTubeTranscriptUnavailableError(
+                f"video transcript unavailable: {type(exc).__name__}"
+            ) from exc
         except Exception as exc:
             raise YouTubeAdapterError(
                 f"transcript acquisition failed: {type(exc).__name__}"

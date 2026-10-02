@@ -32,7 +32,7 @@ class SegmentRelation(StrEnum):
     CONTEXT = "CONTEXT"
 
 
-LOCAL_PROMPT_VERSION = "speech_structure_local_topics_v1"
+LOCAL_PROMPT_VERSION = "speech_structure_local_topics_v2"
 GLOBAL_PROMPT_VERSION = "speech_structure_global_outline_v1"
 ASSIGNMENT_PROMPT_VERSION = "speech_structure_segment_assignment_v1"
 VALIDATION_PROMPT_VERSION = "speech_structure_validation_review_v1"

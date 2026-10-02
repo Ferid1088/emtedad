@@ -33,8 +33,13 @@ class Settings(BaseSettings):
     storage_root: Path
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     log_json: bool = True
-    claude_oauth_token_work: SecretStr | None = None
-    claude_oauth_token_personal: SecretStr | None = None
+    llm_provider: Literal["codex", "devin"] | None = None
+    devin_api_key: SecretStr | None = None
+    speech_structure_concurrency: int = 2
+    speech_structure_scan_interval_seconds: int = 300
+    speech_structure_max_attempts: int = 3
+    speech_structure_retry_backoff_seconds: int = 300
+    speech_structure_quota_backoff_seconds: int = 1800
 
     @field_validator("database_url")
     @classmethod

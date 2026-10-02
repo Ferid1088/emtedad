@@ -9,7 +9,17 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
+from sqlalchemy import select
 
+from app.content_strategy.lesson_canon import LessonCanonRepository
+from app.content_strategy.lesson_catalog import LessonCatalogItem, load_lesson_catalog
+from app.content_strategy.lesson_research import LessonResearchService
+from app.content_strategy.lesson_workflow import (
+    LESSON_SOURCE_TYPE,
+    create_lesson_project,
+)
+from app.content_strategy.models import ChannelLedgerEntry, EditorialProject
+from app.content_strategy.persian_service import PersianEditorialService
 from app.content_strategy.strategy_service import TopicStrategyService
 from app.core.ayin.importer import AyinImporter, default_seed_manifest
 from app.core.ayin.service import AyinExtractionService, AyinReadService
@@ -31,7 +41,7 @@ from app.dialogue.schemas import (
 from app.dialogue.service import DialogueService
 from app.knowledge.adapters.youtube import YouTubeAdapter
 from app.knowledge.importer import ExternalKnowledgeImporter
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.media import MediaService
 from app.knowledge.resolution import (
     CrossrefResolver,
@@ -289,6 +299,32 @@ def _parser() -> argparse.ArgumentParser:
     backfill = speech_commands.add_parser("backfill")
     backfill.add_argument("--limit", type=int)
     backfill.add_argument("--force", action="store_true")
+
+    lessons = domains.add_parser("lessons")
+    lessons_commands = lessons.add_subparsers(dest="command", required=True)
+    lesson_status = lessons_commands.add_parser("status")
+    lesson_status.add_argument("lesson_id", nargs="?")
+    lesson_package = lessons_commands.add_parser("package")
+    lesson_package.add_argument("lesson_id")
+    lesson_project = lessons_commands.add_parser("project")
+    lesson_project.add_argument("lesson_id")
+    lesson_project.add_argument("--prompt")
+    lesson_project.add_argument("--target-minutes", type=int)
+    lesson_project.add_argument(
+        "--new",
+        action="store_true",
+        help="always create a new project instead of reusing the latest active one",
+    )
+    lesson_research = lessons_commands.add_parser("research")
+    lesson_research.add_argument("project_id", type=UUID)
+    lesson_research.add_argument("--owner-focus")
+    lesson_draft = lessons_commands.add_parser("draft")
+    lesson_draft.add_argument("project_id", type=UUID)
+    lesson_draft.add_argument("--file", type=Path, required=True)
+    lesson_draft.add_argument("--target-minutes", type=int, required=True)
+    lesson_ledger = lessons_commands.add_parser("ledger")
+    lesson_ledger.add_argument("lesson_id", nargs="?")
+    lesson_ledger.add_argument("--limit", type=int, default=20)
     return parser
 
 
@@ -334,6 +370,8 @@ async def _run(args: argparse.Namespace) -> int:
             )
             print(_json(speech_output))
             return 0
+        if args.domain == "lessons":
+            return await _run_lessons(args, database, settings.storage_root)
         if args.command == "import":
             manifest = None if args.without_seed else default_seed_manifest()
             result = await AyinImporter(database, store).import_file(
@@ -548,7 +586,7 @@ async def _run_dialogue(
     service = DialogueService(
         database,
         SentenceTransformerEmbeddingProvider(cache_folder=storage_root / "models"),
-        EvidenceRoleClassifier(CodexCliProvider(), model=model),
+        EvidenceRoleClassifier(resolve_llm_provider(), model=model),
     )
     if args.command == "propose":
         kind, identifier = _dialogue_target(args)
@@ -660,7 +698,7 @@ async def _run_knowledge(
         result = await ExternalKnowledgeImporter(
             database,
             YouTubeAdapter(),
-            CodexCliProvider(),
+            resolve_llm_provider(),
             model=args.model,
             window_size=args.window_size,
             overlap=args.overlap,
@@ -713,6 +751,164 @@ async def _run_knowledge(
             raise RuntimeError(f"unsupported knowledge command: {args.command}")
     print(_json(output))
     return 0 if not hasattr(output, "valid") or output.valid else 1
+
+
+def _lesson_status_payload(item: LessonCatalogItem) -> dict[str, object]:
+    """Machine-readable production status for one canonical lesson."""
+
+    return {
+        "lesson_id": item.package.lesson_id,
+        "number": item.number,
+        "total": item.total,
+        "title": item.package.canonical_lesson_title,
+        "central_question": item.package.central_question,
+        "status": item.status_key,
+        "status_label": item.status_label,
+        "published": item.published,
+        "project_count": item.project_count,
+        "prerequisites_met": item.prerequisites_met,
+        "prerequisites": list(item.package.prerequisites),
+        "concepts": [
+            {"lesson_id": concept.lesson_id, "title_fa": concept.title_fa}
+            for concept in item.concepts
+        ],
+        "canon_hash": item.package.lesson_canon_hash,
+        "package_version": item.package.package_version,
+    }
+
+
+async def _run_lessons(
+    args: argparse.Namespace, database: Database, storage_root: Path
+) -> int:
+    repository = LessonCanonRepository()
+    if args.command == "package":
+        print(_json(repository.package(args.lesson_id)))
+        return 0
+    if args.command == "status":
+        async with database.transaction() as session:
+            items, progress = await load_lesson_catalog(session, repository)
+        if args.lesson_id:
+            by_id = {item.package.lesson_id: item for item in items}
+            item = by_id.get(args.lesson_id)
+            if item is None:
+                raise ValueError(f"unknown lesson_id: {args.lesson_id}")
+            payload: Any = _lesson_status_payload(item)
+            payload["prerequisite_status"] = [
+                {
+                    "lesson_id": prerequisite,
+                    "published": by_id[prerequisite].published,
+                    "status": by_id[prerequisite].status_key,
+                }
+                for prerequisite in item.package.prerequisites
+                if prerequisite in by_id
+            ]
+        else:
+            payload = {
+                "progress": {
+                    "total": progress.total,
+                    "published": progress.published,
+                    "in_progress": progress.in_progress,
+                    "open": progress.open,
+                    "translations": progress.translations,
+                    "voice_ready": progress.voice_ready,
+                },
+                "lessons": [_lesson_status_payload(item) for item in items],
+            }
+        print(_json(payload))
+        return 0
+    if args.command == "project":
+        repository.package(args.lesson_id)  # validate the lesson exists first
+        async with database.transaction() as session:
+            existing = await session.scalar(
+                select(EditorialProject)
+                .where(
+                    EditorialProject.strategy_topic_snapshot["source_type"].astext
+                    == LESSON_SOURCE_TYPE,
+                    EditorialProject.strategy_topic_snapshot["lesson_id"].astext
+                    == args.lesson_id,
+                    EditorialProject.status != "ARCHIVED",
+                )
+                .order_by(EditorialProject.created_at.desc())
+                .limit(1)
+            )
+            created = existing is None or args.new
+            project = existing
+            if project is None or args.new:
+                project = await create_lesson_project(
+                    session,
+                    repository,
+                    args.lesson_id,
+                    owner_prompt=args.prompt,
+                    target_duration_minutes=args.target_minutes,
+                )
+        print(
+            _json(
+                {
+                    "project_id": project.id,
+                    "created": created,
+                    "lesson_id": args.lesson_id,
+                    "title": project.title,
+                    "status": project.status,
+                }
+            )
+        )
+        return 0
+    if args.command == "research":
+        provider = SentenceTransformerEmbeddingProvider(
+            cache_folder=storage_root / "models"
+        )
+        result = await LessonResearchService(database, provider).run(
+            args.project_id, owner_focus=args.owner_focus
+        )
+        print(_json(asdict(result) if not isinstance(result, BaseModel) else result))
+        return 0
+    if args.command == "draft":
+        text = args.file.read_text(encoding="utf-8")
+        service = PersianEditorialService(database)
+        draft_id = await service.register_external_draft(
+            args.project_id, text, target_minutes=args.target_minutes
+        )
+        finding_ids = await service.review(draft_id)
+        print(
+            _json(
+                {
+                    "draft_id": draft_id,
+                    "review_finding_ids": finding_ids,
+                    "status": "PERSIAN_REVIEW",
+                }
+            )
+        )
+        return 0
+    if args.command == "ledger":
+        async with database.transaction() as session:
+            statement = select(ChannelLedgerEntry).order_by(
+                ChannelLedgerEntry.created_at.desc()
+            )
+            if args.lesson_id:
+                statement = statement.where(
+                    ChannelLedgerEntry.lesson_id == args.lesson_id
+                )
+            entries = (await session.scalars(statement.limit(args.limit))).all()
+        print(
+            _json(
+                [
+                    {
+                        "id": entry.id,
+                        "lesson_id": entry.lesson_id,
+                        "published_title": entry.published_title,
+                        "concept_keys": entry.concept_keys,
+                        "open_promises": entry.open_promises,
+                        "fulfilled_promises": entry.fulfilled_promises,
+                        "title_history": entry.title_history,
+                        "coverage_summary": entry.coverage_summary,
+                        "content_hash": entry.content_hash,
+                    }
+                    for entry in entries
+                ]
+            )
+        )
+        return 0
+    raise RuntimeError(f"unsupported lessons command: {args.command}")
 
 
 def main() -> None:

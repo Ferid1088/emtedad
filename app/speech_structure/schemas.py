@@ -1,9 +1,12 @@
 """Strict contracts for structured LLM output and validation reports."""
 
-from typing import Literal
-from uuid import UUID
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+# Models must never copy raw UUIDs; they reference the short labels the
+# pipeline assigns per segment (`s<sequence>`), which are resolved locally.
+SegmentLabel = Annotated[str, StringConstraints(pattern=r"^s\d+$")]
 
 
 class LocalTopic(BaseModel):
@@ -11,7 +14,7 @@ class LocalTopic(BaseModel):
     temporary_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     role: str = "TOPIC"
-    segment_ids: list[UUID] = Field(default_factory=list)
+    segment_ids: list[SegmentLabel] = Field(default_factory=list)
     description: str | None = None
     related_to_previous: bool = False
     confidence: float = Field(default=0.5, ge=0, le=1)

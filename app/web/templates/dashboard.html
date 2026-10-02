@@ -12,6 +12,14 @@
   </div>
 </section>
 {% else %}<section class="card"><p class="warning">Der 100-Lektionen-Kanon wurde noch nicht importiert oder ist unvollständig.</p><a class="button secondary" href="/lessons">Importstatus prüfen</a></section>{% endif %}
+{% if structure_counts %}<section class="card"><div class="split-head"><h2>Vortragsstrukturen</h2><a href="/speech-structures">Übersicht</a></div><div class="status-row">
+{% if structure_counts.get('READY') %}<span class="badge success">✅ {{ structure_counts['READY'] }} fertig</span>{% endif %}
+{% if structure_counts.get('RUNNING') %}<span class="badge published">🔄 {{ structure_counts['RUNNING'] }} läuft</span>{% endif %}
+{% if structure_counts.get('PENDING') %}<span class="badge open">⏳ {{ structure_counts['PENDING'] }} wartet</span>{% endif %}
+{% if structure_counts.get('STALE') %}<span class="badge warning">◌ {{ structure_counts['STALE'] }} veraltet</span>{% endif %}
+{% if structure_counts.get('FAILED') %}<span class="badge danger">⚠️ {{ structure_counts['FAILED'] }} fehlgeschlagen</span>{% endif %}
+{% if structure_counts.get('UNAVAILABLE') %}<span class="badge open">— {{ structure_counts['UNAVAILABLE'] }} ohne Transkript</span>{% endif %}
+</div></section>{% endif %}
 <h2 style="margin-top:2rem">Arbeitsstand</h2>
 <div class="grid">{% for key,label in [('sources','Quellen'),('youtube','YouTube-Videos'),('claims','Externe Claims'),('reviews','Offene Prüfungen'),('topics','Freie Themen'),('channels','Kanäle'),('pending_candidates','Neue Videos'),('segments','Transkriptsegmente')] %}<section class="card"><strong class="metric">{{ counts[key] }}</strong><span>{{ label }}</span></section>{% endfor %}</div>
 <div class="columns"><section><div class="split-head"><h2>Letzte Quellen</h2><a href="/sources">Alle</a></div>{% for source in sources %}<p><a dir="auto" href="/sources/{{ source.id }}">{{ source.title }}</a><small>{{ source.ingestion_status }}</small></p>{% else %}<p class="muted">Noch keine Quellen.</p>{% endfor %}</section><section><div class="split-head"><h2>Freie Themen</h2><a href="/topics">Alle</a></div>{% for topic in topics %}<p><a dir="auto" href="/topics/{{ topic.id }}">{{ topic.title }}</a><small>Flexibler Themenarbeitsraum</small></p>{% else %}<p class="muted">Noch keine freien Themen.</p>{% endfor %}</section></div>

@@ -1,5 +1,7 @@
 """FastAPI application factory and infrastructure lifecycle."""
 
+import asyncio
+import contextlib
 import re
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -27,6 +29,7 @@ from app.db.session import Database, create_database
 from app.ops.logging import configure_logging
 from app.retrieval.embeddings import SentenceTransformerEmbeddingProvider
 from app.speech_structure.routes import router as speech_structure_router
+from app.speech_structure.scheduler import init_scheduler
 from app.web.routes import router as web_router
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
@@ -66,6 +69,16 @@ def create_app(
         else:
             app.state.readiness_service = readiness_service
 
+        scanner_task: asyncio.Task[None] | None = None
+        if database is not None:
+            scheduler = init_scheduler(database, resolved_settings)
+            app.state.speech_scheduler = scheduler
+            scanner_task = asyncio.create_task(
+                scheduler.run_forever(
+                    resolved_settings.speech_structure_scan_interval_seconds
+                )
+            )
+
         logger.info(
             "application.started",
             environment=resolved_settings.environment.value,
@@ -73,6 +86,11 @@ def create_app(
         try:
             yield
         finally:
+            if scanner_task is not None:
+                scheduler.stop()
+                scanner_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await scanner_task
             if database is not None:
                 await database.dispose()
             logger.info("application.stopped")

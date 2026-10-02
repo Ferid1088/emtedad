@@ -10,9 +10,12 @@ from sqlalchemy import select
 from app.content_strategy.models import EditorialLanguageTrack, PersianDraft
 from app.db.session import Database
 from app.knowledge.llm.base import StructuredExtractionRequest
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.lecture.domain import PublicationLanguage
-from app.localization.models import PronunciationLexiconEntry
+from app.localization.lexicon import (
+    DEFAULT_PROVIDER_PROFILE,
+    load_approved_lexicon,
+)
 from app.localization.performance import (
     ElevenLabsCapabilityProfile,
     NativeLanguageOptimizer,
@@ -41,7 +44,7 @@ class MultilingualEditorialService:
 
     def __init__(self, database: Database) -> None:
         self.database = database
-        self.provider = CodexCliProvider()
+        self.provider = resolve_llm_provider()
 
     async def create(
         self,
@@ -156,28 +159,13 @@ class MultilingualEditorialService:
                 raise ValueError(
                     "protected Ayin terminology is missing from the native text"
                 )
-            lexicon_rows = list(
-                await session.scalars(
-                    select(PronunciationLexiconEntry).where(
-                        PronunciationLexiconEntry.language == language
-                    )
-                )
-            )
-            lexicon: list[dict[str, object]] = [
-                {
-                    "written_form": row.written_form,
-                    "preferred_pronunciation": row.preferred_pronunciation,
-                    "criticality": row.criticality.value,
-                    "provider_representation": row.provider_representation,
-                }
-                for row in lexicon_rows
-            ]
+            lexicon = await load_approved_lexicon(session, language)
             prepared = prepare_pronunciation(
                 language,
                 track.display_text,
-                lexicon,
-                lexicon_version=1,
-                provider_profile="elevenlabs_v3",
+                lexicon.entries,
+                lexicon_version=lexicon.version,
+                provider_profile=DEFAULT_PROVIDER_PROFILE,
             )
             pronunciation_findings = (
                 PronunciationValidator().validate_voice_preparation(
@@ -205,6 +193,10 @@ class MultilingualEditorialService:
             track.status = "PERFORMANCE_READY"
             provenance = dict(track.provenance or {})
             provenance["native_quality_status"] = "NATIVE_QUALITY_PASSED"
+            provenance["pronunciation_lexicon"] = {
+                "version": prepared.lexicon_version,
+                "entry_ids": [str(item) for item in lexicon.entry_ids],
+            }
             provenance["performance_profile"] = {
                 "provider": performance.profile.provider,
                 "model_id": performance.profile.model_id,

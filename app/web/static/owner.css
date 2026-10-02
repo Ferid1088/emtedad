@@ -62,6 +62,7 @@ small { display: block; }
 .badge.warning { border-color: #e6d7b6; background: #fbf4e5; color: var(--warning); }
 .badge.published { border-color: #bcd7cf; background: #e4f1ed; color: #225a48; }
 .badge.open { color: var(--muted); }
+.badge.danger { border-color: #e5c1c1; background: #fff0f0; color: var(--danger); }
 .tabs { display: flex; gap: .45rem; margin: 1rem 0; overflow-x: auto; }
 .tabs a, .tab { flex: 0 0 auto; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: #354349; }
 .tabs a.active, .tabs .tab.active { border-color: var(--primary); background: var(--primary); color: #fff; }
@@ -104,6 +105,7 @@ th, td { padding: .72rem; border-bottom: 1px solid #e3e8e7; text-align: left; ve
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: .7rem; }
 .suggestion { padding: 1rem 0; border-top: 1px solid var(--line); }
 .transcript { display: flex; gap: 1rem; padding: .7rem; border-bottom: 1px solid #eee; background: #fff; }
+.transcript-flow { line-height: 2; margin: 0 0 1rem; text-align: justify; }
 .list p { padding: .5rem 0; border-bottom: 1px solid #eee; }
 details { margin: .6rem 0; }
 summary { cursor: pointer; font-weight: 700; }

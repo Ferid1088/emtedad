@@ -17,7 +17,7 @@ from app.dialogue.schemas import (
     ReviewRequest,
 )
 from app.dialogue.service import DialogueService
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.retrieval.embeddings import EmbeddingProvider
 from app.retrieval.schemas import SearchResult
 
@@ -32,7 +32,7 @@ def _service(request: Request, model: str = "configured-default") -> DialogueSer
     return DialogueService(
         _database(request),
         cast(EmbeddingProvider, request.app.state.embedding_provider),
-        EvidenceRoleClassifier(CodexCliProvider(), model=model),
+        EvidenceRoleClassifier(resolve_llm_provider(), model=model),
     )
 
 

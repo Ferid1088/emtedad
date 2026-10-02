@@ -1,7 +1,7 @@
 """Application service for generating and querying speech structures."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -11,9 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
 from app.knowledge.llm.base import LLMProvider
-from app.speech_structure.claude_provider import ClaudeCodeFailoverProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import Source, SourceSegment, SourceVersion
-from app.speech_structure.domain import SegmentRelation, StructureStatus
+from app.speech_structure.domain import (
+    GLOBAL_PROMPT_VERSION,
+    LOCAL_PROMPT_VERSION,
+    SegmentRelation,
+    StructureStatus,
+)
 from app.speech_structure.models import (
     SpeechSection,
     SpeechSectionSegment,
@@ -43,14 +48,18 @@ class SpeechStructureService:
         coverage_threshold: float = 0.95,
     ) -> None:
         self.database = database
-        self.provider = provider or ClaudeCodeFailoverProvider.from_settings()
+        self.provider = provider or resolve_llm_provider("codex")
         self.model = model
         self.window_seconds = window_seconds
         self.overlap_seconds = overlap_seconds
         self.coverage_threshold = coverage_threshold
 
     async def create_for_source(
-        self, source_id: UUID, *, force: bool = False
+        self,
+        source_id: UUID,
+        *,
+        force: bool = False,
+        on_progress: Callable[[str], None] | None = None,
     ) -> SpeechStructure:
         async with self.database.transaction() as session:
             source, source_version, segments = await self._load_transcript(
@@ -100,7 +109,7 @@ class SpeechStructureService:
                 speech_structure_id=structure.id,
                 provider=getattr(self.provider, "name", type(self.provider).__name__),
                 model=self.model,
-                prompt_version="speech_structure_local_topics_v1+speech_structure_global_outline_v1",
+                prompt_version=f"{LOCAL_PROMPT_VERSION}+{GLOBAL_PROMPT_VERSION}",
                 input_hash=input_hash,
                 status=StructureStatus.PROCESSING.value,
             )
@@ -111,7 +120,9 @@ class SpeechStructureService:
                     model=self.model,
                     window_seconds=self.window_seconds,
                     overlap_seconds=self.overlap_seconds,
-                ).analyze(source, segments, input_hash)
+                ).analyze(source, segments, input_hash, on_progress=on_progress)
+                if on_progress is not None:
+                    on_progress("validate")
                 await self._persist_sections(session, structure, result.sections)
                 await session.flush()
                 sections = list(
@@ -242,7 +253,7 @@ class SpeechStructureService:
                         SpeechSectionSegment.source_segment_id == SourceSegment.id,
                     )
                     .where(SpeechSectionSegment.section_id == section_id)
-                    .order_by(SpeechSectionSegment.sequence)
+                    .order_by(SourceSegment.sequence)
                 )
             )
 

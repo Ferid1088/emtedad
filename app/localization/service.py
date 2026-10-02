@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.ayin.domain import LanguageCode
 from app.db.session import Database
 from app.knowledge.llm.base import StructuredExtractionRequest
-from app.knowledge.llm.codex import CodexCliProvider
+from app.knowledge.llm.factory import resolve_llm_provider
 from app.lecture.domain import PublicationLanguage
 from app.lecture.models import LectureMasterVersion
 from app.lecture.service import LectureMasterService
@@ -50,7 +50,7 @@ class LocalizationService:
     def __init__(self, database: Database) -> None:
         self.database = database
         self.master_service = LectureMasterService(database)
-        self.provider = CodexCliProvider()
+        self.provider = resolve_llm_provider()
 
     async def create(
         self,
