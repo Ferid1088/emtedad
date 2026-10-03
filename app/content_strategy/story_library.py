@@ -83,8 +83,7 @@ class StoryLibrary:
             story
             for story in self._stories
             if any(
-                relation.lesson_id == lesson_id
-                for relation in story.related_lessons
+                relation.lesson_id == lesson_id for relation in story.related_lessons
             )
         )
 

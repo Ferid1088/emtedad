@@ -1,4 +1,43 @@
-# Pending Phase: Phase 12 — Evaluation and Acceptance
+# Pending Phase: Multichannel program — Phase 21 complete, awaiting owner review
+
+(For the multichannel program defined in
+`docs/EMTEDAD_CODING_AGENT_MASTER_IMPLEMENTATION_PROMPT.md`. Phases 0–21 are
+complete; evidence in `docs/audits/MULTICHANNEL_PHASE_0_BASELINE.md`,
+`docs/audits/MULTICHANNEL_PHASE_1_EDITORIAL_CHANNELS.md`,
+`docs/audits/MULTICHANNEL_PHASES_4_7.md`,
+`docs/audits/MULTICHANNEL_PHASES_8_20.md`,
+`docs/audits/MULTICHANNEL_GENERIC_MASTER_PATH.md`,
+`docs/audits/MULTICHANNEL_PHASE_21_LEGACY_RETIREMENT.md`.)
+
+Phase 21 completed:
+
+- The active 100-lesson production path is retired: `LessonCanonRepository`,
+  `lesson_catalog`, `lesson_research`, `create_lesson_project`, lesson
+  routes/navigation/CLI, and the file-backed canon are gone.
+- Generic Persian capability lives in `app/content_engine/writing/`
+  (quality, text helpers, published memory, diversity, native reviewer/
+  optimizer, voice contracts) and is wired into `ScriptService` for `fa`
+  drafts — no lesson dependency.
+- `knowledge/structure` is the single Vortragsstruktur owner:
+  `app/knowledge/processing.py` (synchronous pipeline) +
+  `app/knowledge/structure/scheduler.py` (queue/retry/backoff ported from
+  the retired `speech_structure` scheduler); `app/speech_structure` is
+  now models-only for historical rows.
+- Historical lesson projects remain readable through `/workspace/{id}`
+  and the text library; `lesson_id`/`lesson_canon_hash` columns are
+  `LEGACY_PROVENANCE_ONLY`.
+- Verified: 220 unit + 52 integration tests pass; 3 documented baseline
+  failures unchanged (ix_speech index-name drift, ZWNJ ezafe
+  normalization, live-Devin topic suggestions).
+- Stop state: changes are NOT committed; awaiting owner approval.
+
+Next steps after owner approval:
+
+- Commit Phase 21.
+- The implementation prompt ends at Phase 21; the next phase is an owner
+  decision (hardening, deployment, new channels, or follow-on features).
+
+Legacy phase history (Phases 0–12 of the original program) follows.
 
 ## Execution status
 

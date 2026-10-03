@@ -1,0 +1,30 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Emtedad Studio</p>
+    <h1>Editorial Channels</h1>
+    <p class="lede">Five channels share one structured knowledge base. Pick a channel to work in.</p>
+  </div>
+</div>
+<section class="metric-strip">
+  <div class="card"><span class="metric-number">{{ source_count }}</span><small>Resources in library</small></div>
+  <div class="card"><span class="metric-number">{{ production_count }}</span><small>Active productions</small></div>
+  <div class="card"><span class="metric-number">{{ channels|length }}</span><small>Editorial channels</small></div>
+</section>
+<section class="channel-grid" aria-label="Editorial channels">
+  {% for channel in channels %}
+  <a class="card channel-card interactive" href="/studio/channels/{{ channel.slug }}">
+    <h2>{{ channel.name }}</h2>
+    <p class="muted">{{ channel.description }}</p>
+    <dl class="channel-stats">
+      <div><dt>Resources</dt><dd>{{ channel.resource_count }}</dd></div>
+      <div><dt>Topics</dt><dd>{{ channel.topic_count }}</dd></div>
+      <div><dt>Productions</dt><dd>{{ channel.active_production_count }}</dd></div>
+      <div><dt>Published</dt><dd>{{ channel.published_count }}</dd></div>
+    </dl>
+    <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ channel.status.value }}</span>
+  </a>
+  {% endfor %}
+</section>
+{% endblock %}

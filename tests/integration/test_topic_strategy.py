@@ -32,11 +32,11 @@ def test_strategy_tree_owner_workflow_is_retired() -> None:
         )
         for response in requests:
             assert response.status_code == 303
-            assert response.headers["location"] == "/lessons"
+            assert response.headers["location"] == "/studio"
 
-        lessons = client.get("/lessons")
-        assert lessons.status_code == 200
-        assert "100-Lektionen-Kanon" in lessons.text
+        lessons = client.get("/lessons", follow_redirects=False)
+        assert lessons.status_code == 303
+        assert lessons.headers["location"] == "/studio"
 
         topics = client.get("/topics")
         assert topics.status_code == 200

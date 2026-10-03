@@ -280,9 +280,7 @@ class ChannelLedgerEntry(Base):
 
     __tablename__ = "channel_ledger_entries"
     __table_args__ = (
-        CheckConstraint(
-            "content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"
-        ),
+        CheckConstraint("content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"),
         {"schema": CONTENT},
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -293,6 +291,7 @@ class ChannelLedgerEntry(Base):
     published_draft_id: Mapped[UUID] = mapped_column(
         ForeignKey(f"{CONTENT}.persian_drafts.id", ondelete="RESTRICT")
     )
+    # LEGACY_PROVENANCE_ONLY: generic published memory leaves this NULL.
     lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     published_title: Mapped[str] = mapped_column(String(512))
     concept_keys: Mapped[list[str]] = mapped_column(JSONB, default=list)

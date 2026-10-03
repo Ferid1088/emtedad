@@ -19,6 +19,7 @@ from app.core.ayin.models import (
     AyinDistinctionVersion,
     AyinOpenQuestionVersion,
 )
+from app.db.session import Database
 from app.knowledge.adapters.youtube import parse_youtube_video_id
 from app.knowledge.models import (
     ExternalClaim,
@@ -549,6 +550,25 @@ async def save_topic(
     session.add(topic)
     await session.flush()
     return topic
+
+
+async def import_youtube_resource(database: Database, locator: str) -> UUID:
+    """Validate a YouTube locator and ingest it through the shared pipeline."""
+
+    from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
+    from app.knowledge.importer import ExternalKnowledgeImporter
+    from app.knowledge.llm.factory import resolve_llm_provider
+    from app.knowledge.structure.scheduler import schedule_structure_analysis
+    from app.knowledge.structure.service import SourceStructureService
+
+    video_id = validate_youtube_url(locator)
+    importer = ExternalKnowledgeImporter(
+        database, resolve_youtube_adapter(), resolve_llm_provider()
+    )
+    imported = await importer.ingest(video_id)
+    await SourceStructureService(database).mark_ingested(imported.source_id)
+    schedule_structure_analysis(database, imported.source_id)
+    return imported.source_id
 
 
 async def dashboard_counts(session: AsyncSession) -> dict[str, int]:

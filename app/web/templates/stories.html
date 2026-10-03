@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">Externe Wissensbasis · Story Bank</p>
     <h1>Geschichten</h1>
-    <p class="lede">Kuratierte, weniger bekannte Geschichten für Beispiele und Perspektiven. Sie erweitern eine Lektion, definieren aber nicht ihren Ayin-Kern.</p>
+    <p class="lede">Kuratierte, weniger bekannte Geschichten für Beispiele und Perspektiven. Sie bereichern die Recherche, definieren aber keine kanonische Produktionsgrundlage.</p>
   </div>
   <span class="badge success">{{ total }} Geschichten</span>
 </div>
@@ -24,7 +24,7 @@
     <h2 dir="rtl"><a href="/stories/{{ story.story_id }}">{{ story.title_fa }}</a></h2>
     <p dir="rtl">{{ story.hook_fa }}</p>
     <p class="muted">{{ story.place }} · {{ story.key_people|join(', ') }} · {{ story.sources|length }} Quellen</p>
-    <div class="button-row"><a class="button" href="/stories/{{ story.story_id }}">Öffnen</a>{% if story.related_lessons %}<a class="linkbutton" href="/lessons/{{ story.related_lessons[0].lesson_id }}">Lektion {{ story.related_lessons[0].lesson_id }}</a>{% endif %}</div>
+    <div class="button-row"><a class="button" href="/stories/{{ story.story_id }}">Öffnen</a>{% if story.related_lessons %}<span class="badge">Historische Lektion {{ story.related_lessons[0].lesson_id }}</span>{% endif %}</div>
   </article>
 {% else %}
   <section class="card empty-state"><h2>Keine Geschichten gefunden</h2><p>Bitte Suche oder Filter anpassen.</p><a class="button secondary" href="/stories">Filter zurücksetzen</a></section>

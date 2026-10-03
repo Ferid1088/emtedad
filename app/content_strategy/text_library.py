@@ -11,6 +11,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content_engine.writing.text import (
+    extract_examples,
+    extract_open_promises,
+)
 from app.content_strategy.lesson_workflow import (
     LessonProjectMetadata,
     lesson_project_metadata,
@@ -22,10 +26,6 @@ from app.content_strategy.models import (
     EditorialProject,
     PersianDraft,
     TopicStrategyNode,
-)
-from app.content_strategy.persian_pipeline import (
-    extract_ledger_examples,
-    extract_open_promises,
 )
 
 STATUS_LABELS = {
@@ -368,13 +368,11 @@ async def publish_project(session: AsyncSession, project_id: UUID) -> EditorialP
                 published_draft_id=approved.id,
                 lesson_id=str(snapshot.get("lesson_id") or "") or None,
                 published_title=project.title,
-                concept_keys=[
-                    str(item) for item in package.get("core_concepts", [])
-                ],
+                concept_keys=[str(item) for item in package.get("core_concepts", [])],
                 canonical_definitions=[
                     item for item in registry if isinstance(item, dict)
                 ],
-                examples=extract_ledger_examples(approved.text),
+                examples=extract_examples(approved.text),
                 open_promises=extract_open_promises(approved.text),
                 fulfilled_promises=[],
                 title_history=[project.title],

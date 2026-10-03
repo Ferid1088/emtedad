@@ -1,4 +1,4 @@
-from app.content_strategy.persian_quality import (
+from app.content_engine.writing.quality import (
     PersianDraftQualityValidator,
     clean_source_text,
 )

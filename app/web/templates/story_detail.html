@@ -26,7 +26,7 @@
   </section>
 </div>
 <section class="card">
-  <h2>Verknüpfte Lektionen</h2>
-  <ul class="relation-list">{% for relation in story.related_lessons %}<li class="relation-item"><a href="/lessons/{{ relation.lesson_id }}"><strong>Lektion {{ relation.lesson_id }}</strong> · <span dir="rtl">{{ relation.lesson_title_fa }}</span></a><p dir="rtl">{{ relation.relation_fa }}</p></li>{% else %}<li class="muted">Keine redaktionelle Lektion-Verknüpfung hinterlegt.</li>{% endfor %}</ul>
+  <h2>Historische Lektionen-Verknüpfungen</h2>
+  <ul class="relation-list">{% for relation in story.related_lessons %}<li class="relation-item"><strong>Lektion {{ relation.lesson_id }}</strong> · <span dir="rtl">{{ relation.lesson_title_fa }}</span><p dir="rtl">{{ relation.relation_fa }}</p></li>{% else %}<li class="muted">Keine historische Lektion-Verknüpfung hinterlegt.</li>{% endfor %}</ul>
 </section>
 {% endblock %}

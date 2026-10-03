@@ -1,0 +1,71 @@
+{% extends "studio/layout.html" %}
+{% macro render_node(node) %}
+<li class="structure-node">
+  <div class="node-row">
+    <a href="/library/{{ source.id }}/structure?node={{ node.id }}"
+       class="node-title{% if selected_node and selected_node.id == node.id %} selected{% endif %}">
+      {{ node.title }}
+    </a>
+    <span class="chip chip-{{ node.node_type | lower }}">{{ node.node_type }}</span>
+    {% if node.start_seconds is not none %}
+    <span class="muted">{{ node.start_seconds }}s–{{ node.end_seconds }}s</span>
+    {% endif %}
+  </div>
+  {% if node.children %}
+  <ul class="node-children">
+    {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+  </ul>
+  {% endif %}
+</li>
+{% endmacro %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Resource</p>
+    <h1>{{ source.title }}</h1>
+  </div>
+  <form method="post" action="/library/{{ source.id }}/structure">
+    <button class="button" type="submit">
+      {% if tree %}Rebuild structure{% else %}Build structure{% endif %}
+    </button>
+  </form>
+</div>
+{% include "studio/_resource_tabs.html" %}
+{% if state %}
+<p class="muted">Processing status: <strong>{{ state.status.value }}</strong>
+  {% if state.last_error %} — {{ state.last_error }}{% endif %}</p>
+{% endif %}
+{% if tree %}
+<div class="structure-layout">
+  <section class="card">
+    <ul class="structure-tree">
+      {% for node in tree %}{{ render_node(node) }}{% endfor %}
+    </ul>
+  </section>
+  {% if selected_node %}
+  <section class="card node-detail">
+    <h2>{{ selected_node.title }}</h2>
+    <p class="muted">{{ selected_node.node_type.value }} · level {{ selected_node.level }}
+      {% if selected_node.confidence %} · confidence {{ "%.2f" | format(selected_node.confidence) }}{% endif %}</p>
+    <p>{{ selected_node.summary }}</p>
+    <h3>Source span ({{ node_segments | length }} segments)</h3>
+    <ol class="segment-list">
+      {% for segment in node_segments %}
+      <li>
+        <span class="muted">s{{ segment.sequence }} ·
+          {{ segment.start_seconds }}s–{{ segment.end_seconds }}s</span>
+        <p>{{ segment.raw_text }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+</div>
+{% else %}
+<section class="card empty-state">
+  <h2>No structure yet</h2>
+  <p>The hierarchical source structure (Vortragsstruktur) is generated from
+    the transcript. Click “Build structure” to run the extraction.</p>
+</section>
+{% endif %}
+{% endblock %}

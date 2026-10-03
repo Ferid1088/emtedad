@@ -26,11 +26,11 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import ApplicationError
 from app.db.health import DatabaseReadinessService, ReadinessService
 from app.db.session import Database, create_database
+from app.knowledge.structure.scheduler import init_scheduler
 from app.ops.logging import configure_logging
 from app.retrieval.embeddings import SentenceTransformerEmbeddingProvider
-from app.speech_structure.routes import router as speech_structure_router
-from app.speech_structure.scheduler import init_scheduler
 from app.web.routes import router as web_router
+from app.web.studio_routes import router as studio_router
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
@@ -110,7 +110,7 @@ def create_app(
     app.include_router(research_router)
     app.include_router(dialogue_router)
     app.include_router(web_router)
-    app.include_router(speech_structure_router)
+    app.include_router(studio_router)
     app.mount(
         "/static",
         StaticFiles(directory=Path(__file__).parent / "web" / "static"),

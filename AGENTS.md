@@ -85,10 +85,13 @@ repository, service, and workflow boundaries without premature microservices.
 
 Content production runs through the Devin Cloud API
 (`app/knowledge/llm/devin.py`); all structured extraction and editorial
-workflows resolve providers via `resolve_llm_provider()`. Programmatic
-lesson access goes through `python -m app.cli lessons
-status|package|project|research|draft|ledger`; the owner-approval gate in the
-orchestration is mandatory before any packaging step.
+workflows resolve providers via `resolve_llm_provider()`. Production is
+resource-first: `python -m app.cli knowledge ingest-youtube` imports sources,
+post-ingestion processing (structure → KnowledgeUnits) runs through
+`app.knowledge.structure`, and new productions originate from ContentBriefs
+(`origin_type=CONTENT_BRIEF`) — the 100-lesson canon is retired. The
+owner-approval gate in the orchestration is mandatory before any packaging
+step.
 
 ## Verification
 

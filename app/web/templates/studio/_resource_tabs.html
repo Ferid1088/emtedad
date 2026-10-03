@@ -1,0 +1,9 @@
+<nav class="tabs" aria-label="Resource sections">
+  {% for suffix, key, label in [
+    ('', 'original', 'Original'),
+    ('/structure', 'structure', 'Structure'),
+    ('/units', 'units', 'Knowledge Units')
+  ] %}
+  <a href="/library/{{ source.id }}{{ suffix }}" {% if active_tab == key %}class="active"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

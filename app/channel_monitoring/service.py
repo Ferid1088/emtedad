@@ -18,7 +18,7 @@ from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.models import Source
-from app.speech_structure.scheduler import schedule_structure_analysis
+from app.knowledge.structure.scheduler import schedule_structure_analysis
 
 
 @dataclass(frozen=True, slots=True)

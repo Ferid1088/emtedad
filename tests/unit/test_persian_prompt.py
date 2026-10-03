@@ -1,14 +1,19 @@
-from app.content_strategy.persian_prompt import MASTER_PERSIAN_WRITING_PROMPT
+from app.content_engine.writing.prompts import (
+    EMTEDAD_VOICE_CONTRACT,
+    PERSIAN_VOICE_CONTRACT,
+)
 
 
-def test_master_persian_prompt_preserves_editorial_boundaries() -> None:
-    assert "The path did not begin with us" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "پذیرش تسلیم نیست" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "Never write that science proves Ayin" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "Return only the" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "finished Persian editorial draft" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "Lesson Content Package is the complete AYIN CORE" in (
-        MASTER_PERSIAN_WRITING_PROMPT
-    )
-    assert "Do not retrieve from" in MASTER_PERSIAN_WRITING_PROMPT
-    assert "Published Script Archive" in MASTER_PERSIAN_WRITING_PROMPT
+def test_persian_voice_contract_preserves_editorial_boundaries() -> None:
+    assert "Return only the" in PERSIAN_VOICE_CONTRACT
+    assert "finished Persian editorial draft" in PERSIAN_VOICE_CONTRACT
+    assert "Never output source labels" in PERSIAN_VOICE_CONTRACT
+    # The generic contract must not depend on the retired lesson canon.
+    for forbidden in ("lesson", "Lesson", "Lesson Content Package", "canon"):
+        assert forbidden not in PERSIAN_VOICE_CONTRACT
+
+
+def test_emtedad_contract_preserves_ayin_boundaries() -> None:
+    assert "پذیرش تسلیم نیست" in EMTEDAD_VOICE_CONTRACT
+    assert "Never write that science proves Ayin" in EMTEDAD_VOICE_CONTRACT
+    assert "بُن" in EMTEDAD_VOICE_CONTRACT

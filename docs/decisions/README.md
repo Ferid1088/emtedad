@@ -30,3 +30,4 @@ belong to the editorial versioning workflow.
 - [ADR-011: Semantic Lecture Master and ResearchPackage Writer Isolation](ADR-011-semantic-lecture-master.md)
 - [ADR-012: Localization and Pronunciation Boundary](ADR-012-localization-pronunciation-boundary.md)
 - [ADR-013: Lesson Canon and Script-Generation Retrieval Boundary](ADR-013-lesson-canon-generation-boundary.md)
+- [ADR-014: Multi-Channel Resource-First Studio](ADR-014-multichannel-resource-first-studio.md)

@@ -16,19 +16,10 @@ from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_strategy.domain import TopicOrigin, TopicWorkspaceStatus
-from app.content_strategy.lesson_canon import LessonCanonRepository
-from app.content_strategy.lesson_catalog import (
-    filter_lesson_catalog,
-    load_lesson_catalog,
-)
-from app.content_strategy.lesson_research import (
-    LessonResearchService,
-    lesson_research_summary,
-)
 from app.content_strategy.lesson_workflow import (
-    create_lesson_project,
     lesson_package_from_project,
     lesson_project_metadata,
+    lesson_research_summary,
 )
 from app.content_strategy.models import (
     ContentTopic,
@@ -54,12 +45,7 @@ from app.content_strategy.text_library import (
 from app.core.ayin.models import CanonDocument
 from app.core.config import get_settings
 from app.db.session import Database
-from app.knowledge.adapters.youtube_mcp import (
-    YouTubeMcpClient,
-    resolve_youtube_adapter,
-)
-from app.knowledge.importer import ExternalKnowledgeImporter
-from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.adapters.youtube_mcp import YouTubeMcpClient
 from app.knowledge.models import (
     ExternalClaim,
     Mention,
@@ -70,8 +56,12 @@ from app.knowledge.models import (
     SourceVersion,
     Work,
 )
-from app.lecture.domain import MasterStatus, PublicationLanguage
-from app.lecture.models import LectureMasterVersion
+from app.knowledge.structure.scheduler import (
+    collect_source_infos,
+    get_scheduler,
+    summarize_states,
+)
+from app.lecture.domain import PublicationLanguage
 from app.localization.lexicon import (
     CRITICALITY_LABELS,
     DEFAULT_PROVIDER_PROFILE,
@@ -84,22 +74,14 @@ from app.localization.pronunciation import (
     PronunciationPreparation,
     prepare_pronunciation,
 )
-from app.retrieval.embeddings import EmbeddingProvider
-from app.speech_structure.scheduler import (
-    collect_source_infos,
-    get_scheduler,
-    schedule_structure_analysis,
-    summarize_states,
-)
 from app.topic_discovery import (
     TopicAnalysisService,
     TopicSuggestionService,
     dashboard_counts,
     save_topic,
     topic_detail_view,
-    validate_youtube_url,
 )
-from app.web.service import TopicSuggestion
+from app.web.service import TopicSuggestion, import_youtube_resource
 
 router = APIRouter(tags=["owner-web"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -145,18 +127,6 @@ async def dashboard(request: Request) -> HTMLResponse:
             )
             or 0
         )
-        lesson_progress = None
-        lesson_health = None
-        try:
-            lesson_repository = LessonCanonRepository()
-            _, lesson_progress = await load_lesson_catalog(session, lesson_repository)
-            lesson_health = {
-                "lessons": lesson_repository.lesson_count,
-                "relations": lesson_repository.relation_count,
-                "concepts": len(lesson_repository.core_concepts()),
-            }
-        except (FileNotFoundError, ValueError):
-            logger.exception("lesson canon unavailable for dashboard")
         structure_states = summarize_states(
             await collect_source_infos(session),
             get_scheduler(_database(request)),
@@ -174,8 +144,6 @@ async def dashboard(request: Request) -> HTMLResponse:
         sources=sources,
         topics=topics,
         pending_channels=pending_channels,
-        lesson_progress=lesson_progress,
-        lesson_health=lesson_health,
         structure_counts=structure_counts,
     )
 
@@ -233,12 +201,7 @@ async def add_source(request: Request) -> Response:
     form = await request.form()
     locator = str(form.get("url", "")).strip()
     try:
-        validate_youtube_url(locator)
-        importer = ExternalKnowledgeImporter(
-            _database(request), resolve_youtube_adapter(), resolve_llm_provider()
-        )
-        imported = await importer.ingest(locator)
-        schedule_structure_analysis(_database(request), imported.source_id)
+        await import_youtube_resource(_database(request), locator)
     except ValueError as exc:
         return await _render(
             request, "source_new.html", title="Quelle hinzufügen", error=str(exc)
@@ -383,61 +346,18 @@ async def knowledge(request: Request, section: str = "sources") -> HTMLResponse:
     )
 
 
-@router.get("/lessons", response_class=HTMLResponse)
-async def lessons(
-    request: Request,
-    q: str = "",
-    status: str = "",
-    concept: str = "",
-    prerequisites: str = "ALL",
-    number_from: str = "",
-    number_to: str = "",
-) -> HTMLResponse:
-    """Render the approved lesson canon as the long-term editorial map."""
+@router.get("/lessons")
+async def retired_lessons() -> RedirectResponse:
+    """The 100-lesson catalog is retired; production lives in the Studio."""
 
-    try:
-        repository = LessonCanonRepository()
-        async with _database(request).transaction() as session:
-            catalog, progress = await load_lesson_catalog(session, repository)
-        filtered = filter_lesson_catalog(
-            catalog,
-            query=q,
-            status=status,
-            concept=concept,
-            prerequisites=prerequisites,
-            number_from=_optional_int(number_from),
-            number_to=_optional_int(number_to),
-        )
-        health = {
-            "lessons": repository.lesson_count,
-            "relations": repository.relation_count,
-            "concepts": len(repository.core_concepts()),
-        }
-        core_concepts = repository.core_concepts()
-        error = None
-    except (FileNotFoundError, ValueError) as exc:
-        logger.exception("lesson canon unavailable")
-        filtered = []
-        progress = None
-        health = None
-        core_concepts = []
-        error = str(exc)
-    return await _render(
-        request,
-        "lessons.html",
-        title="Lektionen",
-        lessons=filtered,
-        progress=progress,
-        health=health,
-        core_concepts=core_concepts,
-        error=error,
-        q=q,
-        selected_status=status,
-        selected_concept=concept,
-        selected_prerequisites=prerequisites,
-        number_from=number_from,
-        number_to=number_to,
-    )
+    return RedirectResponse("/studio", status_code=303)
+
+
+@router.get("/lessons/{rest:path}")
+async def retired_lesson_urls(rest: str) -> RedirectResponse:
+    """Keep old lesson bookmarks safe without exposing the catalog."""
+
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.get("/stories", response_class=HTMLResponse)
@@ -486,124 +406,6 @@ async def story_detail(request: Request, story_id: str) -> HTMLResponse:
         title=story.title_fa,
         story=story,
     )
-
-
-@router.get("/lessons/concepts", response_class=HTMLResponse)
-async def lesson_concepts(request: Request) -> HTMLResponse:
-    try:
-        repository = LessonCanonRepository()
-        concepts = repository.core_concepts()
-        error = None
-    except (FileNotFoundError, ValueError) as exc:
-        logger.exception("lesson core concepts unavailable")
-        concepts = []
-        error = str(exc)
-    return await _render(
-        request,
-        "lesson_concepts.html",
-        title="Kernbegriffe",
-        concepts=concepts,
-        error=error,
-    )
-
-
-@router.get("/lessons/{lesson_id}", response_class=HTMLResponse)
-async def lesson_detail(request: Request, lesson_id: str) -> HTMLResponse:
-    try:
-        repository = LessonCanonRepository()
-        package = repository.package(lesson_id)
-    except ValueError:
-        return HTMLResponse("Lektion nicht gefunden", status_code=404)
-    except FileNotFoundError:
-        return HTMLResponse("Lektionskanon nicht importiert", status_code=503)
-
-    summaries = {item.lesson_id: item for item in repository.summaries()}
-    prerequisites_view = [
-        {
-            "lesson": summaries[relation.to_lesson_id],
-            "number": repository.ordinal(relation.to_lesson_id),
-            "explanation": relation.explanation_fa,
-        }
-        for relation in repository.outgoing_relations(lesson_id)
-        if relation.is_prerequisite
-    ]
-    prepares_view = [
-        {
-            "lesson": summaries[relation.from_lesson_id],
-            "number": repository.ordinal(relation.from_lesson_id),
-            "explanation": relation.explanation_fa,
-        }
-        for relation in repository.incoming_relations(lesson_id)
-        if relation.is_prerequisite
-    ]
-    related: dict[str, dict[str, object]] = {}
-    for relation in repository.outgoing_relations(lesson_id):
-        if not relation.is_prerequisite:
-            related[relation.to_lesson_id] = {
-                "lesson": summaries[relation.to_lesson_id],
-                "number": repository.ordinal(relation.to_lesson_id),
-                "explanation": relation.explanation_fa,
-            }
-    for relation in repository.incoming_relations(lesson_id):
-        if not relation.is_prerequisite:
-            related.setdefault(
-                relation.from_lesson_id,
-                {
-                    "lesson": summaries[relation.from_lesson_id],
-                    "number": repository.ordinal(relation.from_lesson_id),
-                    "explanation": relation.explanation_fa,
-                },
-            )
-
-    try:
-        related_stories = StoryLibrary().for_lesson(lesson_id)
-        stories_error = None
-    except (FileNotFoundError, ValueError) as exc:
-        related_stories = ()
-        stories_error = str(exc)
-
-    async with _database(request).transaction() as session:
-        catalog, _ = await load_lesson_catalog(session, repository)
-        item = next(entry for entry in catalog if entry.package.lesson_id == lesson_id)
-        projects = [
-            entry
-            for entry in await load_library_items(session, status=None)
-            if entry.lesson is not None and entry.lesson.lesson_id == lesson_id
-        ]
-    return await _render(
-        request,
-        "lesson_detail.html",
-        title=package.canonical_lesson_title,
-        item=item,
-        package=package,
-        projects=projects,
-        prerequisites_view=prerequisites_view,
-        prepares_view=prepares_view,
-        related_view=list(related.values()),
-        related_stories=related_stories,
-        stories_error=stories_error,
-    )
-
-
-@router.post("/lessons/{lesson_id}/projects")
-async def start_lesson_project(request: Request, lesson_id: str) -> Response:
-    form = await request.form()
-    owner_prompt = str(form.get("owner_prompt", "")).strip() or None
-    raw_duration = str(form.get("target_duration_minutes", "")).strip()
-    duration = int(raw_duration) if raw_duration.isdigit() else None
-    try:
-        repository = LessonCanonRepository()
-        async with _database(request).transaction() as session:
-            project = await create_lesson_project(
-                session,
-                repository,
-                lesson_id,
-                owner_prompt=owner_prompt,
-                target_duration_minutes=duration,
-            )
-    except ValueError:
-        return HTMLResponse("Lektion nicht gefunden", status_code=404)
-    return RedirectResponse(f"/workspace/{project.id}", status_code=303)
 
 
 @router.get("/topics", response_class=HTMLResponse)
@@ -885,46 +687,46 @@ async def refresh_topic_analysis(request: Request, topic_id: UUID) -> Response:
 async def retired_strategy_tree() -> RedirectResponse:
     """Retire the former fixed tree without deleting historical references."""
 
-    return RedirectResponse("/lessons", status_code=303)
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.post("/strategy/generate")
 async def generate_strategy() -> RedirectResponse:
     """Never recreate the obsolete owner-facing strategy tree."""
 
-    return RedirectResponse("/lessons", status_code=303)
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.post("/strategy/{strategy_id}/approve")
 async def approve_strategy(request: Request, strategy_id: UUID) -> RedirectResponse:
-    return RedirectResponse("/lessons", status_code=303)
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.get("/strategy/topics/{node_id}")
 async def retired_strategy_topic(node_id: UUID) -> RedirectResponse:
     """Keep old URLs safe while removing the tree as a navigation surface."""
 
-    return RedirectResponse("/lessons", status_code=303)
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.post("/strategy/topics/{node_id}/use")
 async def use_strategy_topic(node_id: UUID) -> RedirectResponse:
     """Block new projects from obsolete fixed strategy topics."""
 
-    return RedirectResponse("/lessons", status_code=303)
+    return RedirectResponse("/studio", status_code=303)
 
 
 @router.get("/workspace/{project_id}", response_class=HTMLResponse)
 async def editorial_workspace(
     request: Request,
     project_id: UUID,
-    research: str | None = None,
 ) -> HTMLResponse:
-    try:
-        lesson_canon = LessonCanonRepository()
-        lesson_summaries = lesson_canon.summaries()
-    except (FileNotFoundError, ValueError):
-        lesson_summaries = []
+    """Read-only workspace for historical editorial projects.
+
+    Lesson canon, lesson research, and Persian draft generation are retired;
+    drafts, findings, and tracks remain viewable and maintainable.
+    """
+
     async with _database(request).transaction() as session:
         project = await session.get(EditorialProject, project_id)
         if project is None:
@@ -968,52 +770,6 @@ async def editorial_workspace(
         lesson_metadata = lesson_project_metadata(project)
         lesson_package = lesson_package_from_project(project)
         research_summary = await lesson_research_summary(session, project)
-        if lesson_metadata is not None:
-            masters = (
-                list(
-                    await session.scalars(
-                        select(LectureMasterVersion).where(
-                            LectureMasterVersion.id == project.semantic_master_id,
-                            LectureMasterVersion.research_package_id
-                            == project.research_package_id,
-                            LectureMasterVersion.status == MasterStatus.READY,
-                        )
-                    )
-                )
-                if research_summary is not None
-                and research_summary.ready_for_writing
-                and project.semantic_master_id is not None
-                and project.research_package_id is not None
-                else []
-            )
-        else:
-            masters = list(
-                await session.scalars(
-                    select(LectureMasterVersion)
-                    .where(LectureMasterVersion.status == MasterStatus.READY)
-                    .order_by(LectureMasterVersion.created_at.desc())
-                )
-            )
-    research_messages = {
-        "ready": "Die externe Recherche ist eingefroren und bereit für den Entwurf.",
-        "empty": (
-            "Die Recherche wurde ausgeführt, fand aber keine passenden externen "
-            "Treffer. Der Kanon wurde nicht mit erfundenem Material ergänzt."
-        ),
-        "review": (
-            "Externe Treffer wurden gespeichert, der Semantic Master benötigt "
-            "jedoch eine Prüfung."
-        ),
-        "missing-index": (
-            "Die externe Wissensbasis ist noch nicht suchbereit. Bitte Quellen "
-            "zuerst indexieren."
-        ),
-        "invalid": "Diese Recherche kann für das Projekt nicht gestartet werden.",
-        "failed": (
-            "Die externe Recherche konnte nicht abgeschlossen werden. "
-            "Die vorhandenen Projektdaten blieben unverändert."
-        ),
-    }
     return await _render(
         request,
         "editorial_workspace.html",
@@ -1021,13 +777,9 @@ async def editorial_workspace(
         project=project,
         drafts=drafts,
         tracks=tracks,
-        masters=masters,
-        lessons=lesson_summaries,
         lesson_metadata=lesson_metadata,
         lesson_package=lesson_package,
         research_summary=research_summary,
-        research_message=research_messages.get(research or ""),
-        research_message_is_error=research in {"missing-index", "invalid", "failed"},
         review_findings=review_findings,
         studio_progress={
             "lesson": lesson_package is not None,
@@ -1042,49 +794,6 @@ async def editorial_workspace(
         project_status_label=(
             workspace_item.status_label if workspace_item else "In Arbeit"
         ),
-    )
-
-
-@router.post("/workspace/{project_id}/research")
-async def run_lesson_research(request: Request, project_id: UUID) -> RedirectResponse:
-    """Create the lesson-scoped external package before any script generation."""
-
-    form = await request.form()
-    owner_focus = str(form.get("owner_focus", "")).strip() or None
-    provider = cast(EmbeddingProvider, request.app.state.embedding_provider)
-    try:
-        result = await LessonResearchService(_database(request), provider).run(
-            project_id, owner_focus=owner_focus
-        )
-    except ValueError as exc:
-        logger.warning(
-            "lesson_research.rejected",
-            extra={"project_id": str(project_id), "reason": str(exc)},
-        )
-        code = (
-            "missing-index"
-            if "Wissensindex" in str(exc) or "indexiert" in str(exc)
-            else "invalid"
-        )
-        return RedirectResponse(
-            f"/workspace/{project_id}?research={code}", status_code=303
-        )
-    except Exception:
-        logger.exception(
-            "lesson_research.failed", extra={"project_id": str(project_id)}
-        )
-        return RedirectResponse(
-            f"/workspace/{project_id}?research=failed", status_code=303
-        )
-    state = (
-        "ready"
-        if result.ready_for_writing
-        else "empty"
-        if result.result_count == 0
-        else "review"
-    )
-    return RedirectResponse(
-        f"/workspace/{project_id}?research={state}", status_code=303
     )
 
 
@@ -1269,27 +978,6 @@ async def export_text(request: Request, project_id: UUID) -> Response:
     )
 
 
-@router.post("/workspace/{project_id}/persian/drafts")
-async def generate_persian_drafts(
-    request: Request, project_id: UUID
-) -> RedirectResponse:
-    form = await request.form()
-    master_id = UUID(str(form.get("semantic_master_id")))
-    lesson_id = str(form.get("lesson_id", "")).strip()
-    target = int(str(form.get("target_duration_minutes", "15")))
-    count = int(str(form.get("draft_count", "1")))
-    prompt = str(form.get("owner_prompt", "")).strip() or None
-    await PersianEditorialService(_database(request)).generate(
-        project_id,
-        master_id,
-        lesson_id=lesson_id,
-        target_minutes=target,
-        draft_count=count,
-        owner_prompt=prompt,
-    )
-    return RedirectResponse(f"/workspace/{project_id}", status_code=303)
-
-
 @router.post("/workspace/{project_id}/persian/drafts/{draft_id}/edit")
 async def edit_persian_draft(
     request: Request, project_id: UUID, draft_id: UUID
@@ -1346,13 +1034,6 @@ async def prepare_track_performance(
         track_id, expected_project_id=project_id
     )
     return RedirectResponse(f"/workspace/{project_id}", status_code=303)
-
-
-@router.get("/studio", response_class=HTMLResponse)
-async def studio(request: Request) -> HTMLResponse:
-    async with _database(request).transaction() as session:
-        items = await load_library_items(session, status="ACTIVE")
-    return await _render(request, "studio.html", title="Studio", items=items)
 
 
 @router.get("/studio/voice", response_class=HTMLResponse)

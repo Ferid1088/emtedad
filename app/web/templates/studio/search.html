@@ -1,0 +1,63 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Knowledge</p>
+    <h1>Knowledge Unit Search</h1>
+  </div>
+</div>
+<form method="get" action="/studio/search" class="unit-search">
+  <input type="search" name="q" value="{{ query }}"
+         placeholder="Search knowledge units or concepts">
+  <select name="expansion">
+    {% for mode in modes %}
+    <option value="{{ mode.value }}" {% if mode.value == expansion %}selected{% endif %}>{{ mode.value }}</option>
+    {% endfor %}
+  </select>
+  <button class="button" type="submit">Search</button>
+</form>
+{% if query and not results %}
+<section class="card empty-state">
+  <h2>No matches</h2>
+  <p>No Knowledge Units matched “{{ query }}”.</p>
+</section>
+{% endif %}
+<section class="card">
+  <ul class="unit-list">
+    {% for hit in results %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <strong>{{ hit.title }}</strong>
+        <span class="chip">{{ hit.unit_type }}</span>
+        {% if hit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
+      </div>
+      <p>{{ hit.summary }}</p>
+      <p class="muted">
+        <a href="/library/{{ hit.source_id }}">{{ hit.source_title }}</a>
+        {% if hit.start_seconds is not none %}
+        · {{ hit.start_seconds }}s–{{ hit.end_seconds }}s
+        {% endif %}
+        · {{ " › ".join(hit.structure_path) }}
+      </p>
+      {% if hit.matched_concepts %}
+      <p class="muted">Concepts: {{ hit.matched_concepts | join(", ") }}</p>
+      {% endif %}
+      <details>
+        <summary>Original text</summary>
+        <p class="unit-fulltext">{{ hit.full_text }}</p>
+      </details>
+      {% if hit.expanded_context %}
+      <details>
+        <summary>Expanded context ({{ hit.expanded_context | length }} units)</summary>
+        <ul>
+          {% for item in hit.expanded_context %}
+          <li><strong>{{ item.title }}</strong> — {{ item.summary }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

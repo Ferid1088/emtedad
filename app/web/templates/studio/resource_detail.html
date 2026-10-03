@@ -1,0 +1,67 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Resource</p>
+    <h1>{{ source.title }}</h1>
+    <p class="lede"><a href="{{ source.canonical_url }}">{{ source.canonical_url }}</a></p>
+  </div>
+</div>
+{% include "studio/_resource_tabs.html" %}
+<section class="card">
+  <h2>Metadata</h2>
+  <dl class="metadata">
+    <div><dt>Type</dt><dd>{{ source.source_type.value }}</dd></div>
+    <div><dt>Platform</dt><dd>{{ source.platform }}</dd></div>
+    <div><dt>Language</dt><dd>{{ source.language }}</dd></div>
+    <div><dt>Ingestion</dt><dd>{{ source.ingestion_status.value }}</dd></div>
+    <div><dt>Duration</dt><dd>{% if source.duration_seconds %}{{ (source.duration_seconds / 60)|round(1) }} min{% else %}—{% endif %}</dd></div>
+    <div><dt>Published</dt><dd>{{ source.published_at.strftime('%Y-%m-%d') if source.published_at else '—' }}</dd></div>
+  </dl>
+  {% if source.description %}<p class="muted">{{ source.description[:600] }}</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Assigned channels</h2>
+  {% if assigned_slugs %}
+  <p>{% for slug in assigned_slugs %}<a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a> {% endfor %}</p>
+  {% else %}
+  <p class="muted">Not assigned to any channel.</p>
+  {% endif %}
+  <form method="post" action="/library/{{ source.id }}/assign" class="assign-form">
+    <label>Assign to channel
+      <select name="channel_slug">
+        {% for channel in channels %}<option value="{{ channel.slug }}">{{ channel.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="button secondary" type="submit">Assign to Channel</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Versions ({{ versions|length }})</h2>
+  <table>
+    <thead><tr><th>Acquired</th><th>Content hash</th><th>Transcript hash</th><th>Tool</th></tr></thead>
+    <tbody>
+      {% for version in versions %}
+      <tr>
+        <td>{{ version.acquired_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><code>{{ version.content_hash[:12] }}…</code></td>
+        <td><code>{{ version.transcript_hash[:12] }}…</code></td>
+        <td>{{ version.acquisition_tool }} {{ version.acquisition_version }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>Transcript ({{ segments|length }} segments)</h2>
+  {% for segment in segments[:200] %}
+  <div class="transcript">
+    <span class="muted">[{{ segment.start_seconds }}s → {{ segment.end_seconds }}s]</span>
+    <span>{{ segment.normalized_text }}</span>
+  </div>
+  {% else %}
+  <p class="muted">No transcript segments stored.</p>
+  {% endfor %}
+  {% if segments|length > 200 %}<p class="muted">Showing first 200 of {{ segments|length }} segments.</p>{% endif %}
+</section>
+{% endblock %}

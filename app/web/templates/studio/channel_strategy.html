@@ -1,0 +1,48 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Channel</p>
+    <h1>{{ channel.name }} — Strategy</h1>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+{% if active_strategy %}
+<section class="card">
+  <div class="split-head">
+    <h2>Active strategy — v{{ active_strategy.version_number }}</h2>
+    <span class="badge success">ACTIVE</span>
+  </div>
+  <p><strong>Core question:</strong> {{ active_strategy.core_question }}</p>
+  <dl class="metadata">
+    <div><dt>Activated</dt><dd>{{ active_strategy.activated_at.strftime('%Y-%m-%d %H:%M') if active_strategy.activated_at else '—' }}</dd></div>
+    <div><dt>Domains</dt><dd>{{ active_strategy.domains_json.get('domains', [])|join(', ') }}</dd></div>
+    <div><dt>Preferred angles</dt><dd>{{ active_strategy.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Forbidden angles</dt><dd>{{ active_strategy.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Special roles</dt><dd>{{ active_strategy.agent_profile_json.get('special_roles', [])|join(', ') }}</dd></div>
+    <div><dt>Scoring weights</dt><dd>
+      {% for key, weight in active_strategy.topic_scoring_policy_json.get('weights', {}).items() %}{{ key }} {{ weight }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </dd></div>
+  </dl>
+</section>
+{% else %}
+<section class="card empty-state"><p>No active strategy for this channel.</p></section>
+{% endif %}
+<section class="card">
+  <h2>Version history</h2>
+  <table>
+    <thead><tr><th>Version</th><th>Status</th><th>Core question</th><th>Created</th><th>Activated</th></tr></thead>
+    <tbody>
+      {% for item in strategies %}
+      <tr>
+        <td>v{{ item.version_number }}</td>
+        <td><span class="badge {% if item.status.value == 'ACTIVE' %}success{% endif %}">{{ item.status.value }}</span></td>
+        <td>{{ item.core_question }}</td>
+        <td>{{ item.created_at.strftime('%Y-%m-%d') }}</td>
+        <td>{{ item.activated_at.strftime('%Y-%m-%d') if item.activated_at else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -16,7 +16,7 @@
   <article class="card topic-card">
     <div class="topic-card-head"><span class="badge">{{ item.origin_label }}</span><span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span></div>
     <h2><a href="/texts/{{ item.project.id }}">{{ item.project.title }}</a></h2>
-    {% if item.lesson %}<p><strong>Lektion {{ item.lesson.number }} / {{ item.lesson.total }}</strong><br><a dir="rtl" href="/lessons/{{ item.lesson.lesson_id }}">{{ item.lesson.title }}</a></p>{% endif %}
+    {% if item.lesson %}<p><strong>Historische Lektion {{ item.lesson.number }} / {{ item.lesson.total }}</strong><br><span dir="rtl">{{ item.lesson.title }}</span></p>{% endif %}
     <p>{{ item.project.human_question }}</p>
     {% if item.topic %}<p class="muted">Thema: {{ item.topic.title }}</p>{% endif %}
     {% if item.branch_title %}<p class="muted">Ast: {{ item.branch_title }}</p>{% endif %}

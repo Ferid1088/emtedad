@@ -1,0 +1,55 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Channel</p>
+    <h1>{{ channel.name }} — Resources</h1>
+    <p class="lede">Sources are shared across channels; assigning never duplicates them.</p>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+<section class="card">
+  <h2>Assigned ({{ assigned|length }})</h2>
+  <table>
+    <thead><tr><th>Title</th><th>Platform</th><th>Language</th><th>Role</th><th></th></tr></thead>
+    <tbody>
+      {% for source in assigned %}
+      {% set link = resources|selectattr('source_id', 'equalto', source.id)|first %}
+      <tr>
+        <td><a href="/library/{{ source.id }}">{{ source.title }}</a></td>
+        <td>{{ source.platform }}</td>
+        <td>{{ source.language }}</td>
+        <td><span class="badge">{{ link.role.value if link else '—' }}</span></td>
+        <td>
+          <form method="post" action="/studio/channels/{{ channel.slug }}/resources/{{ source.id }}/unassign">
+            <button class="linkbutton" type="submit">Unassign</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No resources assigned.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>Assign a resource</h2>
+  {% if unassigned %}
+  <form method="post" action="/studio/channels/{{ channel.slug }}/resources" class="assign-form">
+    <label>Resource
+      <select name="source_id">
+        {% for source in unassigned %}<option value="{{ source.id }}">{{ source.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Role
+      <select name="role">
+        {% for role in roles %}<option value="{{ role.value }}">{{ role.value }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="button" type="submit">Assign Resource</button>
+  </form>
+  {% else %}
+  <p class="muted">Every library resource is already assigned to this channel.</p>
+  {% endif %}
+</section>
+{% endblock %}

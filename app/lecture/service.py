@@ -27,6 +27,7 @@ from app.lecture.domain import (
     EvidenceBindingRole,
     EvidenceKind,
     LectureProjectStatus,
+    MasterOriginType,
     MasterStatus,
     SectionRole,
 )
@@ -143,6 +144,11 @@ class LectureMasterService:
                     "Never present optional metaphysics as scientific fact",
                 ],
                 status=MasterStatus.ARCHITECTED,
+                origin_type=(
+                    MasterOriginType.LEGACY_LESSON
+                    if package.lesson_id is not None
+                    else MasterOriginType.LEGACY_AYIN
+                ),
                 input_hash=_hash(
                     [package.id, package.content_hash, project.lecture_type.value]
                 ),

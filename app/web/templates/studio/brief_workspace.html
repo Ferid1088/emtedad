@@ -1,0 +1,67 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Production{% if channel_slug %} — {{ channel_slug }}{% endif %}</p>
+    <h1>{{ brief.question }}</h1>
+    <p class="lede">{{ brief.thesis }}</p>
+  </div>
+  <div class="score-block">
+    <span class="score-total">{{ state.stage.value.replace('_', ' ') }}</span>
+    <span class="muted">stage</span>
+  </div>
+</div>
+
+<nav class="stepper" aria-label="Production stages">
+  {% for stage in stages %}
+  <span class="step {% if stage == state.stage %}active{% endif %}">{{ stage.value.replace('_', ' ') }}</span>
+  {% endfor %}
+</nav>
+
+<div class="columns">
+  <section class="card">
+    <h2>Current artifact</h2>
+    <dl>
+      <div><dt>Stage</dt><dd>{{ state.stage.value }}</dd></div>
+      <div><dt>Brief status</dt><dd>{{ brief.status.value }}</dd></div>
+      <div><dt>Evidence matrix</dt><dd>{{ state.latest_matrix_id or '—' }}</dd></div>
+      <div><dt>Argument plan</dt><dd>{{ state.latest_argument_id or '—' }}</dd></div>
+      <div><dt>Narrative plan</dt><dd>{{ state.latest_narrative_id or '—' }}</dd></div>
+      <div><dt>Semantic master</dt><dd>{{ state.latest_master_id or '—' }}</dd></div>
+      <div><dt>Latest draft</dt><dd>{{ state.latest_draft_id or '—' }}</dd></div>
+      <div><dt>Open blockers</dt><dd>{{ state.open_blockers }}</dd></div>
+    </dl>
+  </section>
+
+  <aside class="card">
+    <h2>Allowed actions</h2>
+    {% if state.allowed_actions %}
+    {% set action_labels = {
+      'plan_research': 'Plan research',
+      'build_evidence': 'Build evidence matrix',
+      'build_argument': 'Build argument plan',
+      'build_narrative': 'Build narrative plan',
+      'build_master': 'Build Semantic Master',
+      'build_script': 'Build script',
+      'run_review': 'Run review',
+      'revise': 'Revise draft',
+      'approve': 'Approve draft',
+    } %}
+    <ul class="action-list">
+      {% for action in state.allowed_actions %}
+      <li>
+        <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
+          <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No actions available in this stage.</p>
+    {% endif %}
+    {% if state.open_blockers %}
+    <p class="muted">{{ state.open_blockers }} blocking finding(s) must be resolved before approval.</p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

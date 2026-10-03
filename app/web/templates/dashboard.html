@@ -1,22 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="pagehead"><div><p class="eyebrow">Owner Workspace</p><h1>Dashboard</h1><p class="lede">Kanonische Lektionen planen, externe Forschung prüfen und mehrsprachige Texte bis zur Veröffentlichung begleiten.</p></div><div class="button-row"><a class="button" href="/lessons">Lektionen öffnen</a><a class="button secondary" href="/sources/new">Quelle hinzufügen</a></div></div>
+<div class="pagehead"><div><p class="eyebrow">Owner Workspace</p><h1>Dashboard</h1><p class="lede">Kanäle, Ressourcen und Themen planen, externe Forschung prüfen und mehrsprachige Texte bis zur Veröffentlichung begleiten.</p></div><div class="button-row"><a class="button" href="/studio">Studio öffnen</a><a class="button secondary" href="/sources/new">Quelle hinzufügen</a></div></div>
 {% if pending_channels %}<p class="warning"><a href="/channels">{{ pending_channels }} neue Videos warten auf Prüfung.</a></p>{% endif %}
-{% if lesson_progress %}
-<section class="card">
-  <div class="split-head"><div><p class="eyebrow">Serienfortschritt</p><h2>100 Lektionen</h2></div>{% if lesson_health %}<span class="badge success">{{ lesson_health.lessons }} Lektionen · {{ lesson_health.relations }} Beziehungen · {{ lesson_health.concepts }} Kernbegriffe</span>{% endif %}</div>
-  <div class="metric-strip"><div data-lesson-metric="published" data-value="{{ lesson_progress.published }}"><span class="metric-number">{{ lesson_progress.published }}</span><span>veröffentlicht</span></div><div data-lesson-metric="in-progress" data-value="{{ lesson_progress.in_progress }}"><span class="metric-number">{{ lesson_progress.in_progress }}</span><span>in Arbeit</span></div><div data-lesson-metric="open" data-value="{{ lesson_progress.open }}"><span class="metric-number">{{ lesson_progress.open }}</span><span>noch offen</span></div></div>
-  <div class="columns">
-    <div><h3>Sprachfassungen</h3><div class="status-row">{% for lang in ['fa','de','en','ar'] %}<span class="badge">{{ lang|upper }} {{ lesson_progress.translations[lang] }}</span>{% endfor %}</div></div>
-    <div><h3>Voice Ready</h3><div class="status-row">{% for lang in ['fa','de','en','ar'] %}<span class="badge">{{ lang|upper }} {{ lesson_progress.voice_ready[lang] }}</span>{% endfor %}</div></div>
-  </div>
-</section>
-{% else %}<section class="card"><p class="warning">Der 100-Lektionen-Kanon wurde noch nicht importiert oder ist unvollständig.</p><a class="button secondary" href="/lessons">Importstatus prüfen</a></section>{% endif %}
-{% if structure_counts %}<section class="card"><div class="split-head"><h2>Vortragsstrukturen</h2><a href="/speech-structures">Übersicht</a></div><div class="status-row">
+{% if structure_counts %}<section class="card"><div class="split-head"><h2>Vortragsstrukturen</h2><a href="/sources">Übersicht</a></div><div class="status-row">
 {% if structure_counts.get('READY') %}<span class="badge success">✅ {{ structure_counts['READY'] }} fertig</span>{% endif %}
 {% if structure_counts.get('RUNNING') %}<span class="badge published">🔄 {{ structure_counts['RUNNING'] }} läuft</span>{% endif %}
 {% if structure_counts.get('PENDING') %}<span class="badge open">⏳ {{ structure_counts['PENDING'] }} wartet</span>{% endif %}
 {% if structure_counts.get('STALE') %}<span class="badge warning">◌ {{ structure_counts['STALE'] }} veraltet</span>{% endif %}
+{% if structure_counts.get('REVIEW') %}<span class="badge warning">👁 {{ structure_counts['REVIEW'] }} in Prüfung</span>{% endif %}
 {% if structure_counts.get('FAILED') %}<span class="badge danger">⚠️ {{ structure_counts['FAILED'] }} fehlgeschlagen</span>{% endif %}
 {% if structure_counts.get('UNAVAILABLE') %}<span class="badge open">— {{ structure_counts['UNAVAILABLE'] }} ohne Transkript</span>{% endif %}
 </div></section>{% endif %}

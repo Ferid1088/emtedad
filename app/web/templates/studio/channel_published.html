@@ -1,0 +1,14 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Channel</p>
+    <h1>{{ channel.name }} — Published</h1>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+<section class="card empty-state">
+  <h2>Nothing published yet</h2>
+  <p>Published outputs for this channel appear here after owner approval.</p>
+</section>
+{% endblock %}

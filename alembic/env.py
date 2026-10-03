@@ -7,21 +7,28 @@ from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.briefs import models as brief_models  # noqa: F401
+from app.channel_monitoring import models as channel_monitoring_models  # noqa: F401
+from app.content_engine import models as content_engine_models  # noqa: F401
+from app.content_strategy import models as content_strategy_models  # noqa: F401
 from app.core.ayin import models as ayin_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.terminology import models as terminology_models  # noqa: F401
-from app.content_strategy import models as content_strategy_models  # noqa: F401
-from app.channel_monitoring import models as channel_monitoring_models  # noqa: F401
 from app.db.base import Base
 from app.dialogue import models as dialogue_models  # noqa: F401
+from app.editorial_channels import models as editorial_channel_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
-from app.ops.assets import models as asset_models  # noqa: F401
-from app.retrieval import models as retrieval_models  # noqa: F401
-from app.research import models as research_models  # noqa: F401
+from app.knowledge.structure import models as source_structure_models  # noqa: F401
+from app.knowledge.units import models as knowledge_unit_models  # noqa: F401
 from app.lecture import models as lecture_models  # noqa: F401
 from app.localization import models as localization_models  # noqa: F401
+from app.ops.assets import models as asset_models  # noqa: F401
+from app.production import models as production_models  # noqa: F401
+from app.research import models as research_models  # noqa: F401
+from app.retrieval import models as retrieval_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 from app.speech_structure import models as speech_structure_models  # noqa: F401
+from app.topics import models as topic_models  # noqa: F401
 
 config = context.config
 

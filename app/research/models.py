@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, PostgresSchema
 from app.ops.assets.models import utc_now
 from app.research.domain import (
+    EvidenceMatrixStatus,
     EvidenceSelectionRole,
     PackageIssueSeverity,
     PackageStatus,
@@ -222,12 +223,9 @@ class ResearchPlan(Base):
         CheckConstraint("version_number > 0", name="positive_version"),
         CheckConstraint("input_hash ~ '^[0-9a-f]{64}$'", name="valid_input_hash"),
         CheckConstraint(
-            "(ayin_spine_id IS NOT NULL AND lesson_id IS NULL "
-            "AND lesson_canon_hash IS NULL "
-            "AND lesson_content_package_snapshot IS NULL) "
-            "OR (ayin_spine_id IS NULL AND lesson_id IS NOT NULL "
-            "AND lesson_canon_hash IS NOT NULL "
-            "AND lesson_content_package_snapshot IS NOT NULL)",
+            "num_nonnulls(ayin_spine_id, lesson_id, content_brief_id) = 1 "
+            "AND (lesson_id IS NULL OR (lesson_canon_hash IS NOT NULL "
+            "AND lesson_content_package_snapshot IS NOT NULL))",
             name="valid_research_plan_origin",
         ),
         {"schema": CONTENT},
@@ -239,6 +237,13 @@ class ResearchPlan(Base):
         index=True,
         nullable=True,
     )
+    content_brief_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_briefs.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=True,
+    )
+    # LEGACY_PROVENANCE_ONLY: retained so historical lesson-origin rows stay
+    # readable; the generic ContentBrief path never populates them.
     lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     lesson_canon_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     lesson_content_package_snapshot: Mapped[dict[str, object] | None] = mapped_column(
@@ -297,13 +302,16 @@ class ResearchPackage(Base):
         CheckConstraint("input_hash ~ '^[0-9a-f]{64}$'", name="valid_input_hash"),
         CheckConstraint("content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"),
         CheckConstraint(
+            "research_plan_id IS NOT NULL AND ("
             "(lesson_id IS NOT NULL AND lesson_canon_hash IS NOT NULL "
             "AND lesson_content_package_version IS NOT NULL "
             "AND lesson_content_package_snapshot IS NOT NULL "
-            "AND ayin_spine_id IS NULL AND research_plan_id IS NOT NULL "
-            "AND canon_version_id IS NULL) OR "
+            "AND ayin_spine_id IS NULL AND canon_version_id IS NULL "
+            "AND content_brief_id IS NULL) OR "
             "(lesson_id IS NULL AND ayin_spine_id IS NOT NULL "
-            "AND research_plan_id IS NOT NULL AND canon_version_id IS NOT NULL)",
+            "AND canon_version_id IS NOT NULL AND content_brief_id IS NULL) OR "
+            "(lesson_id IS NULL AND ayin_spine_id IS NULL "
+            "AND canon_version_id IS NULL AND content_brief_id IS NOT NULL))",
             name="valid_research_origin",
         ),
         {"schema": CONTENT},
@@ -319,9 +327,16 @@ class ResearchPackage(Base):
     research_plan_id: Mapped[UUID | None] = mapped_column(
         ForeignKey(f"{CONTENT}.research_plans.id", ondelete="RESTRICT"), nullable=True
     )
+    content_brief_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_briefs.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=True,
+    )
     canon_version_id: Mapped[UUID | None] = mapped_column(
         ForeignKey(f"{CORE}.canon_versions.id", ondelete="RESTRICT"), nullable=True
     )
+    # LEGACY_PROVENANCE_ONLY: retained so historical lesson-origin rows stay
+    # readable; the generic ContentBrief path never populates them.
     lesson_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     lesson_canon_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     lesson_content_package_version: Mapped[str | None] = mapped_column(
@@ -570,3 +585,70 @@ class ResearchPackageIssue(Base):
     )
     message: Mapped[str] = mapped_column(Text)
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class EvidenceMatrix(Base):
+    """Versioned evidence matrix behind one ContentBrief."""
+
+    __tablename__ = "evidence_matrices"
+    __table_args__ = (
+        UniqueConstraint("content_brief_id", "version_number"),
+        CheckConstraint("version_number > 0", name="positive_matrix_version"),
+        CheckConstraint(
+            "content_hash ~ '^[0-9a-f]{64}$'", name="valid_matrix_content_hash"
+        ),
+        {"schema": CONTENT},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    content_brief_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_briefs.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    status: Mapped[EvidenceMatrixStatus] = mapped_column(
+        _enum(EvidenceMatrixStatus, "evidence_matrix_status"),
+        default=EvidenceMatrixStatus.DRAFT,
+    )
+    content_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class EvidenceMatrixItem(Base):
+    """One claim row inside an EvidenceMatrix.
+
+    Unit references stay typed; wording limits and provenance travel with
+    each claim so downstream writers cannot overclaim.
+    """
+
+    __tablename__ = "evidence_matrix_items"
+    __table_args__ = (
+        UniqueConstraint("evidence_matrix_id", "ordinal"),
+        CheckConstraint("ordinal > 0", name="positive_matrix_ordinal"),
+        {"schema": CONTENT},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    evidence_matrix_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.evidence_matrices.id", ondelete="CASCADE"),
+        index=True,
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    role: Mapped[EvidenceSelectionRole] = mapped_column(
+        _enum(EvidenceSelectionRole, "evidence_selection_role")
+    )
+    claim_text: Mapped[str] = mapped_column(Text)
+    claim_type: Mapped[str] = mapped_column(String(64), default="UNKNOWN")
+    epistemic_status: Mapped[str] = mapped_column(String(64), default="")
+    supporting_unit_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    counterevidence_unit_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    alternative_unit_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    source_quality: Mapped[str] = mapped_column(String(64), default="")
+    limitations: Mapped[str] = mapped_column(Text, default="")
+    allowed_wording: Mapped[str] = mapped_column(Text, default="")
+    forbidden_wording: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )

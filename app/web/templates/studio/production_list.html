@@ -1,0 +1,31 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Studio</p>
+    <h1>Production</h1>
+    <p class="lede">Active productions across all channels.</p>
+  </div>
+</div>
+<section class="lesson-grid" aria-label="Active productions">
+  {% for item in items %}
+  <article class="card lesson-card interactive">
+    <div class="topic-card-head">
+      <span class="badge">{{ item.origin_label }}</span>
+      <span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span>
+    </div>
+    <h2><a href="/production/{{ item.project.id }}">{{ item.project.title }}</a></h2>
+    {% if item.lesson %}<p><strong>Historical lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
+    {% elif item.topic %}<p class="muted">{{ item.topic.title }}</p>{% endif %}
+    <p>{{ item.project.human_question }}</p>
+    <div class="button-row"><a class="button" href="/production/{{ item.project.id }}">Open</a></div>
+  </article>
+  {% else %}
+  <section class="card empty-state">
+    <h2>No active productions</h2>
+    <p>Productions start from a selected channel topic with a content brief.</p>
+    <a class="button secondary" href="/studio/channels">Choose a channel</a>
+  </section>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -15,40 +15,53 @@ from app.content_strategy.models import (
 )
 from app.core.config import Environment, Settings
 from app.db.session import Database
-from app.lecture.models import LectureClaim, LectureMasterVersion
+from app.lecture.models import LectureMasterVersion
 from app.main import create_app
 
 
 @pytest.mark.integration
-def test_persian_drafts_are_researched_versioned_and_owner_approvable() -> None:
+def test_historical_drafts_stay_editable_reviewable_and_approvable() -> None:
+    """The lesson draft-generation POST is retired; draft maintenance remains."""
+
     database_url = os.environ.get("EMTEDAD_DATABASE_URL")
     if not database_url:
         pytest.skip("EMTEDAD_DATABASE_URL is required")
     database = Database(database_url)
 
-    async def seed() -> tuple[UUID, UUID]:
+    async def seed() -> UUID:
         async with database.transaction() as session:
-            master = await session.scalar(
-                select(LectureMasterVersion)
-                .join(
-                    LectureClaim,
-                    LectureClaim.lecture_master_version_id == LectureMasterVersion.id,
-                )
-                .where(LectureMasterVersion.status == "READY")
-                .where(LectureClaim.semantic_proposition.is_not(None))
-                .order_by(LectureMasterVersion.created_at)
-            )
-            assert master is not None
+            master = await session.scalar(select(LectureMasterVersion).limit(1))
             project = EditorialProject(
-                title="Temporärer persischer Redaktionslauf",
-                human_question=master.central_human_question,
+                title="Historischer persischer Redaktionslauf",
+                human_question=(
+                    master.central_human_question
+                    if master is not None
+                    else "Worum geht es?"
+                ),
                 status="RESEARCH_PENDING",
             )
             session.add(project)
             await session.flush()
-            return project.id, master.id
+            session.add(
+                PersianDraft(
+                    editorial_project_id=project.id,
+                    semantic_master_id=(master.id if master is not None else None),
+                    version_number=1,
+                    variant_index=1,
+                    text="در این متن تاریخی، پرسش انسانی همچنان باز می‌ماند.",
+                    status="PERSIAN_DRAFT",
+                    owner_prompt=None,
+                    target_duration_minutes=15,
+                    target_word_count_min=100,
+                    target_word_count_max=2000,
+                    actual_word_count=12,
+                    estimated_duration_seconds=30,
+                    provenance={"fixture": "phase21-retirement"},
+                )
+            )
+            return project.id
 
-    project_id, master_id = asyncio.run(seed())
+    project_id = asyncio.run(seed())
     settings = Settings(
         _env_file=None,
         environment=Environment.TEST,
@@ -56,54 +69,37 @@ def test_persian_drafts_are_researched_versioned_and_owner_approvable() -> None:
         storage_root=Path("/tmp/emtedad-persian-editorial-test"),
     )
     with TestClient(create_app(settings)) as client:
-        response = client.post(
+        # Retired: lesson-canon draft generation.
+        assert client.post(
             f"/workspace/{project_id}/persian/drafts",
             data={
-                "semantic_master_id": str(master_id),
                 "lesson_id": "1.1",
                 "target_duration_minutes": "15",
-                "draft_count": "3",
-                "owner_prompt": "Ruhig und verständlich.",
+                "draft_count": "1",
             },
             follow_redirects=False,
-        )
-        assert response.status_code == 303
+        ).status_code in {404, 405}
 
-    async def drafts() -> list[PersianDraft]:
+    async def first_draft_id() -> UUID:
         async with database.transaction() as session:
-            return list(
-                await session.scalars(
-                    select(PersianDraft).where(
-                        PersianDraft.editorial_project_id == project_id
-                    )
+            draft = await session.scalar(
+                select(PersianDraft).where(
+                    PersianDraft.editorial_project_id == project_id
                 )
             )
+            assert draft is not None
+            return draft.id
 
-    created = asyncio.run(drafts())
-    assert len(created) == 3
-    assert len({draft.text for draft in created}) >= 2
-    for draft in created:
-        assert draft.actual_word_count > 0
-        assert "duration_deviation_percent" in draft.provenance
-        assert all(
-            phrase not in draft.text
-            for phrase in (
-                "The selected Ayin Working source states",
-                "The external source provides evidence",
-                "ResearchPackage",
-                "Semantic Master",
-            )
-        )
-    first = sorted(created, key=lambda item: item.variant_index)[0]
+    first_id = asyncio.run(first_draft_id())
     with TestClient(create_app(settings)) as client:
         edited = client.post(
-            f"/workspace/{project_id}/persian/drafts/{first.id}/edit",
+            f"/workspace/{project_id}/persian/drafts/{first_id}/edit",
             data={"text": "در چارچوب آیین امتداد، این متن ویرایش مالک است."},
             follow_redirects=False,
         )
         assert edited.status_code == 303
-        latest_id = asyncio.run(_latest_id(database, project_id, first.variant_index))
-        assert latest_id != first.id
+        latest_id = asyncio.run(_latest_id(database, project_id, 1))
+        assert latest_id != first_id
         assert (
             client.post(
                 f"/workspace/{project_id}/persian/drafts/{latest_id}/review",

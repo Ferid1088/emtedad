@@ -1,0 +1,14 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Channel</p>
+    <h1>{{ channel.name }} — Production</h1>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+<section class="card empty-state">
+  <h2>No productions yet</h2>
+  <p>Productions start when a channel topic is selected and a content brief is created.</p>
+</section>
+{% endblock %}

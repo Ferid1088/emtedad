@@ -18,6 +18,7 @@ from app.lecture.domain import (
     EvidenceKind,
     LectureProjectStatus,
     LectureType,
+    MasterOriginType,
     MasterStatus,
     SectionRole,
     ValidationDimension,
@@ -82,6 +83,31 @@ class LectureMasterVersion(Base):
     )
     manasek_version_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("ritual.ritual_versions.id", ondelete="RESTRICT"), nullable=True
+    )
+    # Generic CONTENT_BRIEF provenance — NULL on all legacy rows.
+    origin_type: Mapped[MasterOriginType | None] = mapped_column(
+        _enum(MasterOriginType, "master_origin_type"), nullable=True
+    )
+    content_brief_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_briefs.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    channel_strategy_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.channel_strategy_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    argument_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.argument_plans.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    narrative_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.narrative_plans.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    evidence_matrix_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.evidence_matrices.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     package_authority: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     central_human_question: Mapped[str] = mapped_column(Text)

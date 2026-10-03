@@ -1,0 +1,63 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Resource</p>
+    <h1>{{ source.title }}</h1>
+  </div>
+  <div class="actions">
+    <form method="post" action="/library/{{ source.id }}/units">
+      <button class="button" type="submit">
+        {% if units %}Re-extract units{% else %}Extract knowledge units{% endif %}
+      </button>
+    </form>
+    {% if units %}
+    <form method="post" action="/library/{{ source.id }}/concepts">
+      <button class="button secondary" type="submit">Map concepts</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% include "studio/_resource_tabs.html" %}
+{% if state %}
+<p class="muted">Processing status: <strong>{{ state.status.value }}</strong>
+  {% if state.last_error %} — {{ state.last_error }}{% endif %}</p>
+{% endif %}
+{% if units %}
+<form method="get" action="/library/{{ source.id }}/units" class="unit-search">
+  <input type="search" name="q" value="{{ query }}"
+         placeholder="Search units by title, summary, or text">
+  <button class="button" type="submit">Search</button>
+</form>
+<section class="card">
+  <ul class="unit-list">
+    {% for unit in units %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <strong>{{ unit.title }}</strong>
+        <span class="chip">{{ unit.unit_type.value }}</span>
+        {% if unit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
+        <span class="muted">{{ unit.evidence_level.value }} ·
+          {{ unit.claim_type.value }}</span>
+      </div>
+      {% set unit_concepts = concepts_by_unit.get(unit.id, []) %}
+      {% if unit_concepts %}
+      <p class="muted">Concepts: {{ unit_concepts | join(", ") }}</p>
+      {% endif %}
+      <p>{{ unit.summary }}</p>
+      <details>
+        <summary>Original text ({{ unit.full_text | length }} chars)</summary>
+        <p class="unit-fulltext">{{ unit.full_text }}</p>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% else %}
+<section class="card empty-state">
+  <h2>No knowledge units yet</h2>
+  <p>Knowledge Units are extracted from a validated source structure. Build
+    the structure first, then extract units.</p>
+</section>
+{% endif %}
+{% endblock %}

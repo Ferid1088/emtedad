@@ -45,6 +45,18 @@ class MasterStatus(StrEnum):
     SUPERSEDED = "SUPERSEDED"
 
 
+class MasterOriginType(StrEnum):
+    """Explicit provenance of a LectureMasterVersion.
+
+    Never inferred from nullable legacy fields — each builder writes it.
+    Historical rows predate the column and keep NULL.
+    """
+
+    LEGACY_AYIN = "LEGACY_AYIN"
+    LEGACY_LESSON = "LEGACY_LESSON"
+    CONTENT_BRIEF = "CONTENT_BRIEF"
+
+
 class SectionRole(StrEnum):
     HUMAN_ENTRY = "HUMAN_ENTRY"
     AYIN_FRAME = "AYIN_FRAME"
@@ -59,6 +71,10 @@ class SectionRole(StrEnum):
     LIFE_RETURN = "LIFE_RETURN"
     RITUAL_BRIDGE = "RITUAL_BRIDGE"
     CONCLUSION = "CONCLUSION"
+    # Generic channel productions: a narrative beat that does not map onto
+    # the Ayin-flavored roles above. The original narrative role is kept in
+    # the section's rhetorical_function and the master architecture.
+    NARRATIVE_BEAT = "NARRATIVE_BEAT"
 
 
 class ClaimOrigin(StrEnum):

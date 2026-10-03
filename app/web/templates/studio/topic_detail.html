@@ -1,0 +1,12 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Topic</p>
+    <h1>{{ topic.title if topic else 'Topic' }}</h1>
+  </div>
+</div>
+<section class="card empty-state">
+  <p class="muted">Topic candidates appear once channel topic mining runs.</p>
+</section>
+{% endblock %}

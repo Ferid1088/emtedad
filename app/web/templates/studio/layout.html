@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title }} · Emtedad Studio</title>
+  <link rel="stylesheet" href="/static/owner.css">
+  <link rel="stylesheet" href="/static/studio.css">
+</head>
+<body class="studio">
+  <header class="site-header studio-header">
+    <a class="brand" href="/studio">Emtedad Studio</a>
+    <nav class="primary-nav" aria-label="Studio navigation">
+      {% for href, label in [
+        ('/studio', 'Home'),
+        ('/studio/channels', 'Channels'),
+        ('/library', 'Resource Library'),
+        ('/studio/search', 'Search'),
+        ('/knowledge', 'Knowledge'),
+        ('/production', 'Production'),
+        ('/analytics', 'Analytics'),
+        ('/settings', 'Settings')
+      ] %}
+      <a href="{{ href }}" {% if request.url.path == href or (href != '/studio' and request.url.path.startswith(href)) %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

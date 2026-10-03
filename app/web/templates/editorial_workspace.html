@@ -5,10 +5,10 @@
     <p class="eyebrow">Studio · Redaktionelles Projekt</p>
     <h1>{{ project.title }}</h1>
     {% if lesson_metadata %}
-    <p class="lede">Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }} · <span dir="rtl">{{ lesson_metadata.title }}</span></p>
+    <p class="lede">Historische Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }} · <span dir="rtl">{{ lesson_metadata.title }}</span></p>
     {% endif %}
   </div>
-  <a class="button secondary" href="{{ '/lessons/' ~ lesson_metadata.lesson_id if lesson_metadata else '/studio' }}">Zurück</a>
+  <a class="button secondary" href="/studio">Zurück</a>
 </div>
 
 {% if research_message %}
@@ -39,8 +39,8 @@
 <div class="context-grid" style="margin-top:1rem">
   <section class="card context-panel">
     <div class="split-head">
-      <div><p class="eyebrow">Ayin-Kern</p><h2>{{ 'Lektionskanon' if lesson_package else 'Freies Thema' }}</h2></div>
-      <span class="badge {% if lesson_package %}success{% endif %}">{{ 'aus dem 100-Lektionen-Kanon' if lesson_package else 'nicht kanonisch' }}</span>
+      <div><p class="eyebrow">Ayin-Kern</p><h2>{{ 'Historischer Lektionskanon' if lesson_package else 'Freies Thema' }}</h2></div>
+      <span class="badge {% if lesson_package %}success{% endif %}">{{ 'historische Provenienz' if lesson_package else 'nicht kanonisch' }}</span>
     </div>
     {% if lesson_package %}
     <p><strong>Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</strong></p>
@@ -102,52 +102,9 @@
     {% endif %}
     {% endif %}
     <p class="muted">Veröffentlichte Skripte werden erst nach dem Entwurf auf Wiederholung und Widerspruch geprüft.</p>
-    {% if lesson_package %}
-    <form method="post" action="/workspace/{{ project.id }}/research">
-      <label>Optionaler Recherchefokus
-        <textarea name="owner_focus" rows="3" aria-describedby="research-focus-help" placeholder="Zum Beispiel: historische Perspektiven oder empirische Gegenargumente"></textarea>
-      </label>
-      <small id="research-focus-help">Wird ausschließlich in der externen Wissensbasis gesucht.</small>
-      <button class="button" type="submit">{{ 'Externe Recherche aktualisieren' if research_summary else 'Externe Recherche starten' }}</button>
-    </form>
-    {% else %}
-    <p class="muted">Die automatische lektionsgebundene Recherche steht nur für Projekte aus dem 100-Lektionen-Kanon zur Verfügung.</p>
-    {% endif %}
+    <p class="muted">Die lektionsgebundene Recherche ist eingestellt. Neue Produktionen laufen über den generischen Studio-Pfad.</p>
   </section>
 </div>
-
-<section class="card">
-  <h2>Persische Entwürfe</h2>
-  <p>Der kanonische Lektionsinhalt und die externe Forschung bleiben getrennt. Das vollständige Ayin-Buch wird für den normalen Entwurf nicht abgerufen.</p>
-  <form method="post" action="/workspace/{{ project.id }}/persian/drafts">
-    {% if lesson_metadata %}
-    <input type="hidden" name="lesson_id" value="{{ lesson_metadata.lesson_id }}">
-    <p><strong>Ayin-Kern:</strong> Lektion {{ lesson_metadata.number }} / {{ lesson_metadata.total }}</p>
-    {% else %}
-    <label>Kanonischer Ayin-Kern für diesen Lauf
-      <select name="lesson_id" required>{% for lesson in lessons %}<option value="{{ lesson.lesson_id }}">{{ lesson.lesson_id }} · {{ lesson.title_fa }}</option>{% else %}<option disabled>Kein Lektionskanon verfügbar</option>{% endfor %}</select>
-    </label>
-    {% endif %}
-
-    {% if lesson_metadata %}
-      {% if masters %}
-      <input type="hidden" name="semantic_master_id" value="{{ masters[0].id }}">
-      <p class="notice"><strong>Externe Recherche verbunden:</strong> {{ research_summary.result_count }} Treffer aus {{ research_summary.source_count }} Quellen. Nur dieses lektionsgebundene Paket wird verwendet.</p>
-      {% else %}
-      <p class="warning">Vor dem Schreiben muss die externe Recherche oben erfolgreich abgeschlossen werden.</p>
-      {% endif %}
-    {% else %}
-    <label>Semantic Master mit externer Forschung
-      <select name="semantic_master_id" required>{% for master in masters %}<option value="{{ master.id }}">{{ master.central_human_question }} · {{ master.status }}</option>{% else %}<option disabled>Kein READY Semantic Master vorhanden</option>{% endfor %}</select>
-    </label>
-    {% endif %}
-
-    <label>Zieldauer<input name="target_duration_minutes" type="number" min="5" max="180" value="15"></label>
-    <label>Anzahl Entwürfe<select name="draft_count"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
-    <label>Eigene Anweisung<textarea name="owner_prompt" dir="auto"></textarea></label>
-    <button class="button" type="submit" {% if not masters or (not lesson_metadata and not lessons) %}disabled{% endif %}>Persische Entwürfe erstellen</button>
-  </form>
-</section>
 
 {% if drafts %}
 <section class="card">

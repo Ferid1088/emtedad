@@ -33,20 +33,26 @@ def test_owner_routes_are_registered(test_settings: Settings) -> None:
         "/knowledge",
         "/topics",
         "/lessons",
-        "/lessons/{lesson_id}",
+        "/lessons/{rest:path}",
         "/stories",
         "/stories/{story_id}",
         "/archive",
-        "/workspace/{project_id}/research",
     } <= paths
+    # Retired lesson production routes must not come back.
+    assert "/workspace/{project_id}/research" not in paths
+    assert "/workspace/{project_id}/persian/drafts" not in paths
+    assert "/lessons/{lesson_id}" not in paths
 
 
-def test_primary_navigation_uses_lessons_not_strategy_tree() -> None:
+def test_primary_navigation_has_no_lesson_catalog() -> None:
     template = (
         Path(__file__).parents[2] / "app" / "web" / "templates" / "base.html"
     ).read_text(encoding="utf-8")
 
-    assert "('/lessons', 'Lektionen')" in template
+    assert "('/studio', 'Studio')" in template
+    assert "Lektionen" not in template
+    assert "('/lessons'," not in template
+    assert "speech-structures" not in template
     assert "('/strategy', 'Themenbaum')" not in template
 
 
@@ -79,7 +85,7 @@ def test_legacy_strategy_templates_are_removed() -> None:
     assert not (templates / "strategy_topic_detail.html").exists()
 
 
-def test_lesson_studio_exposes_real_external_research_action() -> None:
+def test_workspace_has_no_lesson_production_actions() -> None:
     template = (
         Path(__file__).parents[2]
         / "app"
@@ -88,10 +94,14 @@ def test_lesson_studio_exposes_real_external_research_action() -> None:
         / "editorial_workspace.html"
     ).read_text(encoding="utf-8")
 
-    assert 'action="/workspace/{{ project.id }}/research"' in template
-    assert "Externe Recherche starten" in template
-    assert "Recherche starten (nächster Schritt)" not in template
-    assert "Wird ausschließlich in der externen Wissensbasis gesucht." in template
+    # Retired: lesson-bound research trigger and lesson-canon draft generation.
+    assert 'action="/workspace/{{ project.id }}/research"' not in template
+    assert 'action="/workspace/{{ project.id }}/persian/drafts"' not in template
+    assert 'name="lesson_id"' not in template
+    assert 'name="semantic_master_id"' not in template
+    # Historical drafts keep their maintain actions.
+    assert "/edit" in template
+    assert "/approve" in template
 
 
 def test_overlap_is_deterministic() -> None:

@@ -1,0 +1,78 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Channel</p>
+    <h1>{{ channel.name }} — Topics</h1>
+    <p class="lede">Video questions mined from this channel's assigned knowledge.</p>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+
+<section class="card">
+  <h2>Mine topics</h2>
+  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/mine" class="inline-form">
+    <input type="text" name="instruction" placeholder="Owner instruction (optional)" />
+    <button type="submit" class="button">Mine topics</button>
+  </form>
+  <p class="muted">Mining uses this channel's assigned resources only and applies the active strategy's scoring weights.</p>
+</section>
+
+{% if not candidates %}
+<section class="card empty-state">
+  <h2>No topics yet</h2>
+  <p>Topic mining becomes available once the channel has assigned resources with extracted knowledge. Assign resources first.</p>
+  <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Manage resources</a>
+</section>
+{% endif %}
+
+{% for candidate in candidates %}
+<article class="card topic-card">
+  <header class="topic-head">
+    <div>
+      <p class="eyebrow">{{ candidate.status.value.replace('_', ' ') }}</p>
+      <h2>{{ candidate.title }}</h2>
+      <p class="lede">{{ candidate.video_question }}</p>
+    </div>
+    <div class="score-block">
+      <span class="score-total">{{ '%.2f' | format(candidate.total_score) }}</span>
+      <span class="muted">total</span>
+    </div>
+  </header>
+
+  <dl class="score-grid">
+    <div><dt>Coverage</dt><dd>{{ '%.2f' | format(candidate.knowledge_coverage_score) }}</dd></div>
+    <div><dt>Channel fit</dt><dd>{{ '%.2f' | format(candidate.channel_fit_score) }}</dd></div>
+    <div><dt>Novelty</dt><dd>{{ '%.2f' | format(candidate.novelty_score) }}</dd></div>
+    <div><dt>Curiosity</dt><dd>{{ '%.2f' | format(candidate.curiosity_score) }}</dd></div>
+    <div><dt>Emotional</dt><dd>{{ '%.2f' | format(candidate.emotional_score) }}</dd></div>
+    <div><dt>Practical</dt><dd>{{ '%.2f' | format(candidate.practical_value_score) }}</dd></div>
+  </dl>
+
+  <p><strong>Thesis.</strong> {{ candidate.tentative_thesis }}</p>
+  <p><strong>Angle.</strong> {{ candidate.angle }}</p>
+  <p class="muted">{{ unit_count.get(candidate.id, 0) }} supporting units
+    {% if concept_names.get(candidate.id) %}— {{ concept_names[candidate.id] | join(", ") }}{% endif %}
+  </p>
+  {% set gaps = candidate.provenance_json.get('knowledge_gaps', []) %}
+  {% if gaps %}
+  <details>
+    <summary>Knowledge gaps</summary>
+    <ul>{% for gap in gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+
+  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}/status" class="inline-form">
+    <select name="status">
+      {% for s in actionable_statuses %}
+      <option value="{{ s.value }}">{{ s.value.replace('_', ' ') }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="button secondary">Set status</button>
+  </form>
+  <form method="post" action="/studio/topics/{{ candidate.id }}/brief" class="inline-form">
+    <button type="submit" class="button">Create brief & open production</button>
+  </form>
+</article>
+{% endfor %}
+{% endblock %}

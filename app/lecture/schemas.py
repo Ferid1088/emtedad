@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.lecture.domain import (
     LectureProjectStatus,
     LectureType,
+    MasterOriginType,
     MasterStatus,
     PublicationLanguage,
     ValidationDimension,
@@ -48,6 +49,12 @@ class LectureMasterRead(BaseModel):
     research_package_content_hash: str
     canon_version_id: UUID | None
     manasek_version_id: UUID | None
+    origin_type: MasterOriginType | None
+    content_brief_id: UUID | None
+    channel_strategy_version_id: UUID | None
+    argument_plan_id: UUID | None
+    narrative_plan_id: UUID | None
+    evidence_matrix_id: UUID | None
     package_authority: dict[str, object]
     central_human_question: str
     ending_mode: str

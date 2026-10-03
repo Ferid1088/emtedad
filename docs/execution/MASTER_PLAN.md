@@ -11,7 +11,9 @@ Only one phase may be `in_progress` at a time.
 
 ## Program status
 
-- Active phase: Phase 12 — complete (pending owner review)
+- Active phase: Multichannel Phase 21 — complete (pending owner review)
+- Last completed checkpoint: Phase 21 - legacy 100-lesson retirement and
+  speech_structure consolidation onto knowledge/structure (2026-10-03)
 - Last completed checkpoint: Phase 12 - approved Persian multilingual production
   (2026-09-23)
 - Latest architectural checkpoint: Phase 12 - lesson-canon generation boundary
@@ -44,6 +46,7 @@ Only one phase may be `in_progress` at a time.
 | 10 | Content Strategy and Publishing | complete | Series, coverage and publication packages |
 | 11 | Evaluation | complete | Owner source/topic discovery and validation checkpoints |
 | 12 | Emtedad Editorial Pipeline | complete | Lesson canon, research workspace, Persian approval, multilingual text output |
+| 21 | Legacy 100-Lesson Retirement | complete | Resource-first production only: lesson canon frozen, generic writing package extracted, knowledge/structure consolidated as canonical Vortragsstruktur |
 
 ## Phase 0 — Repository Audit
 
@@ -301,6 +304,43 @@ Verified complete 2026-09-23. See `docs/audits/PHASE_11_OWNER_MVP_WEB_APP.md`.
 
 Target scope: multilingual retrieval gold set, lecture fidelity fixtures,
 ritual safety tests, end-to-end acceptance suite, benchmark command, and report.
+
+## Multichannel program (EMTEDAD_CODING_AGENT_MASTER_IMPLEMENTATION_PROMPT)
+
+A second, separate program began in parallel after Phase 12: migration to a
+resource-first multi-channel studio. Its phases are numbered 0–19 in that
+prompt. Status here refers to those phases.
+
+| Phase | Name | Status | Primary outcome |
+|---:|---|---|---|
+| 0 | Baseline + ADR | complete | Baseline gates, ADR-014, audit `MULTICHANNEL_PHASE_0_BASELINE.md` |
+| 1 | EditorialChannel domain | complete | Five seeded channels, versioned strategies, source assignment |
+| 2 | Studio UI shell | complete | Studio workspace, resource library, channel pages |
+| 3 | YouTube import | complete | Existing ingest verified, processing state on import |
+| 4 | Source structure | complete | `source_structure_nodes`, two-pass agent, validator, states |
+| 5 | Knowledge Units | complete | Atomic units, deterministic full_text, validator |
+| 6 | Concept mapping | complete | Unit–concept links, concept relationships |
+| 7 | Retrieval V2 | complete | FTS+dense+concept hybrid over units, structural expansion |
+| 8 | Dynamic Topic Engine | complete | Resource-derived TopicCandidate mining, strategy-weighted scoring, gap rule |
+| 9 | ContentBrief | complete | Gated brief contract (§9.2), channel+strategy pinned |
+| 10 | Distinctiveness | complete | ScriptSignature + ACCEPT/REPLAN/REVIEW_REQUIRED planner |
+| 11 | Generic Research | complete | Brief-origin plan/package, EvidenceMatrix, frozen snapshot |
+| 12 | Argument Architect | complete | Versioned ArgumentPlan, gated on EvidenceMatrix |
+| 13 | Narrative Architect | complete | Versioned NarrativePlan, gated on ArgumentPlan |
+| 14 | Generic Script | complete | ScriptDraft gated on NarrativePlan; no canon dependency |
+| 15 | Review Pipeline | complete | Five critics, typed findings, revision, approve gate |
+| 16 | Channel review packs | complete | Per-channel checks in CHANNEL_REVIEW_CHECKS |
+| 17 | Production workspace | complete | `/studio/production/{brief_id}`, backend-driven actions |
+| 18–19 | Library/detail UI | complete | `/library` + resource detail tabs (earlier phases) |
+| 20 | Publication targets | complete | `PublicationTarget` model; no auto-publish |
+| 20a | Generic Semantic Master | complete | `CONTENT_BRIEF`-origin `LectureMasterVersion` via `GenericMasterService`; script gated on READY master; no lesson/canon dependency |
+| 21 | Retire 100-lesson path | pending | Prerequisite met; needs owner deletion decision |
+
+Evidence: `docs/audits/MULTICHANNEL_PHASE_0_BASELINE.md`,
+`docs/audits/MULTICHANNEL_PHASE_1_EDITORIAL_CHANNELS.md`,
+`docs/audits/MULTICHANNEL_PHASES_4_7.md`,
+`docs/audits/MULTICHANNEL_PHASES_8_20.md`,
+`docs/audits/MULTICHANNEL_GENERIC_MASTER_PATH.md`.
 
 ## Mandatory end-of-phase gate
 

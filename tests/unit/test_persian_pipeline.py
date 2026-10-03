@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from app.content_strategy.lesson_canon import LessonCanonRepository
+from app.content_engine.writing.diversity import ScriptDiversityValidator
+from app.content_engine.writing.memory import PublishedMemoryItem
+from app.content_engine.writing.native import PersianNativeReviewer
+from app.content_engine.writing.text import explicit_ayin_reference_ratio
+from app.content_strategy.lesson_canon import LessonContentPackage
 from app.content_strategy.persian_pipeline import (
     LessonConsistencyReviewer,
-    PersianNativeReviewer,
-    PublishedMemoryItem,
-    ScriptDiversityValidator,
-    explicit_ayin_reference_ratio,
     final_semantic_findings,
 )
 
@@ -20,6 +20,36 @@ def _published(text: str, *, title: str = "متن پیشین") -> PublishedMemor
         concept_keys=(),
         examples=(),
         open_promises=(),
+    )
+
+
+def _lesson_package() -> LessonContentPackage:
+    """Hand-built snapshot standing in for the retired canon repository."""
+
+    return LessonContentPackage(
+        lesson_canon_hash="legacy-hash",
+        lesson_id="1.1",
+        lesson_number=1,
+        chapter=1,
+        chapter_title_fa="آغاز",
+        order_in_chapter=1,
+        level=1,
+        canonical_lesson_title="بُن",
+        is_core_concept=True,
+        central_question="بُن چیست؟",
+        canonical_lesson_explanation="توضیح کانونیک درس.",
+        core_concepts=["بُن"],
+        required_distinctions=[],
+        conceptual_boundaries=[],
+        prerequisites=[],
+        lesson_relations=[],
+        canonical_relations_section_fa="",
+        what_this_lesson_develops=[],
+        what_should_remain_open=[],
+        ayin_provenance=None,
+        provenance_complete=True,
+        review_items=[],
+        core_concept_registry=[],
     )
 
 
@@ -37,11 +67,9 @@ def test_published_archive_is_available_only_to_post_draft_diversity_review() ->
 
 
 def test_protected_concept_redefinition_is_a_direct_blocking_contradiction() -> None:
-    lesson = LessonCanonRepository().package("1.1")
-
     findings = LessonConsistencyReviewer().validate(
         "بُن یعنی شخصیت و چیزی بیشتر از آن نیست.",
-        lesson,
+        _lesson_package(),
         external_evidence_count=1,
         published=[],
     )
@@ -52,17 +80,14 @@ def test_protected_concept_redefinition_is_a_direct_blocking_contradiction() -> 
 
 
 def test_unsupported_research_claim_requires_review() -> None:
-    lesson = LessonCanonRepository().package("1.1")
-
     findings = final_semantic_findings(
         "پژوهش‌ها نشان داده‌اند که این نتیجه قطعی است.",
-        lesson,
+        _lesson_package(),
         external_evidence_count=0,
     )
 
     assert any(
-        item.code == "UNSUPPORTED_EXTERNAL_CLAIM" and item.blocking
-        for item in findings
+        item.code == "UNSUPPORTED_EXTERNAL_CLAIM" and item.blocking for item in findings
     )
 
 

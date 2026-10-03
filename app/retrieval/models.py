@@ -379,6 +379,38 @@ class ChunkEmbedding(Base):
     )
 
 
+class KnowledgeUnitEmbedding(Base):
+    """Dense embedding for a Knowledge Unit summary or full text."""
+
+    __tablename__ = "knowledge_unit_embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "knowledge_unit_id",
+            "embedding_model_id",
+            "kind",
+            "content_hash",
+        ),
+        CheckConstraint("content_hash ~ '^[0-9a-f]{64}$'", name="valid_content_hash"),
+        CheckConstraint("kind IN ('SUMMARY', 'FULL_TEXT')", name="valid_kind"),
+        {"schema": RETRIEVAL},
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    knowledge_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{KNOWLEDGE}.knowledge_units.id", ondelete="CASCADE"),
+        index=True,
+    )
+    embedding_model_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{RETRIEVAL}.embedding_models.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    embedding: Mapped[list[float]] = mapped_column(VECTOR())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
 class RetrievalConfiguration(Base):
     __tablename__ = "configurations"
     __table_args__ = (
