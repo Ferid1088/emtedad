@@ -485,7 +485,10 @@ class GenericMasterService:
                 ResearchPackage.content_brief_id == brief_id,
                 ResearchPackage.status == PackageStatus.FROZEN,
             )
-            .order_by(ResearchPackage.package_version.desc())
+            .order_by(
+                ResearchPackage.package_version.desc(),
+                ResearchPackage.created_at.desc(),
+            )
             .limit(1)
         )
         if package is None:

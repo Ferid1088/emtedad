@@ -18,6 +18,9 @@ class _Output(BaseModel):
 
 class _Settings:
     devin_api_key = SecretStr("test-key")
+    devin_rate_limit_max_attempts = 3
+    devin_rate_limit_initial_backoff_seconds = 0.0
+    devin_rate_limit_max_backoff_seconds = 0.0
 
 
 def _request() -> StructuredExtractionRequest:
@@ -282,6 +285,184 @@ async def test_devin_provider_requires_api_key(
     monkeypatch.setattr(devin_module, "get_settings", lambda: _NoKey())
     with pytest.raises(DevinCloudError, match="EMTEDAD_DEVIN_API_KEY"):
         await DevinCloudProvider().extract(_request())
+
+
+def _tracking_handler(
+    payload: dict[str, object],
+) -> tuple[httpx.MockTransport, dict[str, int]]:
+    """Handler that counts create/poll/delete calls."""
+
+    counts = {"create": 0, "delete": 0, "get": 0, "message": 0}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            counts["delete"] += 1
+            return httpx.Response(200, json={})
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            counts["create"] += 1
+            return httpx.Response(200, json={"session_id": "s-1"})
+        if request.method == "POST":
+            counts["message"] += 1
+            return httpx.Response(200, json={})
+        counts["get"] += 1
+        return httpx.Response(200, json=payload)
+
+    return httpx.MockTransport(handle), counts
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_terminates_session_on_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, counts = _tracking_handler(_session_response())
+    provider = _provider(monkeypatch, transport)
+    assert await provider.extract(_request()) == _Output(status="ok")
+    assert counts["delete"] == 1
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_terminates_session_on_validation_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, counts = _tracking_handler(
+        _session_response(structured_output={"wrong": 1})
+    )
+    provider = _provider(monkeypatch, transport)
+    with pytest.raises(DevinCloudError, match="invalid structured output"):
+        await provider.extract(_request())
+    assert counts["delete"] == 1
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_terminates_session_on_poll_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, counts = _tracking_handler(_session_response(status_enum="expired"))
+    provider = _provider(monkeypatch, transport)
+    with pytest.raises(DevinCloudError, match="expired"):
+        await provider.extract(_request())
+    assert counts["delete"] == 1
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_terminates_session_on_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(devin_module, "_MINIMUM_TIMEOUT_SECONDS", 0)
+    transport, counts = _tracking_handler(_session_response(status_enum="running"))
+    provider = _provider(monkeypatch, transport)
+    request = dataclasses.replace(_request(), timeout_seconds=0)
+    with pytest.raises(DevinCloudError, match="did not finish"):
+        await provider.extract(request)
+    assert counts["delete"] == 1
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_terminates_session_mid_create_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed follow-up message must not orphan the created session."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            counts["delete"] += 1
+            return httpx.Response(200, json={})
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            return httpx.Response(200, json={"session_id": "s-1"})
+        if request.method == "POST":
+            return httpx.Response(500, json={"detail": "boom"})
+        return httpx.Response(200, json=_session_response())
+
+    counts = {"delete": 0}
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    long_request = dataclasses.replace(
+        _request(), input_text="x" * (devin_module._PROMPT_CHAR_LIMIT * 2)
+    )
+    with pytest.raises(DevinCloudError, match="request failed: 500"):
+        await provider.extract(long_request)
+    assert counts["delete"] == 1
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_retries_transient_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creates = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal creates
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            creates += 1
+            if creates < 3:
+                return httpx.Response(429, json={"detail": "slow down"})
+            return httpx.Response(200, json={"session_id": "s-1"})
+        if request.method == "DELETE":
+            return httpx.Response(200, json={})
+        return httpx.Response(200, json=_session_response())
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    assert await provider.extract(_request()) == _Output(status="ok")
+    assert creates == 3
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_rate_limit_retry_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creates = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal creates
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            creates += 1
+            return httpx.Response(429, json={"detail": "slow down"})
+        return httpx.Response(200, json=_session_response())
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    with pytest.raises(devin_module.DevinRateLimitError):
+        await provider.extract(_request())
+    assert creates == 3  # bounded by devin_rate_limit_max_attempts
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_parallel_session_cap_is_quota_not_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creates = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal creates
+        creates += 1
+        return httpx.Response(
+            429,
+            json={
+                "detail": (
+                    "You have 5 SWE-2 sessions running, the most the free "
+                    "SWE-2 promotion allows at once."
+                )
+            },
+        )
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    with pytest.raises(devin_module.DevinQuotaError, match="PROVIDER_QUOTA"):
+        await provider.extract(_request())
+    assert creates == 1  # hard quota: no in-call retry
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_cleanup_failure_preserves_original_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            return httpx.Response(500, json={"detail": "cleanup boom"})
+        if request.method == "POST":
+            return httpx.Response(200, json={"session_id": "s-1"})
+        return httpx.Response(200, json=_session_response(status_enum="expired"))
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    with pytest.raises(DevinCloudError, match="expired"):
+        await provider.extract(_request())
 
 
 def test_factory_resolves_devin() -> None:

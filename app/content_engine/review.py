@@ -56,6 +56,7 @@ from app.lecture.models import (
     LectureSection,
 )
 from app.research.models import EvidenceMatrixItem
+from app.topics.signature import ensure_signature_for_draft
 
 # Channel-specific review packs (§16): only the selected channel's checks run.
 CHANNEL_REVIEW_CHECKS: dict[str, tuple[str, ...]] = {
@@ -529,4 +530,7 @@ class ScriptService:
             if blocking:
                 raise GateBlockedError(f"{blocking} blocking findings remain open")
             draft.status = DraftStatus.APPROVED
+            # Owner approval is the authoritative publish-boundary: record the
+            # semantic signature for future distinctiveness comparisons.
+            await ensure_signature_for_draft(session, draft)
             return draft

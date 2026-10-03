@@ -32,6 +32,19 @@ class UnitMetadataBatch(BaseModel):
     units: list[UnitMetadataProposal] = Field(default_factory=list)
 
 
+class UnitMetadataBatchRaw(BaseModel):
+    """Lenient wire shape for provider output.
+
+    Item-level fields are untyped so a single malformed proposal cannot
+    poison the whole batch; each item is strict-validated separately and
+    invalid items fall back to deterministic node metadata.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    units: list[dict[str, object]] = Field(default_factory=list)
+
+
 class UnitValidationReport(BaseModel):
     errors: list[str] = Field(default_factory=list)
     unit_count: int = 0

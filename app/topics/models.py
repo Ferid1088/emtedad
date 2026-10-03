@@ -163,7 +163,10 @@ class ScriptSignature(Base):
     """
 
     __tablename__ = "script_signatures"
-    __table_args__ = {"schema": CONTENT}
+    __table_args__ = (
+        UniqueConstraint("script_draft_id", name="uq_script_signatures_draft"),
+        {"schema": CONTENT},
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     editorial_channel_id: Mapped[UUID] = mapped_column(
@@ -175,6 +178,12 @@ class ScriptSignature(Base):
         nullable=True,
         index=True,
     )
+    script_draft_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.script_drafts.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    editorial_project_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), default="")
 
     question: Mapped[str] = mapped_column(Text)
     thesis: Mapped[str] = mapped_column(Text)

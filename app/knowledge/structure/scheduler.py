@@ -57,7 +57,12 @@ def classify_failure(error: str | None) -> FailureClass:
     """Bucket a persisted processing error into a retry class."""
 
     text = (error or "").lower()
-    if "out_of_quota" in text or "kontingent" in text or "billing" in text:
+    if (
+        "out_of_quota" in text
+        or "provider_quota_exhausted" in text
+        or "kontingent" in text
+        or "billing" in text
+    ):
         return FailureClass.QUOTA
     if "429" in text or "rate limit" in text or "parallele sessions" in text:
         return FailureClass.RATE_LIMIT

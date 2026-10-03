@@ -31,6 +31,13 @@ Rules:
 - Respect forbidden angles.
 """.strip()
 
+_LANGUAGE_NAMES = {
+    "fa": "Persian (Farsi)",
+    "en": "English",
+    "de": "German",
+    "ar": "Arabic",
+}
+
 
 class TopicMiner:
     def __init__(self, provider: LLMProvider, *, model: str) -> None:
@@ -44,6 +51,8 @@ class TopicMiner:
         units: list[KnowledgeUnit],
         published_signatures: list[str],
         owner_instruction: str | None = None,
+        editorial_language: str = "fa",
+        language_correction: bool = False,
     ) -> tuple[TopicMiningBatch, dict[str, UUID]]:
         labels = {f"u{index}": unit.id for index, unit in enumerate(units, 1)}
         payload = {
@@ -61,11 +70,24 @@ class TopicMiner:
             "published_signatures": published_signatures,
             "owner_instruction": owner_instruction,
         }
+        language_name = _LANGUAGE_NAMES.get(editorial_language, editorial_language)
+        instructions = (
+            MINER_INSTRUCTIONS
+            + f"\n- Write title, video_question, tentative_thesis, angle, "
+            f"channel_fit_reason and knowledge_gaps entirely in {language_name}. "
+            "The source units may be in another language; the channel's "
+            "editorial language always wins."
+        )
+        if language_correction:
+            instructions += (
+                f"\n- CORRECTION: your previous answer was in the wrong "
+                f"language. Every text field must be {language_name}."
+            )
         request = StructuredExtractionRequest(
             task="topic_mining",
             prompt_version=TOPIC_PROMPT_VERSION,
             model=self.model,
-            instructions=MINER_INSTRUCTIONS,
+            instructions=instructions,
             input_text=json.dumps(payload, ensure_ascii=False),
             output_model=TopicMiningBatch,
         )

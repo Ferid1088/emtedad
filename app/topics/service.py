@@ -1,5 +1,7 @@
 """Topic candidate mining and lifecycle service."""
 
+import logging
+import re
 from uuid import UUID
 
 from sqlalchemy import select
@@ -27,7 +29,53 @@ from app.topics.models import (
     TopicCandidateUnit,
 )
 from app.topics.novelty import novelty_score
-from app.topics.schemas import TopicCandidateProposal
+from app.topics.schemas import TopicCandidateProposal, TopicMiningBatch
+
+logger = logging.getLogger(__name__)
+
+_ARABIC_SCRIPT = re.compile(
+    "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]"
+)  # Arabic block + supplements + presentation forms
+_LATIN_SCRIPT = re.compile(r"[A-Za-zÀ-ÿ]")
+_ARABIC_LANGUAGES = {"fa", "ar", "ps", "ur"}
+_LATIN_LANGUAGES = {"en", "de", "fr", "es", "tr", "nl", "it", "pt"}
+
+
+def _language_matches(text: str, language: str) -> bool:
+    """Lightweight script check: does the text plausibly match the language?"""
+
+    arabic = len(_ARABIC_SCRIPT.findall(text))
+    latin = len(_LATIN_SCRIPT.findall(text))
+    if language in _ARABIC_LANGUAGES:
+        return arabic > latin
+    if language in _LATIN_LANGUAGES:
+        return latin > 0 and latin > arabic
+    return True
+
+
+def _batch_language_ok(batch: TopicMiningBatch, language: str) -> bool:
+    """Every editorial-facing proposal field must use the editorial language.
+
+    Checked: title, video_question, tentative_thesis, angle,
+    channel_fit_reason, knowledge_gaps. Lightweight script heuristic only —
+    it catches obvious wrong-language responses, not semantic drift.
+    """
+
+    for proposal in batch.topics:
+        fields = [
+            proposal.title,
+            proposal.video_question,
+            proposal.tentative_thesis,
+            proposal.angle,
+            proposal.channel_fit_reason,
+            " ".join(proposal.knowledge_gaps),
+        ]
+        if not all(
+            _language_matches(field, language) for field in fields if field.strip()
+        ):
+            return False
+    return True
+
 
 _ALLOWED_TRANSITIONS: dict[TopicStatus, set[TopicStatus]] = {
     TopicStatus.CANDIDATE: {
@@ -93,12 +141,35 @@ class TopicService:
             existing_concepts = await _channel_candidate_concepts(session, channel.id)
             signatures = await _published_signatures(session, channel.id)
             provider = self.provider or resolve_llm_provider()
-            batch, labels = await TopicMiner(provider, model=self.model).propose(
+            editorial_language = strategy.editorial_language or "fa"
+            miner = TopicMiner(provider, model=self.model)
+            batch, labels = await miner.propose(
                 strategy_payload=_strategy_payload(strategy),
                 units=units,
                 published_signatures=signatures,
                 owner_instruction=owner_instruction,
+                editorial_language=editorial_language,
             )
+            language_review = False
+            if not _batch_language_ok(batch, editorial_language):
+                # One explicit correction pass before flagging for review.
+                batch, labels = await miner.propose(
+                    strategy_payload=_strategy_payload(strategy),
+                    units=units,
+                    published_signatures=signatures,
+                    owner_instruction=owner_instruction,
+                    editorial_language=editorial_language,
+                    language_correction=True,
+                )
+                language_review = not _batch_language_ok(batch, editorial_language)
+            if language_review:
+                logger.warning(
+                    "topic_mining.language_review_required",
+                    extra={
+                        "channel": channel_slug,
+                        "expected_language": editorial_language,
+                    },
+                )
             weights = _scoring_weights(strategy)
             concepts_by_name = await _concept_index(session)
             return [
@@ -112,6 +183,7 @@ class TopicService:
                     existing_concepts,
                     weights,
                     owner_instruction,
+                    language_review,
                 )
                 for proposal in batch.topics
             ]
@@ -131,7 +203,9 @@ class TopicService:
                 .order_by(TopicCandidate.total_score.desc())
                 .options(
                     selectinload(TopicCandidate.units),
-                    selectinload(TopicCandidate.concepts),
+                    selectinload(TopicCandidate.concepts).selectinload(
+                        TopicCandidateConcept.concept
+                    ),
                 )
             )
             if status is not None:
@@ -162,6 +236,7 @@ class TopicService:
         existing_concepts: list[set[UUID]],
         weights: dict[str, object],
         owner_instruction: str | None,
+        language_review: bool,
     ) -> TopicCandidate:
         claimed = list(proposal.supporting_unit_refs)
         resolved = {ref for ref in claimed if ref in labels}
@@ -199,6 +274,8 @@ class TopicService:
                 "claimed_unit_refs": claimed,
                 "owner_instruction": owner_instruction,
                 "model": self.model,
+                "editorial_language": strategy.editorial_language,
+                "language_review_required": language_review,
             },
         )
         session.add(candidate)

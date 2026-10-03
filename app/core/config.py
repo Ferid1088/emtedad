@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     log_json: bool = True
     llm_provider: Literal["devin"] | None = None
     devin_api_key: SecretStr | None = None
+    # Bounded in-call retry for transient 429s; hard quota is never retried.
+    devin_rate_limit_max_attempts: int = 3
+    devin_rate_limit_initial_backoff_seconds: float = 20.0
+    devin_rate_limit_max_backoff_seconds: float = 120.0
     speech_structure_concurrency: int = 2
     speech_structure_scan_interval_seconds: int = 300
     speech_structure_max_attempts: int = 3

@@ -671,3 +671,144 @@ async def test_mining_requires_assigned_units(migrated_database_url: str) -> Non
         assert await topics.mine("emtedad") == []
     finally:
         await database.dispose()
+
+
+class _EnglishThenPersianProvider(_Provider):
+    """topic_mining returns English first, Persian after the correction pass."""
+
+    def __init__(self, *, corrects: bool = True) -> None:
+        self.calls = 0
+        self.corrects = corrects
+
+    async def extract(self, request):
+        if request.task != "topic_mining":
+            return await super().extract(request)
+        self.calls += 1
+        if self.calls == 1 or not self.corrects:
+            return TopicMiningBatch(
+                topics=[
+                    TopicCandidateProposal(
+                        title="Why we keep bad investments",
+                        video_question="Why do we stick with losing choices?",
+                        tentative_thesis="Loss aversion keeps us locked in.",
+                        angle="Everyday decision traps",
+                        supporting_unit_refs=["u1"],
+                        supporting_concepts=[],
+                        knowledge_gaps=["Cross-cultural evidence missing"],
+                        channel_fit_reason="Core decision content",
+                    )
+                ]
+            )
+        return TopicMiningBatch(
+            topics=[
+                TopicCandidateProposal(
+                    title="چرا سرمایه‌گذاری‌های بد را نگه می‌داریم",
+                    video_question="چرا به انتخاب‌های بازنده پایبند می‌مانیم؟",
+                    tentative_thesis="ترس از زیان ما را در انتخاب نگه می‌دارد.",
+                    angle="تله‌های روزمره‌ی تصمیم‌گیری",
+                    supporting_unit_refs=["u1"],
+                    supporting_concepts=[],
+                    knowledge_gaps=["شواهد بین‌فرهنگی کافی نیست"],
+                    channel_fit_reason="محتوای اصلی تصمیم‌گیری",
+                )
+            ]
+        )
+
+
+@pytest.mark.asyncio
+async def test_mining_corrects_wrong_language(migrated_database_url: str) -> None:
+    """FA strategy + English provider output → one correction pass → Persian."""
+
+    database = Database(migrated_database_url)
+    try:
+        channel_service = EditorialChannelService(database)
+        await channel_service.seed_channels()
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        provider = _EnglishThenPersianProvider()
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        assert provider.calls == 2  # one correction pass happened
+        assert len(candidates) == 1
+        candidate = candidates[0]
+        assert "چرا" in candidate.video_question
+        assert candidate.provenance_json["editorial_language"] == "fa"
+        assert candidate.provenance_json["language_review_required"] is False
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_mining_flags_persistent_wrong_language(
+    migrated_database_url: str,
+) -> None:
+    """Still wrong after the correction pass → LANGUAGE_REVIEW flag persists."""
+
+    database = Database(migrated_database_url)
+    try:
+        channel_service = EditorialChannelService(database)
+        await channel_service.seed_channels()
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        provider = _EnglishThenPersianProvider(corrects=False)
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        assert provider.calls == 2  # bounded: exactly one retry
+        assert len(candidates) == 1
+        assert candidates[0].provenance_json["language_review_required"] is True
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_english_strategy_accepts_english_topics(
+    migrated_database_url: str,
+) -> None:
+    """An EN editorial_language accepts English output without a retry."""
+
+    database = Database(migrated_database_url)
+    try:
+        channel_service = EditorialChannelService(database)
+        await channel_service.seed_channels()
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        provider = _EnglishThenPersianProvider(corrects=False)
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        async with database.transaction() as session:
+            strategy = await session.scalar(
+                select(ChannelStrategyVersion).where(
+                    ChannelStrategyVersion.editorial_channel_id == channel.id,
+                    ChannelStrategyVersion.status == StrategyStatus.ACTIVE,
+                )
+            )
+            assert strategy is not None
+            strategy.editorial_language = "en"
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        assert provider.calls == 1  # no correction pass for matching language
+        assert candidates[0].provenance_json["language_review_required"] is False
+    finally:
+        await database.dispose()

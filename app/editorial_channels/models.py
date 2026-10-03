@@ -110,6 +110,10 @@ class ChannelStrategyVersion(Base):
 
     agent_profile_json: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
 
+    # Working language for mined topics/questions — independent of source
+    # language and of publication target language.
+    editorial_language: Mapped[str] = mapped_column(String(8), default="fa")
+
     status: Mapped[StrategyStatus] = mapped_column(
         _enum(StrategyStatus, "channel_strategy_status"),
         default=StrategyStatus.DRAFT,

@@ -29,6 +29,19 @@ class SourceStructureOutput(BaseModel):
     nodes: list[StructureNodeProposal] = Field(default_factory=list)
 
 
+class SourceStructureOutputRaw(BaseModel):
+    """Lenient wire shape for provider output.
+
+    Items stay untyped so one malformed node cannot poison the whole
+    extraction; each item is strict-validated separately and invalid
+    items are dropped — the structure validator then judges coverage.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    nodes: list[dict[str, object]] = Field(default_factory=list)
+
+
 class StructureValidationReport(BaseModel):
     """Blocking errors plus non-blocking structural warnings."""
 

@@ -8,8 +8,8 @@ this provider is an opt-in fallback, not the default. Select it with
 """
 
 import asyncio
-import contextlib
 import json
+import logging
 import time
 
 import httpx
@@ -17,6 +17,8 @@ from pydantic import BaseModel, ValidationError
 
 from app.core.config import get_settings
 from app.knowledge.llm.base import StructuredExtractionRequest
+
+logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.devin.ai"
 _POLL_INTERVAL_SECONDS = 15.0
@@ -41,6 +43,14 @@ _NUDGE_MESSAGE = (
 
 class DevinCloudError(RuntimeError):
     """Raised for auth, HTTP, timeout, JSON, or schema failures."""
+
+
+class DevinRateLimitError(DevinCloudError):
+    """Transient 429 — safe to retry with bounded backoff."""
+
+
+class DevinQuotaError(DevinCloudError):
+    """Hard quota/concurrency exhaustion — never retried inside one call."""
 
 
 class DevinCloudProvider:
@@ -75,14 +85,47 @@ class DevinCloudProvider:
             timeout=60,
             transport=self._transport,
         ) as client:
-            session_id = await self._create_session(client, prompt)
+            session_id = await self._create_session_with_backoff(
+                client, prompt, settings
+            )
             try:
                 payload = await self._await_session(
                     client, session_id, deadline_seconds=timeout
                 )
             finally:
+                # Every code path out of the call — success, timeout, HTTP
+                # error, cancellation — must release the cloud session; an
+                # abandoned session keeps a slot in the concurrency cap.
                 await self._terminate_session(client, session_id)
         return self._validate(request, payload)
+
+    async def _create_session_with_backoff(
+        self, client: httpx.AsyncClient, prompt: str, settings: object
+    ) -> str:
+        """Create a session, retrying only transient rate limits."""
+
+        max_attempts = int(getattr(settings, "devin_rate_limit_max_attempts", 3))
+        delay = float(
+            getattr(settings, "devin_rate_limit_initial_backoff_seconds", 20.0)
+        )
+        max_delay = float(
+            getattr(settings, "devin_rate_limit_max_backoff_seconds", 120.0)
+        )
+        last: DevinRateLimitError | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return await self._create_session(client, prompt)
+            except DevinRateLimitError as exc:
+                last = exc
+                if attempt == max_attempts:
+                    break
+                logger.warning(
+                    "devin.rate_limited",
+                    extra={"attempt": attempt, "backoff_seconds": delay},
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, max_delay)
+        raise last if last is not None else DevinCloudError("unreachable")
 
     async def _create_session(self, client: httpx.AsyncClient, prompt: str) -> str:
         chunks = _chunk_prompt(prompt)
@@ -99,16 +142,21 @@ class DevinCloudProvider:
         session_id = str(payload.get("session_id") or "")
         if not session_id:
             raise DevinCloudError("session creation returned no session_id")
-        for chunk in chunks[1:]:
-            await self._send_message(client, session_id, chunk)
-        if len(chunks) > 1:
-            await self._send_message(
-                client,
-                session_id,
-                f"{_END_OF_INPUT}. Now produce exactly one JSON object "
-                "matching the JSON schema given earlier and set the "
-                "session's structured output to it.",
-            )
+        try:
+            for chunk in chunks[1:]:
+                await self._send_message(client, session_id, chunk)
+            if len(chunks) > 1:
+                await self._send_message(
+                    client,
+                    session_id,
+                    f"{_END_OF_INPUT}. Now produce exactly one JSON object "
+                    "matching the JSON schema given earlier and set the "
+                    "session's structured output to it.",
+                )
+        except BaseException:
+            # A failed follow-up message must not orphan the remote session.
+            await self._terminate_session(client, session_id)
+            raise
         return session_id
 
     async def _send_message(
@@ -132,8 +180,23 @@ class DevinCloudProvider:
         self, client: httpx.AsyncClient, session_id: str
     ) -> None:
         # Blocked sessions keep a slot in the org's concurrency limit; free it.
-        with contextlib.suppress(httpx.HTTPError):
-            await client.delete(f"/v1/sessions/{session_id}")
+        # Cleanup is idempotent and never masks the original failure.
+        try:
+            response = await client.delete(f"/v1/sessions/{session_id}")
+        except httpx.HTTPError as exc:
+            logger.warning(
+                "devin.session_cleanup_error",
+                extra={"session_id": session_id, "error": type(exc).__name__},
+            )
+            return
+        if response.status_code >= 400:
+            logger.warning(
+                "devin.session_cleanup_failed",
+                extra={
+                    "session_id": session_id,
+                    "status_code": response.status_code,
+                },
+            )
 
     async def _post(
         self, client: httpx.AsyncClient, path: str, body: dict[str, object]
@@ -145,14 +208,19 @@ class DevinCloudProvider:
         if response.status_code == 401:
             raise DevinCloudError("EMTEDAD_DEVIN_API_KEY wurde abgelehnt (401)")
         if response.status_code == 403 and "out_of_quota" in response.text:
-            raise DevinCloudError(
+            raise DevinQuotaError(
                 "Devin-Kontingent erschöpft (out_of_quota). "
                 "Billing in Devin prüfen oder später erneut versuchen."
             )
         if response.status_code == 429:
-            raise DevinCloudError(
-                "Devin-Limit für parallele Sessions erreicht: " + response.text[:300]
-            )
+            if "sessions running" in response.text or "parallel" in response.text:
+                # Free-tier parallel-session cap: a hard concurrency quota,
+                # not transient throttling — surface it, don't hammer it.
+                raise DevinQuotaError(
+                    "PROVIDER_QUOTA_EXHAUSTED: Devin-Limit für parallele "
+                    "Sessions erreicht: " + response.text[:300]
+                )
+            raise DevinRateLimitError("Devin rate limit (429): " + response.text[:300])
         if response.status_code != 200:
             raise DevinCloudError(
                 f"request failed: {response.status_code} {response.text[-500:]}"

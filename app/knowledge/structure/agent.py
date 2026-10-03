@@ -6,7 +6,10 @@ the proposals into one global hierarchy. The agent only sees segment
 """
 
 import json
+import logging
 from collections.abc import Callable
+
+from pydantic import ValidationError
 
 from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.models import SourceSegment
@@ -21,9 +24,12 @@ from app.knowledge.structure.prompts import (
 )
 from app.knowledge.structure.schemas import (
     SourceStructureOutput,
+    SourceStructureOutputRaw,
     StructureNodeProposal,
 )
 from app.knowledge.windowing import WindowSegment, build_windows
+
+logger = logging.getLogger(__name__)
 
 
 class SourceStructureAgent:
@@ -72,11 +78,13 @@ class SourceStructureAgent:
                 model=self.model,
                 instructions=LOCAL_INSTRUCTIONS,
                 input_text=window.text,
-                output_model=SourceStructureOutput,
+                output_model=SourceStructureOutputRaw,
             )
             result = await self.provider.extract(request)
-            proposal = SourceStructureOutput.model_validate(result.model_dump())
-            self._assert_within_window(proposal, window.segments)
+            raw = SourceStructureOutputRaw.model_validate(result.model_dump())
+            proposal = SourceStructureOutput(
+                nodes=self._valid_nodes(raw, within=window.segments)
+            )
             local.append(proposal)
             if on_progress is not None:
                 on_progress(f"local:{index}/{len(windows)}")
@@ -101,27 +109,70 @@ class SourceStructureAgent:
                 ],
                 ensure_ascii=False,
             ),
-            output_model=SourceStructureOutput,
+            output_model=SourceStructureOutputRaw,
         )
         merged = await self.provider.extract(merge_request)
-        return SourceStructureOutput.model_validate(merged.model_dump())
+        raw = SourceStructureOutputRaw.model_validate(merged.model_dump())
+        return SourceStructureOutput(nodes=self._valid_nodes(raw))
 
     @staticmethod
-    def _assert_within_window(
-        proposal: SourceStructureOutput, segments: tuple[WindowSegment, ...]
-    ) -> None:
-        valid = {segment.sequence for segment in segments}
-        for node in proposal.nodes:
-            if (
-                node.start_segment_sequence not in valid
-                or node.end_segment_sequence not in valid
-            ):
-                raise ValueError(
-                    f"local node {node.temp_id} escapes its window "
-                    f"({node.start_segment_sequence}-{node.end_segment_sequence})"
+    def _valid_nodes(
+        raw: SourceStructureOutputRaw,
+        *,
+        within: tuple[WindowSegment, ...] | None = None,
+    ) -> list[StructureNodeProposal]:
+        """Strict-validate each proposed node; drop malformed items.
+
+        Unknown keys are trimmed first — provider commentary fields must
+        not discard an otherwise valid node. Spans that escape the local
+        window or invert are dropped as well; the structure validator
+        reports resulting coverage gaps instead of crashing the run.
+        """
+
+        fields = set(StructureNodeProposal.model_fields)
+        valid_sequences = (
+            {segment.sequence for segment in within} if within is not None else None
+        )
+        nodes: list[StructureNodeProposal] = []
+        for item in raw.nodes:
+            trimmed = {key: item[key] for key in fields if key in item}
+            try:
+                node = StructureNodeProposal.model_validate(trimmed)
+            except ValidationError:
+                logger.warning(
+                    "source_structure.invalid_node",
+                    extra={"raw": str(item)[:500]},
                 )
+                continue
+            if valid_sequences is not None and (
+                node.start_segment_sequence not in valid_sequences
+                or node.end_segment_sequence not in valid_sequences
+            ):
+                logger.warning(
+                    "source_structure.node_escapes_window",
+                    extra={
+                        "temp_id": node.temp_id,
+                        "span": (
+                            node.start_segment_sequence,
+                            node.end_segment_sequence,
+                        ),
+                    },
+                )
+                continue
             if node.end_segment_sequence < node.start_segment_sequence:
-                raise ValueError(f"local node {node.temp_id} has an inverted span")
+                logger.warning(
+                    "source_structure.inverted_span",
+                    extra={
+                        "temp_id": node.temp_id,
+                        "span": (
+                            node.start_segment_sequence,
+                            node.end_segment_sequence,
+                        ),
+                    },
+                )
+                continue
+            nodes.append(node)
+        return nodes
 
 
 __all__ = [

@@ -5,13 +5,13 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-import pytest
 from pydantic import BaseModel
 
 from app.knowledge.structure.agent import SourceStructureAgent
 from app.knowledge.structure.domain import StructureNodeType
 from app.knowledge.structure.schemas import (
     SourceStructureOutput,
+    SourceStructureOutputRaw,
     StructureNodeProposal,
 )
 from app.knowledge.structure.service import SourceStructureService
@@ -148,8 +148,8 @@ def test_agent_single_window_skips_merge_pass() -> None:
     assert output.nodes[0].node_type is StructureNodeType.STORY
 
 
-def test_agent_rejects_node_escaping_window() -> None:
-    segments = [_segment(index) for index in range(1, 200)]
+def test_agent_drops_node_escaping_window() -> None:
+    segments = [_segment(index) for index in range(1, 41)]
     provider = _FakeProvider(
         SourceStructureOutput(
             nodes=[
@@ -159,13 +159,50 @@ def test_agent_rejects_node_escaping_window() -> None:
                     summary="x",
                     start_segment_sequence=1,
                     end_segment_sequence=199,
-                )
+                ),
+                StructureNodeProposal(
+                    temp_id="n2",
+                    title="Inside",
+                    summary="x",
+                    start_segment_sequence=1,
+                    end_segment_sequence=10,
+                ),
+            ]
+        )
+    )
+    agent = SourceStructureAgent(provider, window_size=120, overlap=16)
+    output = asyncio.run(agent.propose(segments))  # type: ignore[arg-type]
+    assert [node.temp_id for node in output.nodes] == ["n2"]
+
+
+def test_agent_drops_malformed_node_and_tolerates_extra_keys() -> None:
+    segments = [_segment(index) for index in range(1, 200)]
+    good = StructureNodeProposal(
+        temp_id="n2",
+        title="Inside",
+        summary="x",
+        start_segment_sequence=1,
+        end_segment_sequence=10,
+    ).model_dump(mode="json")
+    good["commentary"] = "provider noise"
+    provider = _FakeProvider(
+        SourceStructureOutputRaw(
+            nodes=[
+                {
+                    "temp_id": "n1",
+                    "title": "Broken",
+                    "summary": "x",
+                    "node_type": "NOT_A_TYPE",
+                    "start_segment_sequence": 1,
+                    "end_segment_sequence": 10,
+                },
+                good,
             ]
         )
     )
     agent = SourceStructureAgent(provider, window_size=40, overlap=8)
-    with pytest.raises(ValueError, match="escapes its window"):
-        asyncio.run(agent.propose(segments))  # type: ignore[arg-type]
+    output = asyncio.run(agent.propose(segments))  # type: ignore[arg-type]
+    assert [node.temp_id for node in output.nodes] == ["n2"]
 
 
 def test_service_stage_maps_sequences_to_segment_ids() -> None:

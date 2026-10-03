@@ -5,16 +5,21 @@ evidence level, claim type). Spans and full text stay deterministic.
 """
 
 import json
+import logging
 from uuid import UUID
+
+from pydantic import ValidationError
 
 from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.models import SourceSegment
 from app.knowledge.structure.models import SourceStructureNode
 from app.knowledge.units.domain import UNIT_PROMPT_VERSION
 from app.knowledge.units.schemas import (
-    UnitMetadataBatch,
+    UnitMetadataBatchRaw,
     UnitMetadataProposal,
 )
+
+logger = logging.getLogger(__name__)
 
 UNIT_INSTRUCTIONS = """You classify structure nodes from a transcript into \
 Knowledge Units.
@@ -75,14 +80,28 @@ class KnowledgeUnitExtractor:
                 model=self.model,
                 instructions=UNIT_INSTRUCTIONS,
                 input_text=payload,
-                output_model=UnitMetadataBatch,
+                output_model=UnitMetadataBatchRaw,
             )
             result = await self.provider.extract(request)
-            parsed = UnitMetadataBatch.model_validate(result.model_dump())
+            parsed = UnitMetadataBatchRaw.model_validate(result.model_dump())
             known = {str(node.id) for node in batch}
-            for proposal in parsed.units:
+            for raw in parsed.units:
+                try:
+                    proposal = UnitMetadataProposal.model_validate(raw)
+                except ValidationError:
+                    # One malformed proposal must not poison the batch; the
+                    # node falls back to deterministic metadata instead.
+                    logger.warning(
+                        "knowledge_units.invalid_proposal",
+                        extra={"raw": str(raw)[:500]},
+                    )
+                    continue
                 if proposal.node_id not in known:
-                    raise ValueError(f"unknown node reference: {proposal.node_id}")
+                    logger.warning(
+                        "knowledge_units.unknown_node_reference",
+                        extra={"node_id": proposal.node_id},
+                    )
+                    continue
                 proposals[proposal.node_id] = proposal
         return proposals
 
