@@ -2,54 +2,55 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource</p>
-    <h1>{{ source.title }}</h1>
+    <p class="eyebrow"><a href="/library/{{ source.id }}">Ressource</a> — Knowledge Units</p>
+    <h1 dir="auto">{{ source.title }}</h1>
   </div>
   <div class="actions">
     <form method="post" action="/library/{{ source.id }}/units">
       <button class="button" type="submit">
-        {% if units %}Re-extract units{% else %}Extract knowledge units{% endif %}
+        {% if units %}Units neu extrahieren{% else %}Knowledge Units extrahieren{% endif %}
       </button>
     </form>
     {% if units %}
     <form method="post" action="/library/{{ source.id }}/concepts">
-      <button class="button secondary" type="submit">Map concepts</button>
+      <button class="button secondary" type="submit">Konzepte zuordnen</button>
     </form>
     {% endif %}
   </div>
 </div>
 {% include "studio/_resource_tabs.html" %}
 {% if state %}
-<p class="muted">Processing status: <strong>{{ state.status.value }}</strong>
-  {% if state.last_error %} — {{ state.last_error }}{% endif %}</p>
+<p class="muted">Verarbeitungsstatus: <strong>{{ state.status.value }}</strong>
+  {% if state.last_error %} — {{ human_error(state.last_error) }}
+  <details class="tech-details"><summary>Technische Details</summary><pre>{{ state.last_error }}</pre></details>{% endif %}</p>
 {% endif %}
 {% if units %}
 <form method="get" action="/library/{{ source.id }}/units" class="unit-search">
   <input type="search" name="q" value="{{ query }}"
-         placeholder="Search units by title, summary, or text">
-  <button class="button" type="submit">Search</button>
+         placeholder="Units nach Titel, Zusammenfassung oder Text suchen">
+  <button class="button" type="submit">Suchen</button>
 </form>
 <section class="card">
   <ul class="unit-list">
     {% for unit in units %}
     <li class="unit-row">
       <div class="unit-head">
-        <strong>{{ unit.title }}</strong>
+        <strong dir="auto">{{ unit.title }}</strong>
         <span class="chip">{{ unit.unit_type.value }}</span>
-        {% if unit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
+        {% if unit.atomic %}<span class="chip chip-story">atomar</span>{% endif %}
         <span class="muted">{{ unit.evidence_level.value }} ·
           {{ unit.claim_type.value }} ·
           {{ epistemic.get(unit.id, '') }}
-          {% if retrieval_roles.get(unit.id) == 'SUMMARY' %}· <strong>summary role</strong>{% endif %}</span>
+          {% if retrieval_roles.get(unit.id) == 'SUMMARY' %}· <strong>Zusammenfassung</strong>{% endif %}</span>
       </div>
       {% set unit_concepts = concepts_by_unit.get(unit.id, []) %}
       {% if unit_concepts %}
-      <p class="muted">Concepts: {{ unit_concepts | join(", ") }}</p>
+      <p class="muted">Konzepte: {{ unit_concepts | join(", ") }}</p>
       {% endif %}
-      <p>{{ unit.summary }}</p>
+      <p dir="auto">{{ unit.summary }}</p>
       <details>
-        <summary>Original text ({{ unit.full_text | length }} chars)</summary>
-        <p class="unit-fulltext">{{ unit.full_text }}</p>
+        <summary>Originaltext ({{ unit.full_text | length }} Zeichen)</summary>
+        <p class="unit-fulltext" dir="auto">{{ unit.full_text }}</p>
       </details>
     </li>
     {% endfor %}
@@ -57,9 +58,9 @@
 </section>
 {% else %}
 <section class="card empty-state">
-  <h2>No knowledge units yet</h2>
-  <p>Knowledge Units are extracted from a validated source structure. Build
-    the structure first, then extract units.</p>
+  <h2>Noch keine Knowledge Units</h2>
+  <p>Knowledge Units werden aus einer validierten Vortragsstruktur extrahiert.
+    Zuerst die Struktur aufbauen, dann Units extrahieren.</p>
 </section>
 {% endif %}
 {% endblock %}

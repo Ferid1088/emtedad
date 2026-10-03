@@ -5,6 +5,7 @@ from app.core.config import Settings
 from app.main import create_app
 from app.web.routes import router as owner_router
 from app.web.service import TopicSuggestionService, validate_youtube_url
+from app.web.studio_routes import router as studio_router
 
 
 def test_youtube_locator_validation() -> None:
@@ -26,6 +27,7 @@ def test_invalid_youtube_locator_is_rejected() -> None:
 def test_owner_routes_are_registered(test_settings: Settings) -> None:
     _app = create_app(test_settings)
     paths = {getattr(route, "path", "") for route in owner_router.routes}
+    paths |= {getattr(route, "path", "") for route in studio_router.routes}
     assert {
         "/",
         "/sources",

@@ -2,9 +2,9 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource — Processing</p>
-    <h1>{{ source.title }}</h1>
-    <p class="lede">Pipeline state in owner terms. Every stage below is derived from persisted artifacts.</p>
+    <p class="eyebrow"><a href="/library/{{ source.id }}">Ressource</a> — Verarbeitung</p>
+    <h1 dir="auto">{{ source.title }}</h1>
+    <p class="lede">Pipeline-Status in verständlichen Schritten. Jede Stufe basiert auf gespeicherten Ergebnissen.</p>
   </div>
   {% if state %}
   <span class="badge {% if state.status.value == 'READY' %}success{% endif %}">{{ state.status.value.replace('_', ' ') }}</span>
@@ -12,10 +12,18 @@
 </div>
 {% include "studio/_resource_tabs.html" %}
 
+{% if state and state.last_error %}
 <section class="card">
-  <h2>Pipeline stages</h2>
+  <h2>Letzter Fehler</h2>
+  <p class="error">{{ human_error(state.last_error) }}</p>
+  <details class="tech-details"><summary>Technische Details</summary><pre>{{ state.last_error }}</pre></details>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Pipeline-Stufen</h2>
   <table>
-    <thead><tr><th>Stage</th><th>Status</th><th>Detail</th></tr></thead>
+    <thead><tr><th>Stufe</th><th>Status</th><th>Detail</th></tr></thead>
     <tbody>
       {% for stage in stages %}
       <tr>
@@ -27,13 +35,13 @@
     </tbody>
   </table>
   {% if state %}
-  <p class="muted">Attempts: {{ state.attempt_count }} · Updated: {{ state.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+  <p class="muted">Versuche: {{ state.attempt_count }} · Aktualisiert: {{ state.updated_at.strftime('%d.%m.%Y %H:%M') }}</p>
   {% endif %}
 </section>
 
 {% if warnings %}
 <section class="card">
-  <h2>Warnings</h2>
+  <h2>Hinweise</h2>
   <ul>
     {% for warning in warnings %}<li>{{ warning }}</li>{% endfor %}
   </ul>
@@ -41,18 +49,18 @@
 {% endif %}
 
 <section class="card">
-  <h2>Actions</h2>
+  <h2>Aktionen</h2>
   <div class="button-row">
     <form method="post" action="/library/{{ source.id }}/structure">
       <button class="button" type="submit">
-        {% if state and state.status.value == 'FAILED' %}Retry failed processing{% else %}Reprocess resource{% endif %}
+        {% if state and state.status.value == 'FAILED' %}Fehlgeschlagene Verarbeitung wiederholen{% else %}Ressource erneut verarbeiten{% endif %}
       </button>
     </form>
     <form method="post" action="/library/{{ source.id }}/units">
-      <button class="button secondary" type="submit">Re-extract units</button>
+      <button class="button secondary" type="submit">Units neu extrahieren</button>
     </form>
     <form method="post" action="/library/{{ source.id }}/concepts">
-      <button class="button secondary" type="submit">Re-map concepts</button>
+      <button class="button secondary" type="submit">Konzepte neu zuordnen</button>
     </form>
   </div>
 </section>

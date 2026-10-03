@@ -2,47 +2,48 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Studio</p>
-    <h1>Resource Library</h1>
-    <p class="lede">One shared library feeds every editorial channel. Assigning a resource never duplicates it.</p>
+    <p class="eyebrow">Quellen</p>
+    <h1>Ressourcen</h1>
+    <p class="lede">Eine gemeinsame Bibliothek speist alle Kanäle. Eine Zuordnung dupliziert die Ressource nicht.</p>
   </div>
 </div>
 {% if request.query_params.get('import') == 'failed' %}
-<p class="error">Import failed. Check the URL and transcript availability, then retry.</p>
+<p class="error">Import fehlgeschlagen. URL und Transkript-Verfügbarkeit prüfen, dann erneut versuchen.</p>
 {% endif %}
 <section class="card">
-  <h2>Import Resource</h2>
-  <form method="post" action="/library/import" class="assign-form">
-    <label>YouTube URL
-      <input type="url" name="url" placeholder="https://www.youtube.com/watch?v=…" required>
-    </label>
-    <button class="button" type="submit">Import YouTube</button>
-  </form>
+  <h2>Ressource importieren</h2>
+  <div class="button-row">
+    <a class="button" href="/library/import">+ YouTube-Video importieren</a>
+    <a class="button" href="/library/import">+ PDF hinzufügen</a>
+    <a class="button" href="/library/import">+ Buch / Text hinzufügen</a>
+  </div>
+  <p class="muted" style="font-size:.8rem">Oder überwachte YouTube-Kanäle nutzen:
+  <a href="/studio/youtube">YouTube-Kanäle →</a></p>
 </section>
 <section class="card">
   <form method="get" action="/library" class="inline-form">
-    <input type="search" name="q" value="{{ query }}" placeholder="Search title, URL, external ID">
+    <input type="search" name="q" value="{{ query }}" placeholder="Titel, URL oder externe ID suchen">
     <select name="source_type">
-      <option value="">All types</option>
+      <option value="">Alle Typen</option>
       {% for t in source_types %}<option value="{{ t.value }}" {% if type_filter == t.value %}selected{% endif %}>{{ t.value }}</option>{% endfor %}
     </select>
     <select name="status">
-      <option value="">All states</option>
+      <option value="">Alle Status</option>
       {% for s in status_options %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s.replace('_', ' ') }}</option>{% endfor %}
     </select>
-    <button class="button secondary" type="submit">Filter</button>
+    <button class="button secondary" type="submit">Filtern</button>
   </form>
 </section>
 <section class="card">
-  <h2>Resources ({{ sources|length }})</h2>
+  <h2>Ressourcen ({{ sources|length }})</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Title</th><th>Type</th><th>Language</th><th>Segments</th><th>Units</th><th>Concepts</th><th>Processing</th><th>Channels</th><th>Added</th><th></th></tr></thead>
+    <thead><tr><th>Titel</th><th>Typ</th><th>Sprache</th><th>Segmente</th><th>Units</th><th>Konzepte</th><th>Verarbeitung</th><th>Kanäle</th><th>Hinzugefügt</th><th></th></tr></thead>
     <tbody>
       {% for source in sources %}
       {% set stats = source_stats.get(source.id, {}) %}
       <tr>
-        <td><a href="/library/{{ source.id }}">{{ source.title }}</a></td>
+        <td><a href="/library/{{ source.id }}" dir="auto">{{ source.title }}</a></td>
         <td>{{ source.source_type.value }}</td>
         <td>{{ source.language }}</td>
         <td>{{ segment_counts.get(source.id, 0) }}</td>
@@ -54,11 +55,11 @@
           <a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a>
           {% else %}<span class="muted">—</span>{% endfor %}
         </td>
-        <td>{{ source.created_at.strftime('%Y-%m-%d') }}</td>
-        <td><a class="linkbutton" href="/library/{{ source.id }}">Inspect</a></td>
+        <td>{{ source.created_at.strftime('%d.%m.%Y') }}</td>
+        <td><a class="linkbutton" href="/library/{{ source.id }}">Öffnen</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="10" class="muted">No resources match. Import a YouTube video above.</td></tr>
+      <tr><td colspan="10" class="muted">Keine Ressourcen gefunden. <a href="/library/import">Ressource importieren</a>.</td></tr>
       {% endfor %}
     </tbody>
   </table>

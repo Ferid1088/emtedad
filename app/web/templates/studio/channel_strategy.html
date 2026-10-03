@@ -2,38 +2,49 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Channel</p>
-    <h1>{{ channel.name }} — Strategy</h1>
-    <p class="lede">Strategies are versioned. The active version is never edited in place — create a draft, then activate it.</p>
+    <p class="eyebrow"><a href="/studio/channels">Meine Kanäle</a></p>
+    <h1>{{ channel.name }} — Strategie</h1>
+    <p class="lede">Strategien sind versioniert. Die aktive Version wird nie direkt bearbeitet — Entwurf anlegen, dann aktivieren.</p>
   </div>
 </div>
 {% include "studio/_channel_nav.html" %}
+
+{% if request.query_params.get('error') == 'invalid' %}
+<p class="error">Der Entwurf konnte nicht aktiviert werden — zuerst die Validierungsfehler beheben.</p>
+{% elif request.query_params.get('error') == 'immutable' %}
+<p class="error">Nur Entwürfe können bearbeitet werden. Bitte einen neuen Entwurf anlegen.</p>
+{% endif %}
 
 {% set draft = strategies | selectattr('status.value', 'equalto', 'DRAFT') | first %}
 
 {% if draft %}
 <section class="card">
   <div class="split-head">
-    <h2>Draft — v{{ draft.version_number }}</h2>
+    <h2>Entwurf — v{{ draft.version_number }}</h2>
     <span class="badge">DRAFT</span>
   </div>
-  <p><strong>Core question:</strong> {{ draft.core_question }}</p>
+  <p><strong>Kernfrage:</strong> {{ draft.core_question }}</p>
   <dl class="metadata">
-    <div><dt>Domains</dt><dd>{{ draft.domains_json.get('domains', [])|join(', ') }}</dd></div>
-    <div><dt>Preferred angles</dt><dd>{{ draft.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
-    <div><dt>Forbidden angles</dt><dd>{{ draft.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Sprache</dt><dd>{{ draft.editorial_language or '—' }}</dd></div>
+    <div><dt>Domänen</dt><dd>{{ draft.domains_json.get('domains', [])|join(', ') }}</dd></div>
+    <div><dt>Bevorzugte Blickwinkel</dt><dd>{{ draft.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Verbotene Blickwinkel</dt><dd>{{ draft.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
   </dl>
-  <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/activate">
-    <button class="button" type="submit">Activate draft</button>
-  </form>
-  <p class="muted">Activating archives the current active version.</p>
+  <div class="inline-form">
+    <a class="button" href="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/edit">Entwurf bearbeiten</a>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/compare">Mit aktiver vergleichen</a>
+    <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/activate">
+      <button class="button secondary" type="submit">Entwurf aktivieren</button>
+    </form>
+  </div>
+  <p class="muted">Die Aktivierung archiviert die bisher aktive Version.</p>
 </section>
 {% else %}
 <section class="card">
-  <h2>{% if active_strategy %}Create draft version{% else %}No draft strategy{% endif %}</h2>
+  <h2>{% if active_strategy %}Entwurfs-Version anlegen{% else %}Kein Strategie-Entwurf{% endif %}</h2>
   <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/draft" class="inline-form">
-    <input type="text" name="core_question" placeholder="New core question (optional — clones active if empty)">
-    <button class="button secondary" type="submit">Create draft</button>
+    <input type="text" name="core_question" placeholder="Neue Kernfrage (optional — leer = aktive kopieren)">
+    <button class="button secondary" type="submit">Entwurf anlegen</button>
   </form>
 </section>
 {% endif %}
@@ -41,37 +52,55 @@
 {% if active_strategy %}
 <section class="card">
   <div class="split-head">
-    <h2>Active strategy — v{{ active_strategy.version_number }}</h2>
+    <h2>Aktive Strategie — v{{ active_strategy.version_number }}</h2>
     <span class="badge success">ACTIVE</span>
   </div>
-  <p><strong>Core question:</strong> {{ active_strategy.core_question }}</p>
+  <p><strong>Kernfrage:</strong> {{ active_strategy.core_question }}</p>
   <dl class="metadata">
-    <div><dt>Language</dt><dd>{{ active_strategy.editorial_language or '—' }}</dd></div>
-    <div><dt>Activated</dt><dd>{{ active_strategy.activated_at.strftime('%Y-%m-%d %H:%M') if active_strategy.activated_at else '—' }}</dd></div>
-    <div><dt>Domains</dt><dd>{{ active_strategy.domains_json.get('domains', [])|join(', ') }}</dd></div>
-    <div><dt>Preferred angles</dt><dd>{{ active_strategy.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
-    <div><dt>Forbidden angles</dt><dd>{{ active_strategy.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
-    <div><dt>Special roles</dt><dd>{{ active_strategy.agent_profile_json.get('special_roles', [])|join(', ') }}</dd></div>
-    <div><dt>Scoring weights</dt><dd>
+    <div><dt>Sprache</dt><dd>{{ active_strategy.editorial_language or '—' }}</dd></div>
+    <div><dt>Aktiviert</dt><dd>{{ active_strategy.activated_at.strftime('%d.%m.%Y %H:%M') if active_strategy.activated_at else '—' }}</dd></div>
+    <div><dt>Zielgruppe</dt><dd>{{ active_strategy.audience_json.get('description', '—') }}</dd></div>
+    <div><dt>Zielgruppen-Probleme</dt><dd>{{ active_strategy.audience_problems_json.get('problems', [])|join(', ') or '—' }}</dd></div>
+    <div><dt>Domänen</dt><dd>{{ active_strategy.domains_json.get('domains', [])|join(', ') }}</dd></div>
+    <div><dt>Bevorzugte Blickwinkel</dt><dd>{{ active_strategy.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Verbotene Blickwinkel</dt><dd>{{ active_strategy.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Quellen-Policy</dt><dd>{% for key, value in active_strategy.source_policy_json.items() %}{{ key.replace('_', ' ') }}: {{ 'ja' if value else 'nein' }}{% if not loop.last %} · {% endif %}{% endfor %}</dd></div>
+    <div><dt>Evidence-Policy</dt><dd>{% for key, value in active_strategy.evidence_policy_json.items() %}{{ key.replace('_', ' ') }}: {{ 'ja' if value else 'nein' }}{% if not loop.last %} · {% endif %}{% endfor %}</dd></div>
+    <div><dt>Sonderrollen</dt><dd>{{ active_strategy.agent_profile_json.get('special_roles', [])|join(', ') or '—' }}</dd></div>
+    <div><dt>Scoring-Gewichte</dt><dd>
       {% for key, weight in active_strategy.topic_scoring_policy_json.get('weights', {}).items() %}{{ key }} {{ weight }}{% if not loop.last %} · {% endif %}{% endfor %}
     </dd></div>
   </dl>
+  {% set advanced = [
+    ('Narrative', active_strategy.narrative_policy_json),
+    ('Style', active_strategy.style_policy_json),
+    ('Hook', active_strategy.hook_policy_json),
+    ('Ending', active_strategy.ending_policy_json)
+  ] %}
+  {% if advanced | selectattr('1') | list %}
+  <details><summary>Erweiterte Policies</summary>
+    {% for name, policy in advanced %}
+      {% if policy %}<p><strong>{{ name }}.</strong> <code>{{ policy | tojson }}</code></p>{% endif %}
+    {% endfor %}
+  </details>
+  {% endif %}
 </section>
 {% else %}
-<section class="card empty-state"><p>No active strategy for this channel.</p></section>
+<section class="card empty-state"><p>Keine aktive Strategie für diesen Kanal.</p></section>
 {% endif %}
 <section class="card">
-  <h2>Version history</h2>
+  <h2>Versions-Verlauf</h2>
   <table>
-    <thead><tr><th>Version</th><th>Status</th><th>Core question</th><th>Created</th><th>Activated</th></tr></thead>
+    <thead><tr><th>Version</th><th>Status</th><th>Kernfrage</th><th>Erstellt</th><th>Aktiviert</th><th></th></tr></thead>
     <tbody>
       {% for item in strategies %}
       <tr>
         <td>v{{ item.version_number }}</td>
         <td><span class="badge {% if item.status.value == 'ACTIVE' %}success{% endif %}">{{ item.status.value }}</span></td>
         <td>{{ item.core_question }}</td>
-        <td>{{ item.created_at.strftime('%Y-%m-%d') }}</td>
-        <td>{{ item.activated_at.strftime('%Y-%m-%d') if item.activated_at else '—' }}</td>
+        <td>{{ item.created_at.strftime('%d.%m.%Y') }}</td>
+        <td>{{ item.activated_at.strftime('%d.%m.%Y') if item.activated_at else '—' }}</td>
+        <td><a class="linkbutton" href="/studio/channels/{{ channel.slug }}/strategy/{{ item.id }}/compare">Vergleichen</a>{% if item.status.value == 'DRAFT' %} · <a class="linkbutton" href="/studio/channels/{{ channel.slug }}/strategy/{{ item.id }}/edit">Bearbeiten</a>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

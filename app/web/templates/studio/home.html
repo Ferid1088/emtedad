@@ -2,80 +2,179 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Emtedad Studio</p>
-    <h1>What needs my attention?</h1>
-    <p class="lede">Five channels share one structured knowledge base. Pick a channel to work in.</p>
+    <p class="eyebrow">Dashboard</p>
+    <h1>Meine 5 Kanäle</h1>
+    <p class="lede">Fünf redaktionelle Kanäle, eine gemeinsame Wissensbasis.</p>
   </div>
 </div>
-<section class="metric-strip">
-  <div class="card"><span class="metric-number">{{ source_count }}</span><small>Resources in library</small></div>
-  <div class="card"><span class="metric-number">{{ production_count }}</span><small>Active productions</small></div>
-  <div class="card"><span class="metric-number">{{ channels|length }}</span><small>Editorial channels</small></div>
-  <div class="card"><span class="metric-number">{{ attention|length }}</span><small>Resources need attention</small></div>
-</section>
-
-{% if attention %}
-<section class="card">
-  <h2>Resources requiring review</h2>
-  <table>
-    <thead><tr><th>Resource</th><th>Status</th><th>Error</th><th></th></tr></thead>
-    <tbody>
-      {% for item in attention %}
-      <tr>
-        <td><a href="/library/{{ item.source.id }}">{{ item.source.title }}</a></td>
-        <td><span class="badge">{{ item.status.replace('_', ' ') }}</span></td>
-        <td class="muted">{{ (item.error or '—')[:120] }}</td>
-        <td><a class="linkbutton" href="/library/{{ item.source.id }}/processing">Inspect</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</section>
-{% endif %}
-
-{% if productions %}
-<section class="card">
-  <h2>Active productions</h2>
-  <table>
-    <thead><tr><th>Question</th><th>Stage</th><th>Blockers</th><th>Next actions</th><th></th></tr></thead>
-    <tbody>
-      {% for state in productions %}
-      <tr>
-        <td>{{ state.brief.question[:110] }}</td>
-        <td><span class="badge {% if state.stage.value == 'APPROVED' %}success{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span></td>
-        <td>{{ state.open_blockers or '—' }}</td>
-        <td class="muted">{{ state.allowed_actions | join(', ') or '—' }}</td>
-        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</section>
-{% endif %}
-
-{% if recent_signatures %}
-<section class="card">
-  <h2>Recent approvals</h2>
-  <ul>
-    {% for sig in recent_signatures %}
-    <li>{{ sig.question[:110] }} <span class="muted">· approved {{ sig.created_at.strftime('%Y-%m-%d') }}</span></li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
 
 <section class="channel-grid" aria-label="Editorial channels">
   {% for channel in channels %}
-  <a class="card channel-card interactive" href="/studio/channels/{{ channel.slug }}">
-    <h2>{{ channel.name }}</h2>
+  <a class="card channel-card interactive chan-card" href="/studio/channels/{{ channel.slug }}">
+    <span class="chan-arrow">→</span>
+    <h4 dir="auto">{{ channel.name }}</h4>
+    <p class="chan-sub">{{ channel.description[:90] }}</p>
     <dl class="channel-stats">
-      <div><dt>Resources</dt><dd>{{ channel.resource_count }}</dd></div>
-      <div><dt>Topics</dt><dd>{{ channel.topic_count }}</dd></div>
-      <div><dt>Productions</dt><dd>{{ channel.active_production_count }}</dd></div>
-      <div><dt>Published</dt><dd>{{ channel.published_count }}</dd></div>
+      <div><dt>Ressourcen</dt><dd>{{ channel.resource_count }}</dd></div>
+      <div><dt>Themen</dt><dd>{{ channel.topic_count }}</dd></div>
+      <div><dt>Produktion</dt><dd>{{ channel.active_production_count }}</dd></div>
+      <div><dt>Publiziert</dt><dd>{{ channel.published_count }}</dd></div>
     </dl>
-    <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ channel.status.value }}</span>
   </a>
   {% endfor %}
 </section>
+
+<section class="dash-section">
+  <h2 class="section-head">Dein Workflow</h2>
+  <div class="workflow-steps">
+    {% for step in [
+      ('1', 'YouTube-Kanal hinzufügen', 'Externe Kanäle beobachten.', '/studio/youtube'),
+      ('2', 'Neue Videos prüfen', 'Neue Inhalte deiner Kanäle finden.', '/studio/youtube'),
+      ('3', 'Ressource importieren', 'Videos, PDFs und Texte aufnehmen.', '/library/import'),
+      ('4', 'Thema erstellen', 'Frage oder Thema für einen Kanal wählen.', '/studio/topics'),
+      ('5', 'Text erstellen', 'Aus Thema wird Recherche, Argument, Skript.', '/production'),
+      ('6', 'Übersetzen', 'Persisch, Deutsch, Englisch.', '/studio/translations'),
+      ('7', 'Veröffentlichen', 'Bereite Inhalte für die Ausspielung.', '/studio/publishing')
+    ] %}
+    <a class="wf-step" href="{{ step[3] }}">
+      <span class="wf-num">{{ step[0] }}</span>
+      <strong>{{ step[1] }}</strong>
+      <small>{{ step[2] }}</small>
+      {% if not loop.last %}<span class="wf-arrow">→</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Wie entsteht mein Text?</h3>
+    <p class="muted">Emtedad sammelt nicht einfach Textstücke. Die Quellen werden
+    strukturiert (Vortragsstruktur), relevante Wissenseinheiten ausgewählt, Belege
+    geprüft (Evidence), Argument und Erzählstruktur aufgebaut — und erst danach wird
+    der fertige Text geschrieben.</p>
+    <p class="muted" style="letter-spacing:.02em">Quellen → Vortragsstruktur → Knowledge Units → Thema → Recherche → Evidence → Argument → Narrativ → Skript</p>
+  </div>
+</section>
+
+<div class="dash-grid dash-section">
+  <section class="card dash-card">
+    <h3>YouTube-Kanäle <a class="button" href="/studio/youtube">Alle verwalten</a></h3>
+    {% if monitored %}
+    <ul class="mini-list">
+      {% for mc in monitored %}
+      <li>
+        <span class="li-title" dir="auto">{{ mc.name }}</span>
+        <span class="li-meta">
+          {% if pending_counts.get(mc.id) %}<span class="badge warning">{{ pending_counts[mc.id] }} neu</span>
+          {% else %}<span class="muted">keine neuen</span>{% endif %}
+          {% if mc.last_checked_at %}· geprüft {{ mc.last_checked_at.strftime('%d.%m. %H:%M') }}{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">Noch keine YouTube-Kanäle überwacht.
+      <a href="/studio/youtube">Ersten Kanal hinzufügen →</a></p>
+    {% endif %}
+  </section>
+
+  <section class="card dash-card">
+    <h3>Neue Videos <a class="button" href="/studio/youtube">Alle anzeigen</a></h3>
+    {% if new_candidates %}
+    <ul class="mini-list">
+      {% for c in new_candidates %}
+      <li>
+        <span class="li-title" dir="auto">{{ c.title[:60] }}</span>
+        <span class="li-meta">
+          <span dir="auto">@{{ candidate_channels[c.channel_id].handle or candidate_channels[c.channel_id].name }}</span>
+          <a class="linkbutton" href="/studio/youtube/{{ c.channel_id }}">Importieren</a>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">Keine neuen Videos. <a href="/studio/youtube">Kanäle prüfen →</a></p>
+    {% endif %}
+  </section>
+
+  <section class="card dash-card">
+    <h3>Themen <a class="button" href="/studio/topics">Alle Themen</a></h3>
+    {% if recent_topics %}
+    <ul class="mini-list">
+      {% for t in recent_topics %}
+      <li>
+        <span class="li-title" dir="auto">{{ t.video_question[:70] }}</span>
+        <span class="li-meta">
+          {{ topic_channels[t.editorial_channel_id].name if t.editorial_channel_id in topic_channels }}
+          <span class="badge">{{ t.status.value.replace('_', ' ') }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">Noch keine Themen. <a href="/studio/topics">Thema erstellen →</a></p>
+    {% endif %}
+  </section>
+
+  <section class="card dash-card">
+    <h3>Aktive Produktionen <a class="button" href="/production">Alle anzeigen</a></h3>
+    {% if productions %}
+    <ul class="mini-list">
+      {% for state in productions %}
+      <li>
+        <span class="li-title" dir="auto">{{ state.brief.question[:60] }}</span>
+        <span class="li-meta">
+          <span class="badge {% if state.stage.value == 'APPROVED' %}success{% elif state.open_blockers %}warning{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span>
+          <a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Öffnen</a>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">Keine aktiven Produktionen.</p>
+    {% endif %}
+  </section>
+
+  <section class="card dash-card">
+    <h3>Übersetzungen <a class="button" href="/studio/translations">Öffnen</a></h3>
+    <ul class="mini-list">
+      <li><span class="li-title">Lokalisierungsprojekte</span><span class="li-meta">{{ localization_total }}</span></li>
+      <li><span class="li-title">Offen / in Arbeit</span><span class="li-meta">
+        {% if localization_open %}<span class="badge warning">{{ localization_open }}</span>{% else %}0{% endif %}</span></li>
+      <li><span class="li-title">Sprachen</span><span class="li-meta">Persisch · Deutsch · Englisch</span></li>
+    </ul>
+  </section>
+
+  <section class="card dash-card" id="aufmerksamkeit">
+    <h3>Aufmerksamkeit erforderlich</h3>
+    <ul class="attn-list">
+      {% if failed_sources %}
+      <li><span>{{ failed_sources }} Ressource(n) fehlgeschlagen</span><a class="linkbutton" href="/library">Anzeigen</a></li>
+      {% endif %}
+      {% if review_sources %}
+      <li><span>{{ review_sources }} Ressource(n) warten auf Prüfung</span><a class="linkbutton" href="/library">Anzeigen</a></li>
+      {% endif %}
+      {% if blocked_productions %}
+      <li><span>{{ blocked_productions }} Produktion(en) mit Blockern</span><a class="linkbutton" href="/production">Anzeigen</a></li>
+      {% endif %}
+      {% if draft_strategies %}
+      <li><span>{{ draft_strategies }} Strategie-Entwurf/Entwürfe wartet auf Aktivierung</span><a class="linkbutton" href="/studio/channels">Anzeigen</a></li>
+      {% endif %}
+      {% if new_candidates %}
+      <li><span>{{ new_candidates|length }} neue Video(s) zum Importieren</span><a class="linkbutton" href="/studio/youtube">Anzeigen</a></li>
+      {% endif %}
+      {% if not (failed_sources or review_sources or blocked_productions or draft_strategies or new_candidates) %}
+      <li><span class="muted">Alles im grünen Bereich — nichts erfordert deine Aufmerksamkeit.</span></li>
+      {% endif %}
+    </ul>
+    {% if attention_items %}
+    <ul class="mini-list" style="margin-top:.5rem">
+      {% for item in attention_items[:3] %}
+      <li>
+        <span class="li-title"><a href="/library/{{ item.source.id }}">{{ item.source.title[:50] }}</a></span>
+        <span class="li-meta"><span class="badge danger">{{ human_error(item.error)[:40] }}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

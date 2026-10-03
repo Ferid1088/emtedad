@@ -1,0 +1,75 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Inhalt</p>
+    <h1>Themen</h1>
+    <p class="lede">Alle Themen-Kandidaten über alle Kanäle — manuell angelegt oder
+    aus dem Wissen generiert.</p>
+  </div>
+</div>
+
+{% if request.query_params.get('msg') %}<p class="notice">{{ request.query_params.get('msg') }}</p>{% endif %}
+{% if request.query_params.get('error') %}<p class="error">{{ request.query_params.get('error') }}</p>{% endif %}
+
+<section class="card">
+  <h2>+ Neues Thema</h2>
+  <form method="post" action="/studio/topics" class="form-grid">
+    <label>Kanal
+      <select name="channel_slug" required>
+        {% for c in channels %}<option value="{{ c.slug }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Video-Frage (erforderlich)
+      <input name="video_question" required placeholder="Welche Frage beantwortet das Video?">
+    </label>
+    <label>Tentative These (optional)
+      <input name="tentative_thesis" placeholder="Erste These zur Frage">
+    </label>
+    <label>Blickwinkel / Notizen (optional)
+      <input name="angle" placeholder="z. B. persönlich, wissenschaftlich">
+    </label>
+    <div class="button-row"><button class="button" type="submit">Thema anlegen</button></div>
+  </form>
+  <p class="muted" style="font-size:.8rem">Themen automatisch aus dem Wissen
+  generieren: im jeweiligen Kanal unter <a href="/studio/channels">Themen →
+  Themen generieren</a>.</p>
+</section>
+
+<section class="card">
+  <h2>Alle Themen</h2>
+  <form method="get" action="/studio/topics" class="filters">
+    <input name="q" value="{{ query }}" placeholder="Frage oder Titel suchen …">
+    <select name="channel">
+      <option value="">Alle Kanäle</option>
+      {% for c in channels %}<option value="{{ c.slug }}" {% if c.slug == channel_slug %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">Alle Status</option>
+      {% for s in statuses %}<option value="{{ s.value }}" {% if s.value == status_filter %}selected{% endif %}>{{ s.value.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    <button class="button" type="submit">Filtern</button>
+  </form>
+  {% if topics %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Video-Frage</th><th>Kanal</th><th>Score</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for t in topics %}
+        <tr>
+          <td dir="auto"><strong>{{ t.video_question[:90] }}</strong>
+            {% if t.tentative_thesis %}<br><span class="muted" dir="auto">{{ t.tentative_thesis[:90] }}</span>{% endif %}</td>
+          <td>{{ channel_map[t.editorial_channel_id].name if t.editorial_channel_id in channel_map }}</td>
+          <td>{{ '%.2f' % t.total_score }}</td>
+          <td><span class="badge">{{ t.status.value.replace('_', ' ') }}</span></td>
+          <td><a class="linkbutton" href="/studio/channels/{{ channel_map[t.editorial_channel_id].slug }}/topics/{{ t.id }}">Öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Keine Themen gefunden.</p>
+  {% endif %}
+</section>
+{% endblock %}

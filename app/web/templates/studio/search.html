@@ -2,24 +2,24 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Knowledge</p>
-    <h1>Knowledge Unit Search</h1>
+    <p class="eyebrow">Suche</p>
+    <h1>Globale Suche</h1>
   </div>
 </div>
 <form method="get" action="/studio/search" class="unit-search">
   <input type="search" name="q" value="{{ query }}"
-         placeholder="Search knowledge units or concepts">
+         placeholder="Knowledge Units oder Konzepte suchen">
   <select name="expansion">
     {% for mode in modes %}
     <option value="{{ mode.value }}" {% if mode.value == expansion %}selected{% endif %}>{{ mode.value }}</option>
     {% endfor %}
   </select>
-  <button class="button" type="submit">Search</button>
+  <button class="button" type="submit">Suchen</button>
 </form>
 {% if query and not results %}
 <section class="card empty-state">
-  <h2>No matches</h2>
-  <p>No Knowledge Units matched “{{ query }}”.</p>
+  <h2>Keine Treffer</h2>
+  <p>Keine Knowledge Units für „{{ query }}" gefunden.</p>
 </section>
 {% endif %}
 <section class="card">
@@ -29,7 +29,7 @@
       <div class="unit-head">
         <strong>{{ hit.title }}</strong>
         <span class="chip">{{ hit.unit_type }}</span>
-        {% if hit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
+        {% if hit.atomic %}<span class="chip chip-story">atomar</span>{% endif %}
       </div>
       <p>{{ hit.summary }}</p>
       <p class="muted">

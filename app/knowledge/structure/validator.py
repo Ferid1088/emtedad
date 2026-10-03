@@ -39,6 +39,8 @@ class SourceStructureValidator:
     ) -> StructureValidationReport:
         errors: list[str] = []
         warnings: list[str] = []
+        if segment_sequences and not nodes:
+            errors.append("no structural nodes produced for a non-empty transcript")
         by_temp = {node.temp_id: node for node in nodes}
         if len(by_temp) != len(nodes):
             errors.append("duplicate temp_id values")

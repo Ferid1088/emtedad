@@ -2,22 +2,22 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource — Concepts</p>
+    <p class="eyebrow">Ressource — Konzepte</p>
     <h1>{{ source.title }}</h1>
-    <p class="lede">Canonical concepts linked to this resource's Knowledge Units. Reused concepts connect this source to the shared knowledge base.</p>
+    <p class="lede">Kanonische Konzepte, verknüpft mit den Knowledge Units dieser Ressource. Geteilte Konzepte verbinden diese Quelle mit der gemeinsamen Wissensbasis.</p>
   </div>
   {% if concepts %}
   <form method="post" action="/library/{{ source.id }}/concepts">
-    <button class="button secondary" type="submit">Re-map concepts</button>
+    <button class="button secondary" type="submit">Konzepte neu zuordnen</button>
   </form>
   {% endif %}
 </div>
 {% include "studio/_resource_tabs.html" %}
 {% if concepts %}
 <section class="card">
-  <h2>{{ concepts|length }} concepts · {{ unit_count }} linked units</h2>
+  <h2>{{ concepts|length }} Konzepte · {{ unit_count }} verknüpfte Units</h2>
   <table>
-    <thead><tr><th>Concept</th><th>Linked units</th><th>Links</th><th>Confidence</th><th>Shared</th></tr></thead>
+    <thead><tr><th>Konzept</th><th>Verknüpfte Units</th><th>Links</th><th>Konfidenz</th><th>Geteilt</th></tr></thead>
     <tbody>
       {% for concept in concepts %}
       <tr>
@@ -25,7 +25,7 @@
         <td>{{ concept.unit_count }}</td>
         <td>{{ concept.link_count }}</td>
         <td>{{ '%.2f' | format(concept.confidence_min) }}–{{ '%.2f' | format(concept.confidence_max) }}</td>
-        <td>{% if concept.shared_versions > 1 %}<span class="badge">shared · {{ concept.shared_versions }} sources</span>{% else %}<span class="muted">this source only</span>{% endif %}</td>
+        <td>{% if concept.shared_versions > 1 %}<span class="badge">geteilt · {{ concept.shared_versions }} Quellen</span>{% else %}<span class="muted">nur diese Quelle</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -33,10 +33,10 @@
 </section>
 {% else %}
 <section class="card empty-state">
-  <h2>No concepts yet</h2>
-  <p>Concept mapping runs automatically after Knowledge Unit extraction. If units exist, run mapping again.</p>
+  <h2>Noch keine Konzepte</h2>
+  <p>Das Konzept-Mapping läuft automatisch nach der Unit-Extraktion. Falls Units vorhanden sind, Mapping erneut starten.</p>
   <form method="post" action="/library/{{ source.id }}/concepts">
-    <button class="button" type="submit">Map concepts</button>
+    <button class="button" type="submit">Konzepte zuordnen</button>
   </form>
 </section>
 {% endif %}

@@ -1,0 +1,66 @@
+{% extends "studio/layout.html" %}
+{% set lang_names = {'fa': 'Persisch', 'de': 'Deutsch', 'en': 'Englisch', 'ar': 'Arabisch'} %}
+{% set status_names = {
+  'DRAFT': 'Entwurf',
+  'SEMANTICALLY_APPROVED': 'Semantisch geprüft',
+  'NOT_READY_FOR_VOICE': 'Review erforderlich',
+  'READY_FOR_VOICE': 'Bereit für Voice',
+  'APPROVED': 'Freigegeben',
+  'FAILED': 'Fehlgeschlagen'
+} %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Inhalt</p>
+    <h1>Übersetzungen</h1>
+    <p class="lede">Jede Sprachfassung entsteht aus demselben Semantic Master.
+    Übersetzungen können erst gestartet werden, wenn ein Master fertig ist.</p>
+  </div>
+</div>
+
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+{% if ready_masters %}
+{% for master in ready_masters %}
+{% set brief = briefs.get(master.content_brief_id) %}
+{% set channel = channels.get(brief.editorial_channel_id) if brief else none %}
+<section class="card">
+  <div class="split-head">
+    <div>
+      <h2 dir="auto">{{ brief.question[:110] if brief else 'Produktion ' ~ master.id|string|truncate(8) }}</h2>
+      <p class="muted">{% if channel %}{{ channel.name }} · {% endif %}Master v{{ master.version_number }} · {{ master.status.value }}</p>
+    </div>
+    {% if brief %}<a class="linkbutton" href="/studio/production/{{ brief.id }}">Produktion öffnen</a>{% endif %}
+  </div>
+  <div class="lang-states">
+    {% for lang in languages %}
+    {% set project = (groups.get(master.id) or []) | selectattr('language.value', 'equalto', lang.value) | list | first %}
+    <div class="lang-state">
+      <span class="lang-name">{{ lang_names.get(lang.value, lang.value) }}</span>
+      <span>
+        {% if project %}
+          <span class="badge {{ 'success' if project.status.value in ['READY_FOR_VOICE','APPROVED'] else ('danger' if project.status.value == 'FAILED' else 'warning') }}">{{ status_names.get(project.status.value, project.status.value) }}</span>
+          {% if brief %}<a class="linkbutton" href="/studio/production/{{ brief.id }}#translations">Öffnen</a>{% endif %}
+        {% else %}
+          <span class="muted">Noch nicht erstellt</span>
+          <form method="post" action="/studio/translations" class="inline-form">
+            <input type="hidden" name="master_id" value="{{ master.id }}">
+            <input type="hidden" name="language" value="{{ lang.value }}">
+            <button class="linkbutton" type="submit">Übersetzen</button>
+          </form>
+        {% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% else %}
+<section class="card">
+  <p class="empty-state">Noch keine fertigen Semantic Master vorhanden.
+  Sobald eine Produktion den Master-Schritt erreicht, kannst du hier
+  Übersetzungen starten. <a href="/production">Produktionen anzeigen →</a></p>
+</section>
+{% endif %}
+{% endblock %}

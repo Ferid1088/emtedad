@@ -1,89 +1,514 @@
 {% extends "studio/layout.html" %}
+{% macro unit_link(unit_id) -%}
+  {%- set info = unit_map.get(unit_id|string) -%}
+  {%- if info and info.source_id -%}
+    <a class="chip" href="/library/{{ info.source_id }}/units" title="{{ info.source_title }}">{{ info.title }}</a>
+  {%- elif info -%}
+    <span class="chip">{{ info.title }}</span>
+  {%- else -%}
+    <span class="chip muted">{{ unit_id }}</span>
+  {%- endif -%}
+{%- endmacro %}
+{% macro item_ref(item_id) -%}
+  {%- set item = item_map.get(item_id|string) -%}
+  {%- if item -%}
+    <span class="chip" title="{{ item.claim_text[:120] }}">E{{ item.ordinal }}</span>
+  {%- else -%}
+    <span class="chip muted">{{ item_id }}</span>
+  {%- endif -%}
+{%- endmacro %}
+{% macro epistemic_badge(status) -%}
+  {%- if status and status in uncertain_epistemic -%}
+    <span class="badge warning">{{ status.replace('_', ' ') }}</span>
+  {%- elif status -%}
+    <span class="badge success">{{ status.replace('_', ' ') }}</span>
+  {%- endif -%}
+{%- endmacro %}
+{% macro not_built(artifact, reason) -%}
+  <section class="card empty-state">
+    <h2>{{ artifact }}</h2>
+    <p class="muted">Noch nicht erstellt. {{ reason }}</p>
+  </section>
+{%- endmacro %}
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Production{% if channel_slug %} — <a href="/studio/channels/{{ channel_slug }}/production">{{ channel_slug }}</a>{% endif %}</p>
-    <h1>{{ brief.question }}</h1>
-    <p class="lede">{{ brief.thesis }}</p>
+    <p class="eyebrow">Produktion{% if channel_slug %} — <a href="/studio/channels/{{ channel_slug }}/production">{{ channel_name or channel_slug }}</a>{% endif %}</p>
+    <h1 dir="auto">{{ brief.question }}</h1>
+    <p class="lede" dir="auto">{{ brief.thesis }}</p>
   </div>
   <div class="score-block">
     <span class="score-total">{{ state.stage.value.replace('_', ' ') }}</span>
-    <span class="muted">stage</span>
+    <span class="muted">aktuelle Stufe</span>
   </div>
 </div>
 
-<nav class="stepper" aria-label="Production stages">
-  {% for stage in stages %}
-  <span class="step {% if stage == state.stage %}active{% endif %}">{{ stage.value.replace('_', ' ') }}</span>
+{% set stage_names = {
+  'BRIEF': 'Brief', 'THESIS': 'These', 'RESEARCH': 'Recherche', 'EVIDENCE': 'Evidence',
+  'ARGUMENT': 'Argument', 'NARRATIVE': 'Narrativ', 'MASTER': 'Master', 'SCRIPT': 'Skript',
+  'REVIEW': 'Review', 'APPROVED': 'Freigegeben', 'LOCALIZATION': 'Übersetzung',
+  'VOICE': 'Voice', 'PUBLISHED': 'Veröffentlicht'
+} %}
+<nav class="stepper" aria-label="Produktions-Stufen">
+  {% for tab in tabs %}
+  <a class="step {% if tab == active_stage %}active{% elif loop.index0 < current_index %}done{% endif %}"
+     href="/studio/production/{{ brief.id }}?stage={{ tab.value }}">{{ stage_names.get(tab.value, tab.value.replace('_', ' ')) }}</a>
   {% endfor %}
 </nav>
 
 <div class="columns">
   <section class="card">
-    <h2>Content brief</h2>
+    <h2>Kontext</h2>
     <dl class="metadata">
-      <div><dt>Status</dt><dd>{{ brief.status.value }}</dd></div>
-      <div><dt>Duration</dt><dd>{{ brief.target_duration_minutes }} min</dd></div>
-      <div><dt>Angle</dt><dd>{{ brief.angle or '—' }}</dd></div>
+      <div><dt>Kanal</dt><dd>{{ channel_name or '—' }}</dd></div>
+      <div><dt>Strategie-Version</dt><dd>v{{ strategy_version if strategy_version else '—' }}</dd></div>
+      <div><dt>Ziel-Dauer</dt><dd>{{ brief.target_duration_minutes }} Min</dd></div>
+      <div><dt>Brief-Status</dt><dd>{{ brief.status.value }}</dd></div>
+      <div><dt>Offene Blocker</dt><dd>{{ state.open_blockers }}</dd></div>
     </dl>
-    {% if brief.target_audience %}<p><strong>Audience.</strong> {{ brief.target_audience }}</p>{% endif %}
-    {% if brief.primary_concepts_json %}<p><strong>Concepts.</strong> {{ brief.primary_concepts_json | join(', ') }}</p>{% endif %}
-    {% if brief.required_evidence_roles_json %}<p><strong>Required evidence.</strong> {{ brief.required_evidence_roles_json | join(', ') }}</p>{% endif %}
-    {% if brief.required_counterargument %}<p><strong>Counterargument required.</strong> {{ brief.required_counterargument }}</p>{% endif %}
-    {% if brief.forbidden_claims_json %}<p><strong>Forbidden claims.</strong> {{ brief.forbidden_claims_json | join(', ') }}</p>{% endif %}
   </section>
-
   <section class="card">
-    <h2>Persisted artifacts</h2>
-    <dl>
-      <div><dt>Evidence matrix</dt><dd>{{ 'ready' if state.latest_matrix_id else '—' }}</dd></div>
-      <div><dt>Argument plan</dt><dd>{{ 'ready' if state.latest_argument_id else '—' }}</dd></div>
-      <div><dt>Narrative plan</dt><dd>{{ 'ready' if state.latest_narrative_id else '—' }}</dd></div>
-      <div><dt>Semantic master</dt><dd>{{ 'ready' if state.latest_master_id else '—' }}</dd></div>
-      <div><dt>Latest draft</dt><dd>{{ draft_status.value if draft_status else '—' }}</dd></div>
-      <div><dt>Open blockers</dt><dd>{{ state.open_blockers }}</dd></div>
-    </dl>
+    <h2>Aktionen</h2>
+    {% set action_labels = {
+      'plan_research': 'Recherche planen',
+      'build_evidence': 'Evidence-Matrix erstellen',
+      'build_argument': 'Argument-Plan erstellen',
+      'build_narrative': 'Narrativ-Plan erstellen',
+      'build_master': 'Semantic Master erstellen',
+      'build_script': 'Skript erstellen',
+      'run_review': 'Review starten',
+      'revise': 'Entwurf überarbeiten',
+      'approve': 'Freigeben',
+      'localize': 'Übersetzen',
+    } %}
+    {% if state.allowed_actions %}
+    <ul class="action-list">
+      {% for action in state.allowed_actions %}
+      <li>
+        <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
+          <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Keine Aktion in dieser Stufe verfügbar.
+      {% if brief.status.value == 'DRAFT' %}Der Brief ist noch ein Entwurf — zuerst abschließen, dann kann die Recherche geplant werden.{% endif %}
+    </p>
+    {% endif %}
+    {% if state.open_blockers %}
+    <p class="muted">{{ state.open_blockers }} blockierende(s) Review-Ergebnis(se) muss/müssen vor der Freigabe gelöst werden.</p>
+    {% endif %}
   </section>
 </div>
 
-{% if signature %}
+{# ------------------------------ BRIEF ------------------------------ #}
+{% if active_stage.value == 'BRIEF' %}
 <section class="card">
-  <h2>Approved</h2>
-  <p><span class="badge success">Signature saved</span> · approved {{ signature.created_at.strftime('%Y-%m-%d %H:%M') }} · hash <code>{{ signature.content_hash[:16] }}…</code></p>
+  <h2>Brief</h2>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ brief.status.value }}</dd></div>
+    <div><dt>Erstellt</dt><dd>{{ brief.created_at.strftime('%d.%m.%Y %H:%M') }}</dd></div>
+    <div><dt>Strategie-Version</dt><dd>v{{ strategy_version if strategy_version else '—' }}</dd></div>
+    <div><dt>Ziel-Dauer</dt><dd>{{ brief.target_duration_minutes }} Minuten</dd></div>
+    <div><dt>Bevorzugte Story-Rolle</dt><dd>{{ brief.preferred_story_role or '—' }}</dd></div>
+  </dl>
+  <p><strong>Video-Frage.</strong> {{ brief.question }}</p>
+  <p><strong>These.</strong> {{ brief.thesis }}</p>
+  {% if brief.target_audience %}<p><strong>Zielgruppe.</strong> {{ brief.target_audience }}</p>{% endif %}
+  {% if brief.angle %}<p><strong>Blickwinkel.</strong> {{ brief.angle }}</p>{% endif %}
+  {% if brief.primary_concepts_json %}<p><strong>Primär-Konzepte.</strong> {{ brief.primary_concepts_json | join(', ') }}</p>{% endif %}
+  {% if brief.required_evidence_roles_json %}<p><strong>Erforderliche Evidence-Rollen.</strong> {{ brief.required_evidence_roles_json | join(', ') }}</p>{% endif %}
+  {% if brief.required_counterargument %}<p><strong>Erforderliches Gegenargument.</strong> {{ brief.required_counterargument }}</p>{% endif %}
+  {% if brief.forbidden_claims_json %}<p><strong>Verbotene Behauptungen.</strong> {{ brief.forbidden_claims_json | join(', ') }}</p>{% endif %}
+  {% if brief.forbidden_repetitions_json %}<p><strong>Verbotene Wiederholungen.</strong> {{ brief.forbidden_repetitions_json | join(', ') }}</p>{% endif %}
+</section>
+
+{# ------------------------------ THESIS ----------------------------- #}
+{% elif active_stage.value == 'THESIS' %}
+<section class="card">
+  <h2>Thesis</h2>
+  <p><strong>Video-Frage.</strong> {{ brief.question }}</p>
+  <p><strong>These.</strong> {{ brief.thesis }}</p>
+  {% if brief.angle %}<p><strong>Blickwinkel.</strong> {{ brief.angle }}</p>{% endif %}
+  <dl class="metadata">
+    <div><dt>Brief-Status</dt><dd>{{ brief.status.value }}</dd></div>
+    <div><dt>Kanal</dt><dd>{{ channel_name or '—' }}</dd></div>
+    <div><dt>Strategie</dt><dd>v{{ strategy_version if strategy_version else '—' }}</dd></div>
+  </dl>
+  {% if brief.status.value == 'DRAFT' %}
+  <p class="muted">Die These lebt im Content Brief. Sobald der Brief READY ist, kann die Recherche geplant werden.</p>
+  {% endif %}
+</section>
+
+{# ----------------------------- RESEARCH ---------------------------- #}
+{% elif active_stage.value == 'RESEARCH' %}
+{% if plan %}
+<section class="card">
+  <h2>Research plan — v{{ plan.version_number }}</h2>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ plan.status.value }}</dd></div>
+    <div><dt>Erstellt</dt><dd>{{ plan.created_at.strftime('%Y-%m-%d %H:%M') }}</dd></div>
+    <div><dt>Input hash</dt><dd><code>{{ plan.input_hash[:16] }}…</code></dd></div>
+  </dl>
+  <table>
+    <thead><tr><th>#</th><th>Kind</th><th>Question</th><th>Counterevidence</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for question in questions %}
+      <tr>
+        <td>{{ question.ordinal }}</td>
+        <td>{{ question.kind.value.replace('_', ' ') }}</td>
+        <td>{{ question.question }}</td>
+        <td>{{ 'yes' if question.requires_counterevidence else '—' }}</td>
+        <td>{{ question.status.value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 {% endif %}
-
+{% if package %}
 <section class="card">
-  <h2>Actions</h2>
-  {% if state.allowed_actions %}
-  {% set action_labels = {
-    'plan_research': 'Plan research',
-    'build_evidence': 'Build evidence matrix',
-    'build_argument': 'Build argument plan',
-    'build_narrative': 'Build narrative plan',
-    'build_master': 'Build Semantic Master',
-    'build_script': 'Build script',
-    'run_review': 'Run review',
-    'revise': 'Revise draft',
-    'approve': 'Approve draft',
-    'localize': 'Localize',
-  } %}
-  <ul class="action-list">
-    {% for action in state.allowed_actions %}
-    <li>
-      <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
-        <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
-      </form>
+  <h2>Research package — v{{ package.package_version }}</h2>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ package.status.value }}</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ package.content_hash[:16] }}…</code></dd></div>
+    <div><dt>Frozen</dt><dd>{{ package.frozen_at.strftime('%Y-%m-%d %H:%M') if package.frozen_at else '—' }}</dd></div>
+    <div><dt>Open issues</dt><dd>{{ package.unresolved_issues | length }}</dd></div>
+  </dl>
+  {% set selected = package.retrieval_snapshot.get('selected_unit_ids', []) %}
+  <h3>Selected knowledge units ({{ selected | length }})</h3>
+  <div class="unit-refs">
+    {% for unit_id in selected %}{{ unit_link(unit_id) }}{% endfor %}
+  </div>
+  {% set claims = package.retrieval_snapshot.get('claims', []) %}
+  {% if claims %}
+  <h3>Packaged claims ({{ claims | length }})</h3>
+  <ul class="unit-list">
+    {% for claim in claims %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <span class="chip">{{ claim.role }}</span>
+        {{ epistemic_badge(claim.epistemic_status) }}
+      </div>
+      <p>{{ claim.claim_text }}</p>
     </li>
     {% endfor %}
   </ul>
-  {% else %}
-  <p class="muted">No actions available in this stage.
-    {% if brief.status.value == 'DRAFT' %}The brief is still a draft — finalize it before planning research.{% endif %}
+  {% endif %}
+  {% for issue in package.unresolved_issues %}
+  <p class="error">{{ issue.get('message', issue) }}</p>
+  {% endfor %}
+</section>
+{% elif not plan %}
+{{ not_built('Research', 'Plan research to create the plan, then freeze the package.') }}
+{% endif %}
+
+{# ----------------------------- EVIDENCE ---------------------------- #}
+{% elif active_stage.value == 'EVIDENCE' %}
+{% if matrix %}
+<section class="card">
+  <h2>Evidence matrix — v{{ matrix.version_number }}</h2>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ matrix.status.value }}</dd></div>
+    <div><dt>Claims</dt><dd>{{ matrix_items | length }}</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ matrix.content_hash[:16] }}…</code></dd></div>
+  </dl>
+</section>
+{% for item in matrix_items %}
+<section class="card">
+  <div class="split-head">
+    <h3>E{{ item.ordinal }} — {{ item.role.value.replace('_', ' ') }}</h3>
+    <div>
+      {{ epistemic_badge(item.epistemic_status) }}
+      <span class="chip">{{ item.claim_type }}</span>
+    </div>
+  </div>
+  <p>{{ item.claim_text }}</p>
+  <dl class="metadata">
+    <div><dt>Source quality</dt><dd>{{ item.source_quality or '—' }}</dd></div>
+    <div><dt>Limitations</dt><dd>{{ item.limitations or '—' }}</dd></div>
+  </dl>
+  {% if item.supporting_unit_ids %}
+  <p><strong>Supporting evidence</strong></p>
+  <div class="unit-refs">{% for uid in item.supporting_unit_ids %}{{ unit_link(uid) }}{% endfor %}</div>
+  {% endif %}
+  {% if item.counterevidence_unit_ids %}
+  <p><strong>Counterevidence</strong></p>
+  <div class="unit-refs">{% for uid in item.counterevidence_unit_ids %}{{ unit_link(uid) }}{% endfor %}</div>
+  {% endif %}
+  {% if item.alternative_unit_ids %}
+  <p><strong>Alternative explanations</strong></p>
+  <div class="unit-refs">{% for uid in item.alternative_unit_ids %}{{ unit_link(uid) }}{% endfor %}</div>
+  {% endif %}
+  {% if item.allowed_wording %}<p><strong>Allowed wording.</strong> {{ item.allowed_wording }}</p>{% endif %}
+  {% if item.forbidden_wording %}<p><strong>Forbidden wording.</strong> {{ item.forbidden_wording }}</p>{% endif %}
+</section>
+{% endfor %}
+{% else %}
+{{ not_built('Evidence matrix', 'Build evidence after the research stage.') }}
+{% endif %}
+
+{# ----------------------------- ARGUMENT ---------------------------- #}
+{% elif active_stage.value == 'ARGUMENT' %}
+{% if argument %}
+<section class="card">
+  <h2>Argument plan — v{{ argument.version_number }}</h2>
+  <p class="muted">Logic only — no prose. Sections below are the reasoning structure.</p>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ argument.status.value }}</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ argument.content_hash[:16] }}…</code></dd></div>
+    <div><dt>Evidence matrix</dt><dd>v{{ matrix.version_number if matrix else '—' }}</dd></div>
+  </dl>
+</section>
+{% for section in argument.sections | sort(attribute='ordinal') %}
+<section class="card">
+  <div class="split-head">
+    <h3>{{ section.ordinal }} — {{ section.role.replace('_', ' ') }}</h3>
+    <span class="chip">{{ section.role }}</span>
+  </div>
+  <p>{{ section.purpose }}</p>
+  {% if section.evidence_item_ids %}<p><strong>Evidence.</strong> {% for ref in section.evidence_item_ids %}{{ item_ref(ref) }}{% endfor %}</p>{% endif %}
+  {% if section.story_unit_ids %}<p><strong>Stories.</strong> {% for ref in section.story_unit_ids %}{{ unit_link(ref) }}{% endfor %}</p>{% endif %}
+  {% if section.counterargument_ids %}<p><strong>Counterarguments.</strong> {% for ref in section.counterargument_ids %}{{ unit_link(ref) }}{% endfor %}</p>{% endif %}
+  {% if section.transition_intent %}<p><strong>Transition.</strong> {{ section.transition_intent }}</p>{% endif %}
+  {% if section.must_include %}<p><strong>Must include.</strong> {{ section.must_include | join('; ') }}</p>{% endif %}
+  {% if section.must_not_claim %}<p><strong>Must not claim.</strong> {{ section.must_not_claim | join('; ') }}</p>{% endif %}
+</section>
+{% endfor %}
+{% else %}
+{{ not_built('Argument plan', 'Requires a ready evidence matrix.') }}
+{% endif %}
+
+{# ----------------------------- NARRATIVE --------------------------- #}
+{% elif active_stage.value == 'NARRATIVE' %}
+{% if narrative %}
+<section class="card">
+  <h2>Narrative plan — v{{ narrative.version_number }}</h2>
+  <p class="muted">Audience experience — beats, emotion, and transitions on top of the argument logic.</p>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ narrative.status.value }}</dd></div>
+    <div><dt>Beats</dt><dd>{{ narrative.sections | length }}</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ narrative.content_hash[:16] }}…</code></dd></div>
+  </dl>
+</section>
+{% for section in narrative.sections | sort(attribute='ordinal') %}
+<section class="card">
+  <div class="split-head">
+    <h3>{{ section.ordinal }} — {{ section.narrative_role.replace('_', ' ') }}</h3>
+    <span class="chip">{{ (section.target_seconds // 60) }}m{{ (section.target_seconds % 60) }}s</span>
+  </div>
+  <p>{{ section.purpose }}</p>
+  <dl class="metadata">
+    {% if section.emotional_function %}<div><dt>Emotional function</dt><dd>{{ section.emotional_function }}</dd></div>{% endif %}
+    {% if section.opening_method %}<div><dt>Opening</dt><dd>{{ section.opening_method }}</dd></div>{% endif %}
+    {% if section.ending_method %}<div><dt>Schluss</dt><dd>{{ section.ending_method }}</dd></div>{% endif %}
+  </dl>
+  {% if section.transition_in %}<p><strong>Transition in.</strong> {{ section.transition_in }}</p>{% endif %}
+  {% if section.transition_out %}<p><strong>Transition out.</strong> {{ section.transition_out }}</p>{% endif %}
+  {% if section.argument_section_ids %}
+  <p><strong>Argument sections.</strong>
+    {% for ref in section.argument_section_ids %}
+      {% set arg_section = argument_section_map.get(ref|string) %}
+      {% if arg_section %}<span class="chip" title="{{ arg_section.purpose[:120] }}">{{ arg_section.ordinal }} · {{ arg_section.role }}</span>{% endif %}
+    {% endfor %}
   </p>
   {% endif %}
+  {% if section.story_unit_ids %}<p><strong>Stories.</strong> {% for ref in section.story_unit_ids %}{{ unit_link(ref) }}{% endfor %}</p>{% endif %}
+</section>
+{% endfor %}
+{% else %}
+{{ not_built('Narrative plan', 'Requires a ready argument plan.') }}
+{% endif %}
+
+{# ------------------------------ MASTER ----------------------------- #}
+{% elif active_stage.value == 'MASTER' %}
+{% if master %}
+<section class="card">
+  <h2>Semantic Master — v{{ master.version_number }}</h2>
+  <p class="muted">The frozen semantic contract every script and localization must honor.</p>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ master.status.value }}</dd></div>
+    <div><dt>Origin</dt><dd>{{ master.origin_type.value if master.origin_type else '—' }}</dd></div>
+    <div><dt>Ending mode</dt><dd>{{ master.ending_mode }}</dd></div>
+    <div><dt>Input hash</dt><dd><code>{{ master.input_hash[:16] }}…</code></dd></div>
+    <div><dt>Frozen</dt><dd>{{ master.frozen_at.strftime('%Y-%m-%d %H:%M') if master.frozen_at else '—' }}</dd></div>
+    <div><dt>Research package</dt><dd>v{{ upstream_versions.package if upstream_versions.package else '—' }}{% if upstream_versions.package_hash %} · <code>{{ upstream_versions.package_hash }}…</code>{% endif %}</dd></div>
+    <div><dt>Evidence matrix</dt><dd>v{{ upstream_versions.matrix if upstream_versions.matrix else '—' }}</dd></div>
+    <div><dt>Argument plan</dt><dd>v{{ upstream_versions.argument if upstream_versions.argument else '—' }}</dd></div>
+    <div><dt>Narrative plan</dt><dd>v{{ upstream_versions.narrative if upstream_versions.narrative else '—' }}</dd></div>
+  </dl>
+  <p><strong>Question.</strong> {{ master.central_human_question }}</p>
+  {% if master.uncertainty_constraints %}
+  <h3>Uncertainty constraints</h3>
+  <ul>{% for rule in master.uncertainty_constraints %}<li>{{ rule }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if master.prohibited_conflations %}
+  <h3>Prohibited conflations</h3>
+  <ul>{% for item in master.prohibited_conflations %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if master_claims %}
+  <h3>Claims ({{ master_claims | length }})</h3>
+  <table>
+    <thead><tr><th>#</th><th>Epistemic</th><th>Intent</th><th>Proposition</th><th>Evidence bindings</th></tr></thead>
+    <tbody>
+      {% for claim in master_claims %}
+      <tr>
+        <td>{{ claim.sequence }}</td>
+        <td><span class="badge {% if claim.epistemic_status.value in uncertain_epistemic %}warning{% endif %}">{{ claim.epistemic_status.value.replace('_', ' ') }}</span></td>
+        <td>{{ claim.claim_intent }}</td>
+        <td>{{ claim.semantic_proposition or claim.plain_meaning or '—' }}</td>
+        <td>{{ claim.source_evidence | length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <details><summary>Citation bindings</summary>
+    {% for claim in master_claims if claim.source_evidence %}
+    <p><strong>Claim {{ claim.sequence }}.</strong>
+      {% for binding in claim.source_evidence %}
+      <span class="chip">{{ binding.get('source_version_id', '')[:8] }} · {{ binding.get('role', '') }}</span>
+      {% endfor %}
+    </p>
+    {% endfor %}
+  </details>
+  {% endif %}
+  {% if master_sections %}
+  <h3>Section architecture</h3>
+  <table>
+    <thead><tr><th>#</th><th>Role</th><th>Purpose</th><th>Rhetorical function</th><th>Seconds</th></tr></thead>
+    <tbody>
+      {% for section in master_sections %}
+      <tr>
+        <td>{{ section.ordinal }}</td>
+        <td>{{ section.role.value }}</td>
+        <td>{{ section.purpose }}</td>
+        <td>{{ section.rhetorical_function }}</td>
+        <td>{{ section.duration_seconds if section.duration_seconds else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <details><summary>Technical details</summary>
+    <pre>{{ master.architecture | tojson(indent=2) }}</pre>
+  </details>
+</section>
+{% else %}
+{{ not_built('Semantic Master', 'Requires a ready narrative plan.') }}
+{% endif %}
+
+{# ------------------------------ SCRIPT ----------------------------- #}
+{% elif active_stage.value == 'SCRIPT' %}
+{% if drafts %}
+<section class="card">
+  <h2>Draft versions</h2>
+  <table>
+    <thead><tr><th>Version</th><th>Language</th><th>Status</th><th>Words</th><th>Est. duration</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for draft in drafts %}
+      <tr>
+        <td>v{{ draft.version_number }}</td>
+        <td>{{ draft.language }}</td>
+        <td><span class="badge {% if draft.status.value == 'APPROVED' %}success{% endif %}">{{ draft.status.value.replace('_', ' ') }}</span></td>
+        <td>{{ draft.actual_word_count }}</td>
+        <td>{{ (draft.estimated_duration_seconds // 60) }} min</td>
+        <td>{{ draft.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>Latest draft — v{{ latest_draft.version_number }} ({{ latest_draft.language }})</h2>
+  <dl class="metadata">
+    <div><dt>Status</dt><dd>{{ latest_draft.status.value.replace('_', ' ') }}</dd></div>
+    <div><dt>Words</dt><dd>{{ latest_draft.actual_word_count }}</dd></div>
+    <div><dt>Target</dt><dd>{{ latest_draft.target_duration_minutes }} min</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ latest_draft.content_hash[:16] }}…</code></dd></div>
+    <div><dt>Narrative plan</dt><dd>v{{ latest_draft.provenance_json.get('narrative_plan_version', '—') }}</dd></div>
+    <div><dt>Semantic master</dt><dd>v{{ latest_draft.provenance_json.get('lecture_master_version', '—') }}</dd></div>
+  </dl>
+  <details open><summary>Script text</summary>
+    <p class="unit-fulltext">{{ latest_draft.text }}</p>
+  </details>
+</section>
+{% else %}
+{{ not_built('Script draft', 'Requires a ready Semantic Master.') }}
+{% endif %}
+
+{# ------------------------------ REVIEW ----------------------------- #}
+{% elif active_stage.value == 'REVIEW' %}
+{% if latest_draft %}
+<section class="card">
+  <h2>Review — draft v{{ latest_draft.version_number }}</h2>
   {% if state.open_blockers %}
-  <p class="muted">{{ state.open_blockers }} blocking finding(s) must be resolved before approval.</p>
+  <p class="error">Approval is blocked: {{ state.open_blockers }} blocking finding(s) are still open.</p>
+  {% else %}
+  <p class="muted">No open blockers — this draft can be approved.</p>
   {% endif %}
 </section>
+{% for role, role_findings in findings | groupby('critic_role') %}
+<section class="card">
+  <h3>{{ role.replace('_', ' ') }} critic ({{ role_findings | length }})</h3>
+  {% for finding in role_findings %}
+  <div class="unit-row">
+    <div class="unit-head">
+      <span class="badge {% if finding.severity.value == 'BLOCKER' %}danger{% elif finding.severity.value == 'WARNING' %}warning{% endif %}">{{ finding.severity.value }}</span>
+      <code>{{ finding.code }}</code>
+      <span class="chip">{{ finding.status.value }}</span>
+    </div>
+    <p><strong>{{ finding.location }}</strong></p>
+    <p>{{ finding.explanation }}</p>
+    {% if finding.correction_constraint %}<p class="muted"><strong>Correction.</strong> {{ finding.correction_constraint }}</p>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% else %}
+<section class="card empty-state"><p class="muted">No critic findings yet — run review.</p></section>
+{% endfor %}
+{% else %}
+{{ not_built('Review', 'A script draft must exist before critics can run.') }}
+{% endif %}
+
+{# ----------------------------- APPROVED ---------------------------- #}
+{% elif active_stage.value == 'APPROVED' %}
+{% if approved_draft %}
+<section class="card">
+  <h2>Approved</h2>
+  <p><span class="badge success">Approved</span> draft v{{ approved_draft.version_number }} · {{ approved_draft.language }} · {{ approved_draft.actual_word_count }} words</p>
+  {% if signature %}
+  <dl class="metadata">
+    <div><dt>Signature saved</dt><dd>{{ signature.created_at.strftime('%Y-%m-%d %H:%M') }}</dd></div>
+    <div><dt>Question</dt><dd>{{ signature.question }}</dd></div>
+    <div><dt>Thesis</dt><dd>{{ signature.thesis }}</dd></div>
+    <div><dt>Angle</dt><dd>{{ signature.angle or '—' }}</dd></div>
+    <div><dt>Story-Units</dt><dd>{{ signature.story_unit_ids | length }}</dd></div>
+    <div><dt>Hook</dt><dd>{{ signature.hook_type or '—' }}</dd></div>
+    <div><dt>Schluss</dt><dd>{{ signature.ending_type or '—' }}</dd></div>
+    <div><dt>Inhalts-Hash</dt><dd><code>{{ signature.content_hash[:16] }}…</code></dd></div>
+  </dl>
+  {% else %}
+  <p class="muted">Die Signatur wird bei der Freigabe erstellt.</p>
+  {% endif %}
+</section>
+<section class="card">
+  <h2 id="translations">Übersetzungen <a class="linkbutton" href="/studio/translations" style="font-size:.8rem">Alle Übersetzungen →</a></h2>
+  {% if localizations %}
+  <table>
+    <thead><tr><th>Sprache</th><th>Status</th><th>Erstellt</th></tr></thead>
+    <tbody>
+      {% for item in localizations %}
+      <tr><td>{{ item.language.value }}</td><td>{{ item.status.value }}</td><td>{{ item.created_at.strftime('%d.%m.%Y') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Noch keine Sprachfassungen. „Übersetzen"-Aktion oben verwenden oder <a href="/studio/translations">Übersetzungen öffnen →</a></p>
+  {% endif %}
+</section>
+{% else %}
+{{ not_built('Approved', 'Einen geprüften Entwurf freigeben, um diese Stufe zu erreichen.') }}
+{% endif %}
+{% endif %}
 {% endblock %}

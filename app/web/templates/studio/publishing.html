@@ -1,0 +1,72 @@
+{% extends "studio/layout.html" %}
+{% set lang_names = {'fa': 'Persisch', 'de': 'Deutsch', 'en': 'Englisch', 'ar': 'Arabisch'} %}
+{% set status_names = {
+  'DRAFT': 'Entwurf',
+  'SEMANTICALLY_APPROVED': 'Semantisch geprüft',
+  'NOT_READY_FOR_VOICE': 'Review erforderlich',
+  'READY_FOR_VOICE': 'Bereit für Voice',
+  'APPROVED': 'Freigegeben',
+  'FAILED': 'Fehlgeschlagen'
+} %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Inhalt</p>
+    <h1>Veröffentlichung</h1>
+    <p class="lede">Freigegebene und übersetzte Inhalte, bereit für die Ausspielung.</p>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Publikationsziele</h2>
+  {% if targets %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ziel</th><th>Plattform</th><th>Sprache</th><th>Kanal</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for t in targets %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{{ t.platform }}</td>
+          <td>{{ lang_names.get(t.language, t.language) }}</td>
+          <td>{{ channels[t.editorial_channel_id].name if t.editorial_channel_id in channels else '—' }}</td>
+          <td><span class="badge">{{ t.status.value if t.status.value is defined else t.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Keine Publikationsziele konfiguriert.</p>
+  {% endif %}
+  <p class="notice" style="margin-top:.75rem">YouTube-Veröffentlichung ist noch nicht verbunden. Inhalte werden hier vorbereitet; das Hochladen erfolgt aktuell manuell.</p>
+</section>
+
+<section class="card">
+  <h2>Bereite Inhalte</h2>
+  {% if projects %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Inhalt</th><th>Kanal</th><th>Sprache</th><th>Übersetzungsstatus</th><th>Bereitschaft</th></tr></thead>
+      <tbody>
+        {% for p in projects %}
+        {% set master = masters.get(p.lecture_master_version_id) %}
+        {% set brief = briefs.get(master.content_brief_id) if master else none %}
+        {% set channel = channels.get(brief.editorial_channel_id) if brief else none %}
+        <tr>
+          <td dir="auto">{{ brief.question[:80] if brief else 'Master ' ~ p.lecture_master_version_id|string|truncate(8) }}</td>
+          <td>{{ channel.name if channel else '—' }}</td>
+          <td>{{ lang_names.get(p.language.value, p.language.value) }}</td>
+          <td><span class="badge success">{{ status_names.get(p.status.value, p.status.value) }}</span></td>
+          <td class="muted">{% if p.status.value == 'APPROVED' %}Freigegeben{% else %}Bereit für Voice{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Noch keine freigegebenen Übersetzungen vorhanden.
+  <a href="/studio/translations">Übersetzungen anzeigen →</a></p>
+  {% endif %}
+</section>
+{% endblock %}

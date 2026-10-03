@@ -7,7 +7,7 @@
       {{ node.title }}
     </a>
     <span class="chip chip-{{ node.node_type | lower }}">{{ node.node_type }}</span>
-    {% if node.start_seconds is not none %}
+    {% if node.start_seconds is not none and source.source_type.value in ['YOUTUBE_VIDEO', 'PODCAST_EPISODE'] %}
     <span class="muted">{{ node.start_seconds }}s–{{ node.end_seconds }}s</span>
     {% endif %}
   </div>
@@ -21,19 +21,20 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource</p>
-    <h1>{{ source.title }}</h1>
+    <p class="eyebrow"><a href="/library/{{ source.id }}">Ressource</a> — Vortragsstruktur</p>
+    <h1 dir="auto">{{ source.title }}</h1>
   </div>
   <form method="post" action="/library/{{ source.id }}/structure">
     <button class="button" type="submit">
-      {% if tree %}Rebuild structure{% else %}Build structure{% endif %}
+      {% if tree %}Struktur neu aufbauen{% else %}Struktur aufbauen{% endif %}
     </button>
   </form>
 </div>
 {% include "studio/_resource_tabs.html" %}
 {% if state %}
-<p class="muted">Processing status: <strong>{{ state.status.value }}</strong>
-  {% if state.last_error %} — {{ state.last_error }}{% endif %}</p>
+<p class="muted">Verarbeitungsstatus: <strong>{{ state.status.value }}</strong>
+  {% if state.last_error %} — {{ human_error(state.last_error) }}
+  <details class="tech-details"><summary>Technische Details</summary><pre>{{ state.last_error }}</pre></details>{% endif %}</p>
 {% endif %}
 {% if tree %}
 <div class="structure-layout">
@@ -44,28 +45,33 @@
   </section>
   {% if selected_node %}
   <section class="card node-detail">
-    <h2>{{ selected_node.title }}</h2>
-    <p class="muted">{{ selected_node.node_type.value }} · level {{ selected_node.level }}
-      {% if selected_node.confidence %} · confidence {{ "%.2f" | format(selected_node.confidence) }}{% endif %}</p>
-    <p>{{ selected_node.summary }}</p>
-    <h3>Source span ({{ node_segments | length }} segments)</h3>
+    <h2 dir="auto">{{ selected_node.title }}</h2>
+    <p class="muted">{{ selected_node.node_type.value }} · Ebene {{ selected_node.level }}
+      {% if selected_node.confidence %} · Konfidenz {{ "%.2f" | format(selected_node.confidence) }}{% endif %}</p>
+    <p dir="auto">{{ selected_node.summary }}</p>
+    <h3>Quellbereich ({{ node_segments | length }} Segmente)</h3>
     <ol class="segment-list">
       {% for segment in node_segments %}
       <li>
-        <span class="muted">s{{ segment.sequence }} ·
-          {{ segment.start_seconds }}s–{{ segment.end_seconds }}s</span>
-        <p>{{ segment.raw_text }}</p>
+        <span class="muted">s{{ segment.sequence }}{% if page_by_seq.get(segment.sequence) %} · S. {{ page_by_seq[segment.sequence] }}{% elif source.source_type.value in ['YOUTUBE_VIDEO', 'PODCAST_EPISODE'] %} ·
+          {{ segment.start_seconds }}s–{{ segment.end_seconds }}s{% endif %}</span>
+        <p dir="auto">{{ segment.raw_text }}</p>
       </li>
       {% endfor %}
     </ol>
+  </section>
+  {% else %}
+  <section class="card node-detail">
+    <p class="empty-state">Wähle links einen Knoten, um Zusammenfassung und
+    Quellbereich (Timestamps / Seiten) zu sehen.</p>
   </section>
   {% endif %}
 </div>
 {% else %}
 <section class="card empty-state">
-  <h2>No structure yet</h2>
-  <p>The hierarchical source structure (Vortragsstruktur) is generated from
-    the transcript. Click “Build structure” to run the extraction.</p>
+  <h2>Noch keine Struktur</h2>
+  <p>Die hierarchische Vortragsstruktur wird aus dem Transkript erzeugt.
+    „Struktur aufbauen" startet die Extraktion.</p>
 </section>
 {% endif %}
 {% endblock %}

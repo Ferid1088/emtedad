@@ -1,11 +1,11 @@
-<nav class="tabs channel-nav" aria-label="Channel workspace">
+<nav class="tabs channel-nav" aria-label="Kanal-Bereich">
   {% for suffix, label in [
-    ('', 'Overview'),
-    ('/strategy', 'Strategy'),
-    ('/resources', 'Resources'),
-    ('/topics', 'Topics'),
-    ('/production', 'Production'),
-    ('/published', 'Published')
+    ('', 'Übersicht'),
+    ('/strategy', 'Strategie'),
+    ('/resources', 'Ressourcen'),
+    ('/topics', 'Themen'),
+    ('/production', 'Produktion'),
+    ('/published', 'Veröffentlicht')
   ] %}
   {% set href = '/studio/channels/' ~ channel.slug ~ suffix %}
   <a href="{{ href }}" {% if request.url.path == href %}class="active"{% endif %}>{{ label }}</a>

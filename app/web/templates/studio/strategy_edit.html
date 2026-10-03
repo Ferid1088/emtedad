@@ -1,0 +1,126 @@
+{% extends "studio/layout.html" %}
+{% set p = submitted.policies if submitted else {} %}
+{% macro current(key, subkey, default='') -%}
+  {{- p.get(key, {}).get(subkey, draft[key].get(subkey, default)) if draft is defined else '' -}}
+{%- endmacro %}
+{% macro lines(key, subkey) -%}
+  {%- if submitted -%}{{ p.get(key, {}).get(subkey, []) | join('\n') }}{%- else -%}{{ draft[key].get(subkey, []) | join('\n') }}{%- endif -%}
+{%- endmacro %}
+{% macro textarea_json(field, key) -%}
+  {%- if submitted -%}{{ p.get(key, {}) | tojson(indent=2) }}{%- else -%}{{ draft[key] | tojson(indent=2) }}{%- endif -%}
+{%- endmacro %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow"><a href="/studio/channels/{{ channel.slug }}/strategy">{{ channel.name }} — Strategie</a></p>
+    <h1>Entwurf v{{ draft.version_number }} bearbeiten</h1>
+    <p class="lede">Entwürfe dürfen frei bearbeitet werden. Die Validierung läuft beim Speichern und erneut bei der Aktivierung.</p>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+
+{% if errors %}
+<section class="card">
+  <h2>Vor dem Speichern beheben</h2>
+  {% for error in errors %}<p class="error">{{ error }}</p>{% endfor %}
+</section>
+{% endif %}
+
+<form method="post" action="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/edit">
+<section class="card">
+  <h2>Identität</h2>
+  <label>Kernfrage
+    <input type="text" name="core_question" required
+      value="{{ submitted.core_question if submitted else draft.core_question }}">
+  </label>
+  <label>Redaktionelle Sprache
+    <select name="editorial_language">
+      {% for lang in languages %}
+      <option value="{{ lang }}" {% if (submitted.core_question is defined and submitted.editorial_language == lang) or (not submitted and draft.editorial_language == lang) %}selected{% endif %}>{{ lang }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</section>
+
+<section class="card">
+  <h2>Zielgruppe</h2>
+  <label>Beschreibung
+    <textarea name="audience_description" rows="3">{{ current('audience_json', 'description') }}</textarea>
+  </label>
+  <label>Zielgruppen-Probleme — eine pro Zeile
+    <textarea name="audience_problems" rows="5">{{ lines('audience_problems_json', 'problems') }}</textarea>
+  </label>
+</section>
+
+<section class="card">
+  <h2>Blickwinkel &amp; Domänen</h2>
+  <div class="form-grid">
+    <label>Domänen — eine pro Zeile
+      <textarea name="domains" rows="5">{{ lines('domains_json', 'domains') }}</textarea>
+    </label>
+    <label>Bevorzugte Blickwinkel — einer pro Zeile
+      <textarea name="preferred_angles" rows="5">{{ lines('preferred_angles_json', 'angles') }}</textarea>
+    </label>
+    <label>Verbotene Blickwinkel — einer pro Zeile
+      <textarea name="forbidden_angles" rows="5">{{ lines('forbidden_angles_json', 'angles') }}</textarea>
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Quellen- &amp; Evidence-Policy</h2>
+  <div class="form-grid">
+    <label class="check"><input type="checkbox" name="sp_channel_only" {% if submitted and p.get('source_policy_json', {}).get('channel_assigned_resources_only') or (not submitted and draft.source_policy_json.get('channel_assigned_resources_only')) %}checked{% endif %}> Nur kanal-zugeordnete Ressourcen</label>
+    <label class="check"><input type="checkbox" name="sp_shared_base" {% if submitted and p.get('source_policy_json', {}).get('shared_knowledge_base') or (not submitted and draft.source_policy_json.get('shared_knowledge_base')) %}checked{% endif %}> Gemeinsame Wissensbasis</label>
+    <label class="check"><input type="checkbox" name="ep_provenance" {% if submitted and p.get('evidence_policy_json', {}).get('require_source_provenance') or (not submitted and draft.evidence_policy_json.get('require_source_provenance')) %}checked{% endif %}> Quellen-Herkunft verlangen</label>
+    <label class="check"><input type="checkbox" name="ep_counter" {% if submitted and p.get('evidence_policy_json', {}).get('require_counterevidence_search') or (not submitted and draft.evidence_policy_json.get('require_counterevidence_search')) %}checked{% endif %}> Gegenbeleg-Suche verlangen</label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Themen-Scoring-Gewichte</h2>
+  <p class="muted">Nicht-negative Zahlen; mindestens eines muss über null liegen.</p>
+  <div class="form-grid weights">
+    {% for key in weight_keys %}
+    <label>{{ key.replace('_', ' ') }}
+      {% set w = p.get('topic_scoring_policy_json', {}).get('weights', {}).get(key) if submitted else draft.topic_scoring_policy_json.get('weights', {}).get(key) %}
+      <input type="number" step="0.1" min="0" name="w_{{ key }}" value="{{ w if w is not none else 0 }}">
+    </label>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Agenten-Profil</h2>
+  <label>Sonderrollen — eine pro Zeile
+    <textarea name="special_roles" rows="4">{{ lines('agent_profile_json', 'special_roles') }}</textarea>
+  </label>
+</section>
+
+<details class="card">
+  <summary><h2 style="display:inline">Erweiterte Policies (JSON)</h2></summary>
+  <p class="muted">Narrativ-, Stil-, Hook- und Schluss-Policies. JSON-Objekte — leer bedeutet nicht gesetzt.</p>
+  <div class="form-grid">
+    <label>Narrativ-Policy
+      <textarea name="narrative_policy" rows="6" class="code">{{ textarea_json('narrative_policy', 'narrative_policy_json') }}</textarea>
+    </label>
+    <label>Stil-Policy
+      <textarea name="style_policy" rows="6" class="code">{{ textarea_json('style_policy', 'style_policy_json') }}</textarea>
+    </label>
+    <label>Hook-Policy
+      <textarea name="hook_policy" rows="6" class="code">{{ textarea_json('hook_policy', 'hook_policy_json') }}</textarea>
+    </label>
+    <label>Schluss-Policy
+      <textarea name="ending_policy" rows="6" class="code">{{ textarea_json('ending_policy', 'ending_policy_json') }}</textarea>
+    </label>
+  </div>
+</details>
+
+<section class="card">
+  <div class="inline-form">
+    <button class="button" type="submit">Entwurf speichern &amp; vergleichen</button>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/strategy">Abbrechen</a>
+  </div>
+</section>
+</form>
+{% endblock %}

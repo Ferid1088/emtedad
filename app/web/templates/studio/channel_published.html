@@ -2,18 +2,18 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Channel</p>
-    <h1>{{ channel.name }} — Published</h1>
-    <p class="lede">Approved semantic signatures — what this channel has already said.</p>
+    <p class="eyebrow"><a href="/studio/channels">Meine Kanäle</a></p>
+    <h1>{{ channel.name }} — Veröffentlicht</h1>
+    <p class="lede">Freigegebene semantische Signaturen — was dieser Kanal bereits gesagt hat.</p>
   </div>
 </div>
 {% include "studio/_channel_nav.html" %}
 
 {% if signatures %}
 <section class="card">
-  <h2>Approved signatures ({{ signatures|length }})</h2>
+  <h2>Freigegebene Signaturen ({{ signatures|length }})</h2>
   <table>
-    <thead><tr><th>Question</th><th>Thesis</th><th>Angle</th><th>Signature</th><th>Approved</th></tr></thead>
+    <thead><tr><th>Frage</th><th>These</th><th>Blickwinkel</th><th>Signatur</th><th>Freigegeben</th></tr></thead>
     <tbody>
       {% for sig in signatures %}
       <tr>
@@ -21,7 +21,7 @@
         <td class="muted">{{ sig.thesis[:160] }}</td>
         <td>{{ sig.angle }}</td>
         <td><code>{{ sig.content_hash[:12] }}…</code></td>
-        <td>{{ sig.created_at.strftime('%Y-%m-%d') }}</td>
+        <td>{{ sig.created_at.strftime('%d.%m.%Y') }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -29,14 +29,14 @@
 </section>
 {% else %}
 <section class="card empty-state">
-  <h2>Nothing published yet</h2>
-  <p>Approved scripts appear here once a production passes owner approval and its signature is recorded.</p>
+  <h2>Noch nichts veröffentlicht</h2>
+  <p>Freigegebene Skripte erscheinen hier, sobald eine Produktion die Owner-Freigabe passiert hat.</p>
 </section>
 {% endif %}
 
 {% if targets %}
 <section class="card">
-  <h2>Publication targets</h2>
+  <h2>Publikationsziele</h2>
   <ul>
     {% for target in targets %}
     <li>{{ target.name }} <span class="muted">· {{ target.platform }} · {{ target.language }}</span></li>

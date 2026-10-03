@@ -2,22 +2,22 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource — Original</p>
-    <h1>{{ source.title }}</h1>
-    <p class="lede">The source transcript remains authoritative. Generated summaries never replace it.</p>
+    <p class="eyebrow"><a href="/library/{{ source.id }}">Ressource</a> — Original</p>
+    <h1 dir="auto">{{ source.title }}</h1>
+    <p class="lede">Das Original-Transkript bleibt maßgeblich. Generierte Zusammenfassungen ersetzen es nie.</p>
   </div>
 </div>
 {% include "studio/_resource_tabs.html" %}
 <section class="card">
-  <h2>Transcript ({{ segments|length }} segments)</h2>
+  <h2>Transkript ({{ segments|length }} Segmente)</h2>
   {% for segment in segments[:300] %}
   <div class="transcript">
-    <span class="muted">{% if segment.start_seconds is not none %}[{{ segment.start_seconds }}s → {{ segment.end_seconds }}s]{% else %}[segment {{ segment.sequence }}]{% endif %}</span>
-    <span>{{ segment.normalized_text }}</span>
+    <span class="muted">{% if page_by_seq.get(segment.sequence) %}[S. {{ page_by_seq[segment.sequence] }}]{% elif source.source_type.value in ['YOUTUBE_VIDEO', 'PODCAST_EPISODE'] and segment.start_seconds is not none %}[{{ segment.start_seconds }}s → {{ segment.end_seconds }}s]{% else %}[Segment {{ segment.sequence }}]{% endif %}</span>
+    <span dir="auto">{{ segment.normalized_text }}</span>
   </div>
   {% else %}
-  <p class="muted">No transcript segments stored.</p>
+  <p class="muted">Keine Transkript-Segmente gespeichert.</p>
   {% endfor %}
-  {% if segments|length > 300 %}<p class="muted">Showing first 300 of {{ segments|length }} segments.</p>{% endif %}
+  {% if segments|length > 300 %}<p class="muted">Zeige die ersten 300 von {{ segments|length }} Segmenten.</p>{% endif %}
 </section>
 {% endblock %}

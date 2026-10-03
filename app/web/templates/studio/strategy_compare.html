@@ -1,0 +1,70 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow"><a href="/studio/channels/{{ channel.slug }}/strategy">{{ channel.name }} — Strategie</a></p>
+    <h1>Vergleich — v{{ draft.version_number }}</h1>
+    <p class="lede">{{ changed_count }} Abschnitt(e) geändert gegenüber {% if active %}aktiver v{{ active.version_number }}{% else %}keiner aktiven Basis{% endif %}.</p>
+  </div>
+</div>
+{% include "studio/_channel_nav.html" %}
+
+<section class="card">
+  <div class="inline-form">
+    {% if draft.status.value == 'DRAFT' %}
+    <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/activate">
+      <button class="button" type="submit">Entwurf v{{ draft.version_number }} aktivieren</button>
+    </form>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/edit">Entwurf bearbeiten</a>
+    {% endif %}
+    <a class="linkbutton" href="/studio/channels/{{ channel.slug }}/strategy">Zurück zur Strategie</a>
+  </div>
+</section>
+
+{% for diff in diffs %}
+<section class="card {% if diff.changed %}diff-changed{% endif %}">
+  <div class="split-head">
+    <h2>{{ diff.section }}</h2>
+    {% if diff.changed %}<span class="badge warning">Geändert</span>{% else %}<span class="badge">Unverändert</span>{% endif %}
+  </div>
+  {% if diff.changed %}
+  <table class="diff-table">
+    <thead><tr><th>Feld</th><th>Aktiv</th><th>Entwurf v{{ draft.version_number }}</th></tr></thead>
+    <tbody>
+      {% for key in diff.modified %}
+      <tr class="diff-mod">
+        <td>{{ key }}</td>
+        <td>{{ diff.before.get(key, '—') }}</td>
+        <td>{{ diff.after.get(key, '—') }}</td>
+      </tr>
+      {% endfor %}
+      {% for key in diff.added %}
+      <tr class="diff-add">
+        <td>{{ key }}</td>
+        <td class="muted">—</td>
+        <td>{{ diff.after[key] }}</td>
+      </tr>
+      {% endfor %}
+      {% for key in diff.removed %}
+      <tr class="diff-del">
+        <td>{{ key }}</td>
+        <td>{{ diff.before[key] }}</td>
+        <td class="muted">—</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <details><summary>{{ diff.after | length }} unveränderte Felder anzeigen</summary>
+    <table class="diff-table">
+      <tbody>
+        {% for key, value in diff.after.items() %}
+        <tr><td>{{ key }}</td><td colspan="2">{{ value }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

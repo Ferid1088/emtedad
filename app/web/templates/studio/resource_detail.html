@@ -2,9 +2,9 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Resource</p>
-    <h1>{{ source.title }}</h1>
-    <p class="lede"><a href="{{ source.canonical_url }}">{{ source.canonical_url }}</a></p>
+    <p class="eyebrow"><a href="/library">Ressourcen</a></p>
+    <h1 dir="auto">{{ source.title }}</h1>
+    <p class="lede"><a href="{{ source.canonical_url }}" dir="auto">{{ source.canonical_url }}</a></p>
   </div>
   {% if state %}
   <span class="badge {% if state.status.value == 'READY' %}success{% endif %}">{{ state.status.value.replace('_', ' ') }}</span>
@@ -13,64 +13,67 @@
 {% include "studio/_resource_tabs.html" %}
 
 <section class="card">
-  <h2>Metadata</h2>
+  <h2>Metadaten</h2>
   <dl class="metadata">
-    <div><dt>Type</dt><dd>{{ source.source_type.value }}</dd></div>
-    <div><dt>Platform</dt><dd>{{ source.platform }}</dd></div>
-    <div><dt>Language</dt><dd>{{ source.language }}</dd></div>
-    <div><dt>Ingestion</dt><dd>{{ source.ingestion_status.value }}</dd></div>
-    <div><dt>Processing</dt><dd>{{ state.status.value.replace('_', ' ') if state else 'Not started' }}</dd></div>
-    <div><dt>Duration</dt><dd>{% if source.duration_seconds %}{{ (source.duration_seconds / 60)|round(1) }} min{% else %}—{% endif %}</dd></div>
-    <div><dt>Published</dt><dd>{{ source.published_at.strftime('%Y-%m-%d') if source.published_at else '—' }}</dd></div>
-    <div><dt>Imported</dt><dd>{{ source.created_at.strftime('%Y-%m-%d') }}</dd></div>
+    <div><dt>Typ</dt><dd>{{ source.source_type.value }}</dd></div>
+    <div><dt>Plattform</dt><dd>{{ source.platform }}</dd></div>
+    <div><dt>Sprache</dt><dd>{{ source.language }}</dd></div>
+    <div><dt>Aufnahme</dt><dd>{{ source.ingestion_status.value }}</dd></div>
+    <div><dt>Verarbeitung</dt><dd>{{ state.status.value.replace('_', ' ') if state else 'Nicht gestartet' }}</dd></div>
+    <div><dt>Dauer</dt><dd>{% if source.duration_seconds %}{{ (source.duration_seconds / 60)|round(1) }} Min{% else %}—{% endif %}</dd></div>
+    <div><dt>Veröffentlicht</dt><dd>{{ source.published_at.strftime('%d.%m.%Y') if source.published_at else '—' }}</dd></div>
+    <div><dt>Importiert</dt><dd>{{ source.created_at.strftime('%d.%m.%Y') }}</dd></div>
   </dl>
-  {% if source.description %}<p class="muted">{{ source.description[:600] }}</p>{% endif %}
+  {% if source.description %}<p class="muted" dir="auto">{{ source.description[:600] }}</p>{% endif %}
 </section>
 
 <section class="card">
-  <h2>Knowledge journey</h2>
-  <nav class="stepper" aria-label="Resource pipeline">
-    <a class="step{% if counts.segments %} done{% endif %}" href="/library/{{ source.id }}/original">Source · {{ counts.segments }} segments</a>
-    <a class="step{% if counts.nodes %} done{% endif %}" href="/library/{{ source.id }}/structure">Vortragsstruktur · {{ counts.nodes }} nodes</a>
+  <h2>Wissens-Pipeline</h2>
+  <nav class="stepper" aria-label="Ressourcen-Pipeline">
+    <a class="step{% if counts.segments %} done{% endif %}" href="/library/{{ source.id }}/original">Original · {{ counts.segments }} Segmente</a>
+    <a class="step{% if counts.nodes %} done{% endif %}" href="/library/{{ source.id }}/structure">Vortragsstruktur · {{ counts.nodes }} Knoten</a>
     <a class="step{% if counts.units %} done{% endif %}" href="/library/{{ source.id }}/units">Knowledge Units · {{ counts.units }}</a>
-    <a class="step{% if counts.concepts %} done{% endif %}" href="/library/{{ source.id }}/concepts">Concepts · {{ counts.concepts }}</a>
+    <a class="step{% if counts.concepts %} done{% endif %}" href="/library/{{ source.id }}/concepts">Konzepte · {{ counts.concepts }}</a>
   </nav>
   {% if state and state.status.value not in ('READY',) %}
   <form method="post" action="/library/{{ source.id }}/structure" class="inline-form">
     <button class="button" type="submit">
-      {% if state.status.value == 'FAILED' %}Retry processing{% else %}Process resource{% endif %}
+      {% if state.status.value == 'FAILED' %}Verarbeitung erneut versuchen{% else %}Ressource verarbeiten{% endif %}
     </button>
-    {% if state.last_error %}<span class="muted">{{ state.last_error }}</span>{% endif %}
+    {% if state.last_error %}
+    <span class="muted">{{ human_error(state.last_error) }}</span>
+    <details class="tech-details"><summary>Technische Details</summary><pre>{{ state.last_error }}</pre></details>
+    {% endif %}
   </form>
   {% endif %}
-  {% if review_warnings %}<p class="muted">{{ review_warnings }} review warning(s) — see the Processing tab.</p>{% endif %}
+  {% if review_warnings %}<p class="muted">{{ review_warnings }} Prüfhinweis(e) — siehe Reiter „Verarbeitung".</p>{% endif %}
 </section>
 
 <section class="card">
-  <h2>Channel use</h2>
+  <h2>Kanal-Nutzung</h2>
   {% if assigned_slugs %}
   <p>{% for slug in assigned_slugs %}<a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a> {% endfor %}</p>
   {% else %}
-  <p class="muted">Not assigned to any channel.</p>
+  <p class="muted">Keinem Kanal zugeordnet.</p>
   {% endif %}
   <form method="post" action="/library/{{ source.id }}/assign" class="assign-form">
-    <label>Assign to channel
+    <label>Kanal zuordnen
       <select name="channel_slug">
         {% for channel in channels %}<option value="{{ channel.slug }}">{{ channel.name }}</option>{% endfor %}
       </select>
     </label>
-    <button class="button secondary" type="submit">Assign to Channel</button>
+    <button class="button secondary" type="submit">Zuordnen</button>
   </form>
 </section>
 
 <section class="card">
-  <h2>Versions ({{ versions|length }})</h2>
+  <h2>Versionen ({{ versions|length }})</h2>
   <table>
-    <thead><tr><th>Acquired</th><th>Content hash</th><th>Transcript hash</th><th>Tool</th></tr></thead>
+    <thead><tr><th>Erfasst</th><th>Inhalts-Hash</th><th>Transkript-Hash</th><th>Werkzeug</th></tr></thead>
     <tbody>
       {% for version in versions %}
       <tr>
-        <td>{{ version.acquired_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ version.acquired_at.strftime('%d.%m.%Y %H:%M') }}</td>
         <td><code>{{ version.content_hash[:12] }}…</code></td>
         <td><code>{{ version.transcript_hash[:12] }}…</code></td>
         <td>{{ version.acquisition_tool }} {{ version.acquisition_version }}</td>

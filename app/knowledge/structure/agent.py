@@ -123,10 +123,13 @@ class SourceStructureAgent:
     ) -> list[StructureNodeProposal]:
         """Strict-validate each proposed node; drop malformed items.
 
-        Unknown keys are trimmed first — provider commentary fields must
-        not discard an otherwise valid node. Spans that escape the local
-        window or invert are dropped as well; the structure validator
-        reports resulting coverage gaps instead of crashing the run.
+        Provider drift is normalized first — ``type`` aliases ``node_type``,
+        missing titles derive from the summary, 0-based ordinals shift to
+        1-based, and known provider-invented type labels map onto the nearest
+        ``StructureNodeType``. Labels outside the enum and the alias table
+        stay untouched so validation drops them.
+        Spans that escape the local window or invert are dropped as well;
+        the structure validator reports resulting coverage gaps.
         """
 
         fields = set(StructureNodeProposal.model_fields)
@@ -135,7 +138,22 @@ class SourceStructureAgent:
         )
         nodes: list[StructureNodeProposal] = []
         for item in raw.nodes:
-            trimmed = {key: item[key] for key in fields if key in item}
+            normalized = dict(item)
+            if "node_type" not in normalized and "type" in normalized:
+                normalized["node_type"] = normalized["type"]
+            trimmed = {key: normalized[key] for key in fields if key in normalized}
+            raw_type = str(trimmed.get("node_type") or "").strip()
+            if raw_type:
+                try:
+                    trimmed["node_type"] = StructureNodeType(raw_type.upper())
+                except ValueError:
+                    alias = _NODE_TYPE_ALIASES.get(raw_type.upper())
+                    if alias is not None:
+                        trimmed["node_type"] = alias
+            if not str(trimmed.get("title") or "").strip():
+                summary = str(trimmed.get("summary") or "").strip()
+                if summary:
+                    trimmed["title"] = summary[:120].rstrip()
             try:
                 node = StructureNodeProposal.model_validate(trimmed)
             except ValidationError:
@@ -172,7 +190,24 @@ class SourceStructureAgent:
                 )
                 continue
             nodes.append(node)
+        if nodes and min(node.ordinal for node in nodes) == 0:
+            nodes = [
+                node.model_copy(update={"ordinal": node.ordinal + 1}) for node in nodes
+            ]
         return nodes
+
+
+_NODE_TYPE_ALIASES: dict[str, StructureNodeType] = {
+    "CLAIM": StructureNodeType.ARGUMENT,
+    "DISCUSSION": StructureNodeType.TOPIC,
+    "DETAIL": StructureNodeType.SUBTOPIC,
+    "EVIDENCE": StructureNodeType.EXPLANATION,
+    "INTRODUCTION": StructureNodeType.TOPIC,
+    "NARRATIVE": StructureNodeType.STORY,
+    "POINT": StructureNodeType.ARGUMENT,
+    "SECTION": StructureNodeType.TOPIC,
+    "SUMMARY": StructureNodeType.CONCLUSION,
+}
 
 
 __all__ = [

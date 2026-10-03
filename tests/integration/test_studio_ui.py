@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,6 +16,11 @@ from sqlalchemy.engine import make_url
 
 from alembic import command
 from app.briefs.service import BriefInput, BriefService
+from app.channel_monitoring.domain import CandidateStatus
+from app.channel_monitoring.models import (
+    ChannelVideoCandidate,
+    MonitoredChannel,
+)
 from app.content_engine.service import ContentEngineService
 from app.core.config import Environment, Settings
 from app.db.session import Database
@@ -23,8 +29,14 @@ from app.editorial_channels.domain import (
     ChannelResourceRole,
 )
 from app.editorial_channels.service import EditorialChannelService
+from app.knowledge.adapters.base import (
+    ChannelSnapshot,
+    ChannelVideoSnapshot,
+)
 from app.knowledge.domain import IngestionStatus, SourceType
 from app.knowledge.models import Source
+from app.knowledge.structure.domain import SourceProcessingStatus
+from app.knowledge.structure.models import SourceProcessingState
 from app.knowledge.structure.service import SourceStructureService
 from app.knowledge.units.service import KnowledgeUnitService
 from app.main import create_app
@@ -238,8 +250,8 @@ async def test_production_workspace_generic_master_flow(studio_client) -> None:
 
         page = client.get(f"/studio/production/{brief.id}")
         assert page.status_code == 200
-        assert "Build Semantic Master" in page.text
-        assert "Build script" not in page.text  # gated until a master exists
+        assert "Semantic Master erstellen" in page.text
+        assert "Skript erstellen" not in page.text  # gated until a master exists
         assert "lesson" not in page.text.lower()
 
         response = client.post(
@@ -251,7 +263,7 @@ async def test_production_workspace_generic_master_flow(studio_client) -> None:
         page = client.get(f"/studio/production/{brief.id}")
         assert page.status_code == 200
         assert "MASTER" in page.text  # stage advanced past NARRATIVE
-        assert "Build script" in page.text
+        assert "Skript erstellen" in page.text
         assert "lesson" not in page.text.lower()
     finally:
         await database.dispose()
@@ -291,7 +303,7 @@ async def test_resource_tabs_and_topic_detail(studio_client) -> None:
             assert response.status_code == 200, suffix
 
         overview = client.get(f"/library/{source.id}")
-        assert "Knowledge journey" in overview.text
+        assert "Wissens-Pipeline" in overview.text
         assert "Vortragsstruktur" in overview.text
 
         processing = client.get(f"/library/{source.id}/processing")
@@ -309,8 +321,8 @@ async def test_resource_tabs_and_topic_detail(studio_client) -> None:
         assert candidates
         detail = client.get(f"/studio/channels/emtedad/topics/{candidates[0].id}")
         assert detail.status_code == 200
-        assert "Distinctiveness" in detail.text
-        assert "Knowledge support" in detail.text
+        assert "Eigenständigkeit" in detail.text
+        assert "Wissens-Abdeckung" in detail.text
 
         # Cross-channel isolation: another channel must not see the candidate.
         other = client.get(
@@ -347,7 +359,7 @@ async def test_strategy_draft_and_activation_flow(studio_client) -> None:
         assert response.status_code == 303
         page = client.get("/studio/channels/emtedad/strategy")
         assert "Sprint draft question?" in page.text
-        assert "Activate draft" in page.text
+        assert "Entwurf aktivieren" in page.text
 
         service = EditorialChannelService(database)
         channel = await service.get_channel("emtedad")
@@ -372,5 +384,237 @@ async def test_strategy_draft_and_activation_flow(studio_client) -> None:
             follow_redirects=False,
         )
         assert wrong.status_code == 404
+    finally:
+        await database.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Final Studio UI redesign — new screens, workflows, error UX
+# ---------------------------------------------------------------------------
+
+
+class _FakeChannelAdapter:
+    async def resolve_channel(self, _locator: str) -> ChannelSnapshot:
+        return ChannelSnapshot(
+            external_channel_id="UCtest-channel-000001",
+            name="Fixture Quellkanal",
+            channel_url="https://www.youtube.com/channel/UCtest-channel-000001",
+            handle="@fixture-kanal",
+        )
+
+    async def list_channel_videos(
+        self, _locator: str
+    ) -> tuple[ChannelVideoSnapshot, ...]:
+        return (
+            ChannelVideoSnapshot(
+                youtube_video_id="FIXTUREVIDEO1",
+                title="Fixture Video Eins",
+                published_at=datetime.now(UTC),
+                thumbnail_url=None,
+                duration_seconds=300,
+            ),
+        )
+
+
+def _seed_monitored_channel(session) -> MonitoredChannel:
+    channel = MonitoredChannel(
+        platform="YOUTUBE",
+        external_channel_id=f"UC{uuid4().hex[:20]}",
+        name="Beobachteter Testkanal",
+        channel_url="https://www.youtube.com/channel/test",
+        handle="@testkanal",
+        active=True,
+        last_checked_at=datetime.now(UTC),
+    )
+    session.add(channel)
+    return channel
+
+
+def test_dashboard_shows_shell_five_channels_and_workflow(studio_client) -> None:
+    client, _ = studio_client
+    page = client.get("/studio")
+    assert page.status_code == 200
+    body = page.text
+    # Sidebar separation: editorial vs. source channels.
+    assert "Meine Kanäle" in body
+    assert "YouTube-Kanäle" in body
+    assert "sidebar" in body
+    # Exactly five editorial channel cards with real DB counts.
+    for slug in CHANNEL_SLUGS:
+        assert f"/studio/channels/{slug}" in body
+    assert body.count("chan-card") == 5
+    # Seven-step workflow explainer.
+    assert "Dein Workflow" in body
+    assert body.count("wf-step") == 7
+    # Attention is a secondary card, not the headline.
+    assert "Meine 5 Kanäle" in body
+
+
+def test_youtube_channels_page_and_detail(studio_client) -> None:
+    client, database_url = studio_client
+    _seed(client)
+
+    import asyncio
+
+    from app.db.session import Database as _Db
+
+    async def _insert() -> str:
+        db = _Db(database_url)
+        try:
+            async with db.transaction() as session:
+                channel = _seed_monitored_channel(session)
+                await session.flush()
+                session.add(
+                    ChannelVideoCandidate(
+                        channel_id=channel.id,
+                        youtube_video_id="CANDIDATE1",
+                        title="Neues Kandidaten-Video",
+                        status=CandidateStatus.NEW,
+                        discovered_at=datetime.now(UTC),
+                    )
+                )
+                return str(channel.id)
+        finally:
+            await db.dispose()
+
+    channel_id = asyncio.run(_insert())
+
+    page = client.get("/studio/youtube")
+    assert page.status_code == 200
+    assert "Beobachteter Testkanal" in page.text
+    assert "YouTube-Kanal hinzufügen" in page.text
+    assert "Neues Kandidaten-Video" in page.text
+
+    detail = client.get(f"/studio/youtube/{channel_id}")
+    assert detail.status_code == 200
+    assert "Neues Kandidaten-Video" in detail.text
+    assert "Ausgewählte importieren" in detail.text
+    assert "Kanal entfernen" in detail.text
+
+    missing = client.get(f"/studio/youtube/{uuid4()}")
+    assert missing.status_code == 404
+
+
+def test_youtube_add_channel_flow_with_injected_adapter(studio_client) -> None:
+    client, _ = studio_client
+    _seed(client)
+    client.app.state.channel_adapter = _FakeChannelAdapter()
+    try:
+        response = client.post(
+            "/studio/youtube",
+            data={"locator": "https://www.youtube.com/@fixture-kanal"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert "msg=Kanal" in response.headers["location"]
+
+        page = client.get("/studio/youtube")
+        assert "Fixture Quellkanal" in page.text
+    finally:
+        client.app.state.channel_adapter = None
+
+
+def test_youtube_add_channel_error_is_human_readable(studio_client) -> None:
+    client, _ = studio_client
+    _seed(client)
+    client.app.state.channel_adapter = _FakeChannelAdapter()
+    try:
+        # Empty locator → friendly error, no traceback.
+        response = client.post(
+            "/studio/youtube", data={"locator": ""}, follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert "error=" in response.headers["location"]
+    finally:
+        client.app.state.channel_adapter = None
+
+
+def test_global_topics_page_and_manual_topic(studio_client) -> None:
+    client, _ = studio_client
+    _seed(client)
+    page = client.get("/studio/topics")
+    assert page.status_code == 200
+    assert "+ Neues Thema" in page.text
+    assert "Video-Frage" in page.text
+
+    response = client.post(
+        "/studio/topics",
+        data={
+            "channel_slug": "emtedad",
+            "video_question": "Warum testen wir manuelle Themen?",
+            "tentative_thesis": "Weil der Owner sie braucht.",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    page = client.get("/studio/topics?channel=emtedad")
+    assert "Warum testen wir manuelle Themen?" in page.text
+
+    # Missing fields → error redirect, not a crash.
+    bad = client.post(
+        "/studio/topics",
+        data={"channel_slug": "emtedad"},
+        follow_redirects=False,
+    )
+    assert bad.status_code == 303
+    assert "error=" in bad.headers["location"]
+
+
+def test_translations_and_publishing_pages_render(studio_client) -> None:
+    client, _ = studio_client
+    _seed(client)
+    page = client.get("/studio/translations")
+    assert page.status_code == 200
+    assert "Übersetzungen" in page.text
+    assert "Persisch" in page.text or "Noch keine" in page.text
+
+    page = client.get("/studio/publishing")
+    assert page.status_code == 200
+    assert "Veröffentlichung" in page.text
+    assert "YouTube-Veröffentlichung ist noch nicht verbunden" in page.text
+
+
+@pytest.mark.asyncio
+async def test_processing_error_is_humanized_not_raw(studio_client) -> None:
+    """Raw provider codes must only appear inside a tech-details element."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        async with database.transaction() as session:
+            source = Source(
+                source_type=SourceType.YOUTUBE_VIDEO,
+                platform="youtube",
+                external_id=f"err{uuid4().hex[:8]}",
+                canonical_url="https://www.youtube.com/watch?v=err-fixture",
+                title="Error fixture source",
+                language="en",
+                ingestion_status=IngestionStatus.INGESTED,
+            )
+            session.add(source)
+            await session.flush()
+            session.add(
+                SourceProcessingState(
+                    source_id=source.id,
+                    status=SourceProcessingStatus.FAILED,
+                    last_error='PROVIDER_QUOTA_EXHAUSTED: {"detail": "quota exceeded"}',
+                )
+            )
+            source_id = source.id
+
+        for path in (f"/library/{source_id}", f"/library/{source_id}/processing"):
+            page = client.get(path)
+            assert page.status_code == 200, path
+            body = page.text
+            # Human-readable German error present.
+            assert "Provider-Kapazität erreicht" in body
+            # Raw code appears at most inside a tech-details element.
+            occurrences = body.count("PROVIDER_QUOTA_EXHAUSTED")
+            assert occurrences <= 1, path
+            if occurrences:
+                assert "tech-details" in body
+            # Never rendered as a bare error banner with the raw code.
+            assert '<p class="error">PROVIDER_QUOTA_EXHAUSTED' not in body
     finally:
         await database.dispose()

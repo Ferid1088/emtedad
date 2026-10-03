@@ -1,11 +1,11 @@
-<nav class="tabs" aria-label="Resource sections">
+<nav class="tabs" aria-label="Ressourcen-Bereiche">
   {% for suffix, key, label in [
-    ('', 'overview', 'Overview'),
+    ('', 'overview', 'Übersicht'),
     ('/original', 'original', 'Original'),
-    ('/structure', 'structure', 'Structure'),
+    ('/structure', 'structure', 'Vortragsstruktur'),
     ('/units', 'units', 'Knowledge Units'),
-    ('/concepts', 'concepts', 'Concepts'),
-    ('/processing', 'processing', 'Processing')
+    ('/concepts', 'concepts', 'Konzepte'),
+    ('/processing', 'processing', 'Verarbeitung')
   ] %}
   <a href="/library/{{ source.id }}{{ suffix }}" {% if active_tab == key %}class="active"{% endif %}>{{ label }}</a>
   {% endfor %}

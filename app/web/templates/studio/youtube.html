@@ -1,0 +1,94 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Quellen</p>
+    <h1>YouTube-Kanäle</h1>
+    <p class="lede">Externe YouTube-Kanäle, die beobachtet werden. Neue Videos
+    erscheinen hier als Kandidaten — du entscheidest, was importiert wird.</p>
+  </div>
+  <form method="post" action="/studio/youtube/check-all">
+    <button class="button" type="submit">Alle Kanäle prüfen</button>
+  </form>
+</div>
+
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>+ YouTube-Kanal hinzufügen</h2>
+  <form method="post" action="/studio/youtube" class="assign-form">
+    <input name="locator" placeholder="YouTube-Kanal-URL oder @handle" required style="flex:1">
+    <button class="button" type="submit">Hinzufügen</button>
+  </form>
+  <p class="muted" style="font-size:.8rem">Dies ist ein <strong>Quell-Kanal</strong>
+  (Beobachtung). Deine fünf redaktionellen Kanäle findest du unter
+  <a href="/studio/channels">Meine Kanäle</a>.</p>
+</section>
+
+<section class="card">
+  <h2>Überwachte Kanäle</h2>
+  {% if yt_channels %}
+  <div class="table-wrap">
+    <table class="yt-table">
+      <thead><tr><th>Kanal</th><th>Status</th><th>Zuletzt geprüft</th><th>Neue Videos</th><th>Importiert</th><th>Aktionen</th></tr></thead>
+      <tbody>
+        {% for mc in yt_channels %}
+        <tr>
+          <td>
+            <div class="yt-name" dir="auto">{{ mc.name }}</div>
+            <div class="yt-url" dir="auto">{{ mc.handle or mc.channel_url }}</div>
+          </td>
+          <td><span class="badge {% if mc.active %}success{% else %}muted{% endif %}">{{ 'aktiv' if mc.active else 'inaktiv' }}</span></td>
+          <td class="muted">{{ mc.last_checked_at.strftime('%d.%m.%Y %H:%M') if mc.last_checked_at else 'nie' }}</td>
+          <td>{% if pending_counts.get(mc.id) %}<span class="badge warning">{{ pending_counts[mc.id] }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+          <td>{{ imported_counts.get(mc.id, 0) }}</td>
+          <td class="actions">
+            <form method="post" action="/studio/youtube/{{ mc.id }}/check" class="inline-form">
+              <button class="linkbutton" type="submit">Jetzt prüfen</button>
+            </form>
+            <a class="linkbutton" href="/studio/youtube/{{ mc.id }}">Öffnen</a>
+            <form method="post" action="/studio/youtube/{{ mc.id }}/delete" class="inline-form"
+                  onsubmit="return confirm('Kanal wirklich entfernen? Bereits importierte Ressourcen bleiben erhalten.')">
+              <button class="linkbutton" type="submit" style="color:#dc2626">Entfernen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Noch keine YouTube-Kanäle. Oben den ersten Kanal hinzufügen.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Neue Videos <span class="muted" style="font-weight:400;font-size:.8rem">(offene Kandidaten aller Kanäle)</span></h2>
+  {% if candidates %}
+  <div class="table-wrap">
+    <table class="yt-table">
+      <thead><tr><th>Video</th><th>Kanal</th><th>Veröffentlicht</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for c in candidates %}
+        <tr>
+          <td>
+            {% if c.thumbnail_url %}<img class="candidate-thumb" src="{{ c.thumbnail_url }}" alt="" loading="lazy">{% endif %}
+            <div class="yt-name" dir="auto">{{ c.title }}</div>
+          </td>
+          <td dir="auto">@{{ channel_map[c.channel_id].handle or channel_map[c.channel_id].name }}</td>
+          <td class="muted">{{ c.published_at.strftime('%d.%m.%Y') if c.published_at else '—' }}</td>
+          <td><span class="badge {% if c.status.value == 'FAILED' %}danger{% else %}warning{% endif %}">{{ 'neu' if c.status.value == 'NEW' else 'fehlgeschlagen' }}</span>
+            {% if c.last_error %}<details class="tech-details"><summary>Details</summary><pre>{{ c.last_error }}</pre></details>{% endif %}
+          </td>
+          <td><a class="linkbutton" href="/studio/youtube/{{ c.channel_id }}">Öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Keine neuen Videos. „Alle Kanäle prüfen" sucht nach neuen Inhalten.</p>
+  {% endif %}
+</section>
+{% endblock %}

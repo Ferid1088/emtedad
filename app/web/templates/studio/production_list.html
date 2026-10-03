@@ -1,49 +1,63 @@
 {% extends "studio/layout.html" %}
+{% set action_names = {
+  'plan_research': 'Recherche planen',
+  'build_evidence': 'Evidence erstellen',
+  'build_argument': 'Argument aufbauen',
+  'build_narrative': 'Narrativ erstellen',
+  'build_master': 'Master erstellen',
+  'build_script': 'Skript erstellen',
+  'run_review': 'Review starten',
+  'revise': 'Überarbeiten',
+  'approve': 'Freigeben',
+  'localize': 'Übersetzen'
+} %}
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Studio</p>
-    <h1>Production</h1>
-    <p class="lede">Active productions across all channels.</p>
+    <p class="eyebrow">Inhalt</p>
+    <h1>Produktionen</h1>
+    <p class="lede">Aktive Produktionen über alle Kanäle hinweg.</p>
   </div>
 </div>
 <section class="card">
-  <h2>Brief productions ({{ productions|length }})</h2>
+  <h2>Brief-Produktionen ({{ productions|length }})</h2>
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Video Question</th><th>Channel</th><th>Stage</th><th>Status</th><th>Blockers</th><th>Next actions</th><th></th></tr></thead>
+    <thead><tr><th>Video-Frage</th><th>Kanal</th><th>Stufe</th><th>Status</th><th>Blocker</th><th>Nächste Aktion</th><th></th></tr></thead>
     <tbody>
       {% for state in productions %}
       <tr>
-        <td>{{ state.brief.question[:110] }}</td>
+        <td dir="auto">{{ state.brief.question[:110] }}</td>
         <td><a class="badge" href="/studio/channels/{{ brief_channels.get(state.brief.id) }}/production">{{ brief_channels.get(state.brief.id) }}</a></td>
         <td><span class="badge {% if state.stage.value == 'APPROVED' %}success{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span></td>
         <td>{{ state.brief.status.value }}</td>
-        <td>{{ state.open_blockers or '—' }}</td>
-        <td class="muted">{{ state.allowed_actions | join(', ') or '—' }}</td>
-        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
+        <td>{% if state.open_blockers %}<span class="badge warning">{{ state.open_blockers }}</span>{% else %}—{% endif %}</td>
+        <td>{% if state.allowed_actions %}<span class="badge action">{{ action_names.get(state.allowed_actions[0], state.allowed_actions[0]) }}</span>{% if state.allowed_actions|length > 1 %}<span class="muted">+{{ state.allowed_actions|length - 1 }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Öffnen</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">No brief productions. Select a channel topic to start one.</td></tr>
+      <tr><td colspan="7" class="muted">Keine Produktionen. Wähle ein Thema und starte eine Produktion.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 
 {% if items %}
 <section class="card">
-  <h2>Historical productions</h2>
-  <p class="muted">Lesson-era projects kept for provenance. New productions use the brief pipeline above.</p>
-  <section class="lesson-grid" aria-label="Historical productions">
+  <h2>Historische Produktionen</h2>
+  <p class="muted">Projekte aus der Lesson-Ära, zur Dokumentation aufbewahrt. Neue Produktionen laufen über die Brief-Pipeline oben.</p>
+  <section class="lesson-grid" aria-label="Historische Produktionen">
     {% for item in items %}
     <article class="card lesson-card">
       <div class="topic-card-head">
         <span class="badge">{{ item.origin_label }}</span>
         <span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span>
       </div>
-      <h2><a href="/production/{{ item.project.id }}">{{ item.project.title }}</a></h2>
-      {% if item.lesson %}<p><strong>Historical lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
+      <h2><a href="/production/{{ item.project.id }}" dir="auto">{{ item.project.title }}</a></h2>
+      {% if item.lesson %}<p><strong>Historische Lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
       {% elif item.topic %}<p class="muted">{{ item.topic.title }}</p>{% endif %}
-      <p>{{ item.project.human_question }}</p>
+      <p dir="auto">{{ item.project.human_question }}</p>
     </article>
     {% endfor %}
   </section>

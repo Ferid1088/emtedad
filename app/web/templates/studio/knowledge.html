@@ -1,0 +1,155 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Quellen</p>
+    <h1>Wissen</h1>
+    <p class="lede">Alle Kanäle schöpfen aus derselben Wissensbasis. Konzepte und Units gehören nie nur einem Kanal.</p>
+  </div>
+</div>
+
+<nav class="stepper" aria-label="Wissens-Bereiche">
+  {% for item in sections %}
+  <a class="step {% if item == section %}active{% endif %}" href="/knowledge?section={{ item }}">{{ item.replace('_', ' ') }}</a>
+  {% endfor %}
+</nav>
+
+<section class="card">
+  <form method="get" action="/knowledge" class="inline-form">
+    <input type="hidden" name="section" value="{{ section }}">
+    <input type="search" name="q" value="{{ query }}" placeholder="Suchen …">
+    {% if section in ['units', 'claims'] %}
+    <select name="unit_type">
+      <option value="">Alle Unit-Typen</option>
+      {% for t in unit_types %}<option value="{{ t.value }}" {% if filters.unit_type == t.value %}selected{% endif %}>{{ t.value.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    {% if section in ['units', 'stories', 'case_studies', 'claims'] %}
+    <select name="source_type">
+      <option value="">Alle Quell-Typen</option>
+      {% for t in source_types %}<option value="{{ t.value }}" {% if filters.source_type == t.value %}selected{% endif %}>{{ t.value }}</option>{% endfor %}
+    </select>
+    <select name="epistemic">
+      <option value="">Beliebiger epistemischer Status</option>
+      <option value="UNCERTAIN" {% if filters.epistemic == 'UNCERTAIN' %}selected{% endif %}>Unsicher (prüfen)</option>
+      <option value="ESTABLISHED_SCIENCE" {% if filters.epistemic == 'ESTABLISHED_SCIENCE' %}selected{% endif %}>Etablierte Wissenschaft</option>
+      <option value="STRONG_EVIDENCE" {% if filters.epistemic == 'STRONG_EVIDENCE' %}selected{% endif %}>Starke Belege</option>
+      <option value="LIMITED_EVIDENCE" {% if filters.epistemic == 'LIMITED_EVIDENCE' %}selected{% endif %}>Begrenzte Belege</option>
+      <option value="HYPOTHESIS" {% if filters.epistemic == 'HYPOTHESIS' %}selected{% endif %}>Hypothese</option>
+      <option value="CONTESTED" {% if filters.epistemic == 'CONTESTED' %}selected{% endif %}>Umstritten</option>
+      <option value="SPECULATION" {% if filters.epistemic == 'SPECULATION' %}selected{% endif %}>Spekulation</option>
+      <option value="UNKNOWN" {% if filters.epistemic == 'UNKNOWN' %}selected{% endif %}>Unbekannt</option>
+    </select>
+    <label class="check"><input type="checkbox" name="atomic" value="1" {% if filters.atomic == '1' %}checked{% endif %}> nur atomare</label>
+    <select name="retrieval_role">
+      <option value="">Beliebige Rolle</option>
+      <option value="UNIT" {% if filters.retrieval_role == 'UNIT' %}selected{% endif %}>Unit</option>
+      <option value="SUMMARY" {% if filters.retrieval_role == 'SUMMARY' %}selected{% endif %}>Zusammenfassung</option>
+    </select>
+    {% endif %}
+    <button class="button secondary" type="submit">Filtern</button>
+  </form>
+</section>
+
+{% if section == 'concepts' %}
+<section class="card">
+  <h2>Konzepte ({{ concepts | length }})</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Konzept</th><th>Units</th><th>Quellen</th><th>Nutzende Kanäle</th></tr></thead>
+    <tbody>
+      {% for item in concepts %}
+      <tr>
+        <td><a href="/knowledge/concepts/{{ item.id }}">{{ item.name }}</a><br>
+          <span class="muted">{{ (item.description or '')[:140] }}</span></td>
+        <td>{{ item.unit_count }}</td>
+        <td>{{ item.version_count }}</td>
+        <td>{% for slug in item.channels %}<a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No concepts match.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% elif section in ['units', 'stories', 'case_studies', 'claims'] %}
+<section class="card">
+  <h2>{{ section.replace('_', ' ').title() }} ({{ units | length }})</h2>
+  <ul class="unit-list">
+    {% for row in units %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <span class="chip {% if row.unit.unit_type.value in ['STORY', 'CASE_STUDY'] %}chip-story{% endif %}">{{ row.unit.unit_type.value.replace('_', ' ') }}</span>
+        {% if row.unit.atomic %}<span class="chip">atomic</span>{% endif %}
+        {% if row.role == 'SUMMARY' %}<span class="chip">summary</span>{% endif %}
+        <span class="badge {% if row.uncertain %}warning{% endif %}">{{ row.epistemic.replace('_', ' ') }}</span>
+        {% if row.used %}<span class="badge success">used in published</span>{% endif %}
+      </div>
+      <p><strong>{{ row.unit.title }}</strong></p>
+      <p>{{ row.unit.summary[:400] }}</p>
+      <p class="muted">
+        {% for name in row.concepts %}<span class="chip">{{ name }}</span>{% endfor %}
+        {% if row.source_id %}<a href="/library/{{ row.source_id }}/units">{{ row.source_title }}</a>{% endif %}
+      </p>
+    </li>
+    {% else %}
+    <li class="muted">No units match.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% elif section == 'people' %}
+<section class="card">
+  <h2>People ({{ people | length }})</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Labels / aliases</th></tr></thead>
+    <tbody>
+      {% for row in people %}
+      <tr><td>{{ row.person.canonical_name }}</td><td>{{ row.labels }}</td></tr>
+      {% else %}
+      <tr><td colspan="2" class="muted">No people recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% elif section == 'works' %}
+<section class="card">
+  <h2>Works ({{ works | length }})</h2>
+  <table>
+    <thead><tr><th>Title</th><th>Type</th><th>Year</th></tr></thead>
+    <tbody>
+      {% for work in works %}
+      <tr><td>{{ work.canonical_title }}</td><td>{{ work.work_type.value }}</td><td>{{ work.publication_year or '—' }}</td></tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">No works recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% elif section == 'sources' %}
+<section class="card">
+  <h2>Sources ({{ sources | length }})</h2>
+  <p class="muted">The full library lives under <a href="/library">Resource Library</a>.</p>
+  <table>
+    <thead><tr><th>Title</th><th>Type</th><th>Units</th><th>Concepts</th><th></th></tr></thead>
+    <tbody>
+      {% for row in sources %}
+      <tr>
+        <td>{{ row.source.title }}</td>
+        <td>{{ row.source.source_type.value }}</td>
+        <td>{{ row.stats.get('units', 0) }}</td>
+        <td>{{ row.stats.get('concepts', 0) }}</td>
+        <td><a class="linkbutton" href="/library/{{ row.source.id }}">Open</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No sources yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

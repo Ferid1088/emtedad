@@ -1,20 +1,37 @@
 """Studio shell routes: channel workspaces, resource library, production."""
 
 import contextlib
+import json
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Any, TypedDict, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.datastructures import UploadFile
 
 from app.briefs.models import ContentBrief
 from app.briefs.service import BriefInput, BriefService
-from app.content_engine.domain import ProductionStage
-from app.content_engine.models import ScriptDraft
+from app.channel_monitoring.domain import CandidateStatus
+from app.channel_monitoring.models import (
+    ChannelVideoCandidate,
+    MonitoredChannel,
+)
+from app.channel_monitoring.service import ChannelDiscoveryService
+from app.content_engine.domain import (
+    DraftStatus,
+    ProductionStage,
+)
+from app.content_engine.models import (
+    ArgumentPlan,
+    NarrativePlan,
+    ReviewFinding,
+    ScriptDraft,
+)
 from app.content_engine.review import ScriptService
 from app.content_engine.service import (
     ContentEngineService,
@@ -29,37 +46,64 @@ from app.content_strategy.text_library import load_library_items
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
 from app.db.session import Database
-from app.editorial_channels.domain import ChannelResourceRole
+from app.editorial_channels.domain import ChannelResourceRole, StrategyStatus
 from app.editorial_channels.models import (
     ChannelStrategyVersion,
     EditorialChannel,
     EditorialChannelResource,
 )
 from app.editorial_channels.service import (
+    EDITORIAL_LANGUAGES,
+    SCORING_WEIGHT_KEYS,
     ChannelNotFoundError,
     EditorialChannelService,
+    StrategyValidationError,
+    compare_strategies,
 )
 from app.knowledge.domain import SourceType
+from app.knowledge.file_import import FileImportError, import_file_resource
 from app.knowledge.models import (
+    EntityLabel,
     ExternalConcept,
+    Person,
     Source,
     SourceSegment,
     SourceVersion,
+    Work,
 )
 from app.knowledge.structure.domain import SourceProcessingStatus
 from app.knowledge.structure.models import SourceProcessingState, SourceStructureNode
 from app.knowledge.structure.service import SourceStructureService
-from app.knowledge.units.domain import ClaimType
+from app.knowledge.units.domain import ClaimType, KnowledgeUnitType
 from app.knowledge.units.mapping_service import ConceptMappingService
 from app.knowledge.units.models import KnowledgeUnit, KnowledgeUnitConcept
 from app.knowledge.units.quality import unit_retrieval_role
 from app.knowledge.units.service import KnowledgeUnitService
-from app.lecture.domain import PublicationLanguage
+from app.lecture.domain import (
+    MasterOriginType,
+    MasterStatus,
+    PublicationLanguage,
+)
 from app.lecture.generic_service import GenericMasterService
+from app.lecture.models import (
+    LectureClaim,
+    LectureMasterVersion,
+    LectureSection,
+)
+from app.localization.domain import LocalizationStatus
+from app.localization.models import LocalizationProject
 from app.localization.service import LocalizationService
+from app.production.models import PublicationTarget
 from app.production.service import ProductionService, ProductionState
 from app.research.epistemic import classify_epistemic
 from app.research.generic import GenericResearchService
+from app.research.models import (
+    EvidenceMatrix,
+    EvidenceMatrixItem,
+    ResearchPackage,
+    ResearchPlan,
+    ResearchPlanQuestion,
+)
 from app.retrieval.unit_retrieval import (
     ExpansionMode,
     KnowledgeUnitSearchService,
@@ -95,7 +139,64 @@ def _service(request: Request) -> EditorialChannelService:
 
 
 async def _render(request: Request, name: str, **context: object) -> HTMLResponse:
+    context.setdefault("attention_count", await _attention_count(request))
     return templates.TemplateResponse(request=request, name=name, context=context)
+
+
+async def _attention_count(request: Request) -> int:
+    """Topbar badge: open candidates + sources needing attention."""
+
+    database = _database(request)
+    try:
+        async with database.transaction() as session:
+            new_videos = int(
+                await session.scalar(
+                    select(func.count(ChannelVideoCandidate.id)).where(
+                        ChannelVideoCandidate.status == CandidateStatus.NEW
+                    )
+                )
+                or 0
+            )
+            flagged = int(
+                await session.scalar(
+                    select(func.count(SourceProcessingState.source_id)).where(
+                        SourceProcessingState.status.in_(
+                            [
+                                SourceProcessingStatus.STRUCTURE_REVIEW_REQUIRED,
+                                SourceProcessingStatus.UNIT_REVIEW_REQUIRED,
+                                SourceProcessingStatus.FAILED,
+                            ]
+                        )
+                    )
+                )
+                or 0
+            )
+    except Exception:  # noqa: BLE001 - badge must never break a page render
+        return 0
+    return new_videos + flagged
+
+
+def human_error(raw: str | None) -> str:
+    """Map provider/internal error codes to owner-readable German text."""
+
+    if not raw:
+        return "Verarbeitung fehlgeschlagen."
+    lowered = raw.lower()
+    if "quota" in lowered or "rate_limit" in lowered or "429" in lowered:
+        return (
+            "Provider-Kapazität erreicht. Die Verarbeitung konnte nicht "
+            "fortgesetzt werden; deine Ressource wurde gespeichert."
+        )
+    if "timeout" in lowered or "timed out" in lowered:
+        return "Verarbeitung vorübergehend nicht möglich (Zeitüberschreitung)."
+    if "channel not found" in lowered or "not found" in lowered:
+        return "Nicht gefunden."
+    if "unauthorized" in lowered or "forbidden" in lowered or "401" in lowered:
+        return "Zugriff verweigert — bitte Anmeldedaten prüfen."
+    return "Verarbeitung fehlgeschlagen — siehe technische Details."
+
+
+templates.env.globals["human_error"] = human_error
 
 
 async def _channel_context(request: Request, slug: str) -> ChannelContext | None:
@@ -142,13 +243,29 @@ async def studio_home(request: Request) -> HTMLResponse:
         # First access on a migrated database: run the idempotent seed.
         await service.seed_channels()
         summaries = await service.channel_summaries()
-    attention_states = (
-        SourceProcessingStatus.STRUCTURE_REVIEW_REQUIRED,
-        SourceProcessingStatus.UNIT_REVIEW_REQUIRED,
-        SourceProcessingStatus.FAILED,
-    )
     async with _database(request).transaction() as session:
         source_count = int(await session.scalar(select(func.count(Source.id))) or 0)
+        failed_sources = int(
+            await session.scalar(
+                select(func.count(SourceProcessingState.source_id)).where(
+                    SourceProcessingState.status == SourceProcessingStatus.FAILED
+                )
+            )
+            or 0
+        )
+        review_sources = int(
+            await session.scalar(
+                select(func.count(SourceProcessingState.source_id)).where(
+                    SourceProcessingState.status.in_(
+                        [
+                            SourceProcessingStatus.STRUCTURE_REVIEW_REQUIRED,
+                            SourceProcessingStatus.UNIT_REVIEW_REQUIRED,
+                        ]
+                    )
+                )
+            )
+            or 0
+        )
         attention_rows = (
             await session.execute(
                 select(Source, SourceProcessingState)
@@ -156,12 +273,20 @@ async def studio_home(request: Request) -> HTMLResponse:
                     SourceProcessingState,
                     SourceProcessingState.source_id == Source.id,
                 )
-                .where(SourceProcessingState.status.in_(attention_states))
+                .where(
+                    SourceProcessingState.status.in_(
+                        [
+                            SourceProcessingStatus.STRUCTURE_REVIEW_REQUIRED,
+                            SourceProcessingStatus.UNIT_REVIEW_REQUIRED,
+                            SourceProcessingStatus.FAILED,
+                        ]
+                    )
+                )
                 .order_by(SourceProcessingState.updated_at.desc())
-                .limit(10)
+                .limit(5)
             )
         ).all()
-        attention = [
+        attention_items = [
             {
                 "source": source,
                 "status": state.status.value,
@@ -169,6 +294,97 @@ async def studio_home(request: Request) -> HTMLResponse:
             }
             for source, state in attention_rows
         ]
+        new_candidates = list(
+            await session.scalars(
+                select(ChannelVideoCandidate)
+                .where(ChannelVideoCandidate.status == CandidateStatus.NEW)
+                .order_by(ChannelVideoCandidate.discovered_at.desc())
+                .limit(6)
+            )
+        )
+        candidate_channels = {
+            channel_id: chan
+            for channel_id, chan in (
+                await session.execute(
+                    select(MonitoredChannel.id, MonitoredChannel).where(
+                        MonitoredChannel.id.in_([c.channel_id for c in new_candidates])
+                    )
+                )
+            ).all()
+        }
+        monitored = list(
+            await session.scalars(
+                select(MonitoredChannel)
+                .where(MonitoredChannel.active.is_(True))
+                .order_by(MonitoredChannel.name)
+                .limit(5)
+            )
+        )
+        pending_counts = {
+            cid: int(count)
+            for cid, count in (
+                await session.execute(
+                    select(
+                        ChannelVideoCandidate.channel_id,
+                        func.count(ChannelVideoCandidate.id),
+                    )
+                    .where(ChannelVideoCandidate.status == CandidateStatus.NEW)
+                    .group_by(ChannelVideoCandidate.channel_id)
+                )
+            ).all()
+        }
+        draft_strategies = int(
+            await session.scalar(
+                select(func.count(ChannelStrategyVersion.id)).where(
+                    ChannelStrategyVersion.status == StrategyStatus.DRAFT
+                )
+            )
+            or 0
+        )
+        topic_rows = (
+            await session.execute(
+                select(TopicCandidate.status, func.count(TopicCandidate.id)).group_by(
+                    TopicCandidate.status
+                )
+            )
+        ).all()
+        topic_counts = {str(status): int(count) for status, count in topic_rows}
+        recent_topics = list(
+            await session.scalars(
+                select(TopicCandidate)
+                .order_by(TopicCandidate.created_at.desc())
+                .limit(5)
+            )
+        )
+        topic_channels = {
+            channel_id: chan
+            for channel_id, chan in (
+                await session.execute(
+                    select(EditorialChannel.id, EditorialChannel).where(
+                        EditorialChannel.id.in_(
+                            [t.editorial_channel_id for t in recent_topics]
+                        )
+                    )
+                )
+            ).all()
+        }
+        localization_total = int(
+            await session.scalar(select(func.count(LocalizationProject.id))) or 0
+        )
+        localization_open = int(
+            await session.scalar(
+                select(func.count(LocalizationProject.id)).where(
+                    LocalizationProject.status.in_(
+                        [
+                            LocalizationStatus.DRAFT,
+                            LocalizationStatus.NOT_READY_FOR_VOICE,
+                            LocalizationStatus.FAILED,
+                        ]
+                    )
+                )
+            )
+            or 0
+        )
         recent_signatures = list(
             await session.scalars(
                 select(ScriptSignature)
@@ -176,16 +392,30 @@ async def studio_home(request: Request) -> HTMLResponse:
                 .limit(5)
             )
         )
-    productions = await _brief_states(request, limit=8)
+    productions = await _brief_states(request, limit=6)
+    blocked_productions = sum(1 for s in productions if s.open_blockers)
     return await _render(
         request,
         "studio/home.html",
-        title="Studio",
+        title="Dashboard",
         channels=summaries,
         source_count=source_count,
-        production_count=len(productions),
         productions=productions,
-        attention=attention,
+        production_count=len(productions),
+        blocked_productions=blocked_productions,
+        monitored=monitored,
+        pending_counts=pending_counts,
+        new_candidates=new_candidates,
+        candidate_channels=candidate_channels,
+        failed_sources=failed_sources,
+        review_sources=review_sources,
+        draft_strategies=draft_strategies,
+        attention_items=attention_items,
+        topic_counts=topic_counts,
+        recent_topics=recent_topics,
+        topic_channels=topic_channels,
+        localization_total=localization_total,
+        localization_open=localization_open,
         recent_signatures=recent_signatures,
     )
 
@@ -194,7 +424,501 @@ async def studio_home(request: Request) -> HTMLResponse:
 async def studio_channels(request: Request) -> HTMLResponse:
     summaries = await _service(request).channel_summaries()
     return await _render(
-        request, "studio/channels.html", title="Channels", channels=summaries
+        request, "studio/channels.html", title="Meine Kanäle", channels=summaries
+    )
+
+
+# ---------------------------------------------------------------------------
+# YouTube source channels (external monitoring — distinct from editorial channels)
+# ---------------------------------------------------------------------------
+
+
+def _yt_service(request: Request) -> ChannelDiscoveryService:
+    adapter = getattr(request.app.state, "channel_adapter", None)
+    return ChannelDiscoveryService(_database(request), adapter=adapter)
+
+
+async def _yt_context(request: Request) -> dict[str, Any]:
+    """Monitored channels + pending counts + recent candidates."""
+
+    database = _database(request)
+    async with database.transaction() as session:
+        channels = list(
+            await session.scalars(
+                select(MonitoredChannel).order_by(MonitoredChannel.name)
+            )
+        )
+        pending_counts = {
+            cid: int(count)
+            for cid, count in (
+                await session.execute(
+                    select(
+                        ChannelVideoCandidate.channel_id,
+                        func.count(ChannelVideoCandidate.id),
+                    )
+                    .where(ChannelVideoCandidate.status == CandidateStatus.NEW)
+                    .group_by(ChannelVideoCandidate.channel_id)
+                )
+            ).all()
+        }
+        imported_counts = {
+            cid: int(count)
+            for cid, count in (
+                await session.execute(
+                    select(
+                        ChannelVideoCandidate.channel_id,
+                        func.count(ChannelVideoCandidate.id),
+                    )
+                    .where(ChannelVideoCandidate.status == CandidateStatus.IMPORTED)
+                    .group_by(ChannelVideoCandidate.channel_id)
+                )
+            ).all()
+        }
+        candidates = list(
+            await session.scalars(
+                select(ChannelVideoCandidate)
+                .where(
+                    ChannelVideoCandidate.status.in_(
+                        [CandidateStatus.NEW, CandidateStatus.FAILED]
+                    )
+                )
+                .order_by(ChannelVideoCandidate.discovered_at.desc())
+                .limit(60)
+            )
+        )
+    return {
+        "yt_channels": channels,
+        "pending_counts": pending_counts,
+        "imported_counts": imported_counts,
+        "candidates": candidates,
+        "channel_map": {c.id: c for c in channels},
+    }
+
+
+@router.get("/studio/youtube", response_class=HTMLResponse)
+async def studio_youtube(request: Request) -> HTMLResponse:
+    return await _render(
+        request,
+        "studio/youtube.html",
+        title="YouTube-Kanäle",
+        notice=str(request.query_params.get("msg") or ""),
+        error=str(request.query_params.get("error") or ""),
+        **(await _yt_context(request)),
+    )
+
+
+@router.post("/studio/youtube")
+async def studio_youtube_add(request: Request) -> Response:
+    form = await request.form()
+    locator = str(form.get("locator") or "").strip()
+    if not locator:
+        return RedirectResponse(
+            "/studio/youtube?error=Bitte+eine+Kanal-URL+oder+ein+Handle+angeben.",
+            status_code=303,
+        )
+    try:
+        await _yt_service(request).register(locator)
+    except ValueError as exc:
+        return RedirectResponse(
+            "/studio/youtube?error=" + str(exc).replace(" ", "+"), status_code=303
+        )
+    except Exception:  # noqa: BLE001 - owner must see a friendly error, not a trace
+        return RedirectResponse(
+            "/studio/youtube?error="
+            + "Der+YouTube-Kanal+konnte+nicht+aufgel%C3%B6st+werden.",
+            status_code=303,
+        )
+    return RedirectResponse(
+        "/studio/youtube?msg=Kanal+hinzugef%C3%BCgt.", status_code=303
+    )
+
+
+@router.post("/studio/youtube/check-all")
+async def studio_youtube_check_all(request: Request) -> Response:
+    service = _yt_service(request)
+    for channel in await service.active_channels():
+        with contextlib.suppress(Exception):
+            await service.discover(channel.id)
+    return RedirectResponse(
+        "/studio/youtube?msg=Alle+Kan%C3%A4le+gepr%C3%BCft.", status_code=303
+    )
+
+
+@router.post("/studio/youtube/{channel_id}/check")
+async def studio_youtube_check(request: Request, channel_id: UUID) -> Response:
+    try:
+        await _yt_service(request).discover(channel_id)
+    except ValueError:
+        return HTMLResponse("Kanal nicht gefunden", status_code=404)
+    except Exception:  # noqa: BLE001
+        return RedirectResponse(
+            f"/studio/youtube/{channel_id}?error="
+            "Die+Pr%C3%BCfung+ist+fehlgeschlagen.+Bitte+sp%C3%A4ter+erneut+versuchen.",
+            status_code=303,
+        )
+    return RedirectResponse(
+        f"/studio/youtube/{channel_id}?msg=Neue+Videos+gepr%C3%BCft.",
+        status_code=303,
+    )
+
+
+@router.post("/studio/youtube/{channel_id}/delete")
+async def studio_youtube_delete(request: Request, channel_id: UUID) -> Response:
+    with contextlib.suppress(ValueError):
+        await _yt_service(request).delete_channel(channel_id)
+    return RedirectResponse(
+        "/studio/youtube?msg=Kanal+entfernt.+Importierte+Ressourcen+bleiben+erhalten.",
+        status_code=303,
+    )
+
+
+@router.get("/studio/youtube/{channel_id}", response_class=HTMLResponse)
+async def studio_youtube_detail(request: Request, channel_id: UUID) -> Response:
+    service = _yt_service(request)
+    database = _database(request)
+    async with database.transaction() as session:
+        channel = await session.get(MonitoredChannel, channel_id)
+        if channel is None:
+            return HTMLResponse("Kanal nicht gefunden", status_code=404)
+        counts = {
+            status: int(count)
+            for status, count in (
+                await session.execute(
+                    select(
+                        ChannelVideoCandidate.status,
+                        func.count(ChannelVideoCandidate.id),
+                    )
+                    .where(ChannelVideoCandidate.channel_id == channel_id)
+                    .group_by(ChannelVideoCandidate.status)
+                )
+            ).all()
+        }
+    candidates = await service.candidates(channel_id)
+    return await _render(
+        request,
+        "studio/youtube_detail.html",
+        title=channel.name,
+        yt_channel=channel,
+        candidates=candidates,
+        counts=counts,
+        notice=str(request.query_params.get("msg") or ""),
+        error=str(request.query_params.get("error") or ""),
+    )
+
+
+@router.post("/studio/youtube/{channel_id}/import")
+async def studio_youtube_import(request: Request, channel_id: UUID) -> Response:
+    form = await request.form()
+    candidate_ids: list[UUID] = []
+    for raw in form.getlist("candidate_ids"):
+        with contextlib.suppress(ValueError):
+            candidate_ids.append(UUID(str(raw)))
+    if not candidate_ids:
+        return RedirectResponse(
+            f"/studio/youtube/{channel_id}?error=Bitte+Videos+ausw%C3%A4hlen.",
+            status_code=303,
+        )
+    results = await _yt_service(request).import_selected(channel_id, candidate_ids)
+    imported = sum(1 for r in results if r.success)
+    failed = sum(1 for r in results if not r.success)
+    msg = f"{imported}+Video(s)+importiert."
+    if failed:
+        msg += f"+{failed}+fehlgeschlagen."
+    return RedirectResponse(f"/studio/youtube/{channel_id}?msg={msg}", status_code=303)
+
+
+@router.post("/studio/youtube/{channel_id}/candidates/{candidate_id}/ignore")
+async def studio_youtube_ignore(
+    request: Request, channel_id: UUID, candidate_id: UUID
+) -> Response:
+    await _yt_service(request).ignore(channel_id, candidate_id)
+    return RedirectResponse(f"/studio/youtube/{channel_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Global topics
+# ---------------------------------------------------------------------------
+
+
+@router.get("/studio/topics", response_class=HTMLResponse)
+async def studio_topics(request: Request) -> HTMLResponse:
+    database = _database(request)
+    query = str(request.query_params.get("q") or "").strip()
+    channel_slug = str(request.query_params.get("channel") or "").strip()
+    status_filter = str(request.query_params.get("status") or "").strip()
+    async with database.transaction() as session:
+        channels = list(
+            await session.scalars(
+                select(EditorialChannel).order_by(EditorialChannel.name)
+            )
+        )
+        statement = (
+            select(TopicCandidate)
+            .order_by(TopicCandidate.total_score.desc())
+            .limit(150)
+        )
+        if channel_slug:
+            statement = statement.join(
+                EditorialChannel,
+                EditorialChannel.id == TopicCandidate.editorial_channel_id,
+            ).where(EditorialChannel.slug == channel_slug)
+        if status_filter:
+            with contextlib.suppress(ValueError):
+                statement = statement.where(
+                    TopicCandidate.status == TopicStatus(status_filter)
+                )
+        if query:
+            like = f"%{query}%"
+            statement = statement.where(
+                TopicCandidate.video_question.ilike(like)
+                | TopicCandidate.title.ilike(like)
+            )
+        topics = list(await session.scalars(statement))
+    channel_map = {c.id: c for c in channels}
+    return await _render(
+        request,
+        "studio/topics.html",
+        title="Themen",
+        topics=topics,
+        channels=channels,
+        channel_map=channel_map,
+        query=query,
+        channel_slug=channel_slug,
+        status_filter=status_filter,
+        statuses=list(TopicStatus),
+    )
+
+
+@router.post("/studio/topics")
+async def studio_topics_manual(request: Request) -> Response:
+    form = await request.form()
+    slug = str(form.get("channel_slug") or "").strip()
+    question = str(form.get("video_question") or "").strip()
+    context = await _channel_context(request, slug)
+    strategy = (
+        (context["active_strategy"] or context["strategies"][0])
+        if context and context["strategies"]
+        else None
+    )
+    if context is None or not question or strategy is None:
+        return RedirectResponse(
+            "/studio/topics?error=Bitte+Kanal+und+Video-Frage+angeben.",
+            status_code=303,
+        )
+    await TopicService(_database(request)).create_manual(
+        context["channel"].id,
+        strategy.id,
+        question=question,
+        title=str(form.get("title") or ""),
+        thesis=str(form.get("tentative_thesis") or ""),
+        angle=str(form.get("angle") or ""),
+    )
+    return RedirectResponse(
+        f"/studio/topics?msg=Thema+angelegt.&channel={slug}", status_code=303
+    )
+
+
+# ---------------------------------------------------------------------------
+# Translations (localization projects over approved semantic masters)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/studio/translations", response_class=HTMLResponse)
+async def studio_translations(request: Request) -> HTMLResponse:
+    database = _database(request)
+    async with database.transaction() as session:
+        projects = list(
+            await session.scalars(
+                select(LocalizationProject)
+                .order_by(LocalizationProject.created_at.desc())
+                .limit(200)
+            )
+        )
+        master_ids = {p.lecture_master_version_id for p in projects}
+        masters = (
+            {
+                m.id: m
+                for m in (
+                    await session.scalars(
+                        select(LectureMasterVersion).where(
+                            LectureMasterVersion.id.in_(master_ids)
+                        )
+                    )
+                ).all()
+            }
+            if master_ids
+            else {}
+        )
+        # Localizable masters: CONTENT_BRIEF origin, READY, sorted newest first.
+        ready_masters = list(
+            await session.scalars(
+                select(LectureMasterVersion)
+                .where(
+                    LectureMasterVersion.origin_type == MasterOriginType.CONTENT_BRIEF,
+                    LectureMasterVersion.status == MasterStatus.READY,
+                )
+                .order_by(LectureMasterVersion.created_at.desc())
+                .limit(50)
+            )
+        )
+        brief_ids = {
+            m.content_brief_id
+            for m in list(masters.values()) + ready_masters
+            if m.content_brief_id
+        }
+        briefs = (
+            {
+                b.id: b
+                for b in (
+                    await session.scalars(
+                        select(ContentBrief).where(ContentBrief.id.in_(brief_ids))
+                    )
+                ).all()
+            }
+            if brief_ids
+            else {}
+        )
+        channel_ids = {b.editorial_channel_id for b in briefs.values()}
+        channels = (
+            {
+                c.id: c
+                for c in (
+                    await session.scalars(
+                        select(EditorialChannel).where(
+                            EditorialChannel.id.in_(channel_ids)
+                        )
+                    )
+                ).all()
+            }
+            if channel_ids
+            else {}
+        )
+        targets = list(await session.scalars(select(PublicationTarget)))
+    groups: dict[UUID, list[LocalizationProject]] = {}
+    for project in projects:
+        groups.setdefault(project.lecture_master_version_id, []).append(project)
+    return await _render(
+        request,
+        "studio/translations.html",
+        title="Übersetzungen",
+        groups=groups,
+        masters=masters,
+        ready_masters=ready_masters,
+        briefs=briefs,
+        channels=channels,
+        targets=targets,
+        languages=list(PublicationLanguage),
+        notice=str(request.query_params.get("msg") or ""),
+        error=str(request.query_params.get("error") or ""),
+    )
+
+
+@router.post("/studio/translations")
+async def studio_translations_create(request: Request) -> Response:
+    form = await request.form()
+    try:
+        master_id = UUID(str(form.get("master_id") or ""))
+        language = PublicationLanguage(str(form.get("language") or ""))
+    except ValueError:
+        return RedirectResponse(
+            "/studio/translations?error=Ung%C3%BCltige+Anfrage.", status_code=303
+        )
+    try:
+        await LocalizationService(_database(request)).create(master_id, language)
+    except ValueError as exc:
+        return RedirectResponse(
+            "/studio/translations?error=" + str(exc).replace(" ", "+"),
+            status_code=303,
+        )
+    except Exception:  # noqa: BLE001
+        return RedirectResponse(
+            "/studio/translations?error="
+            "Die+%C3%9Cbersetzung+konnte+nicht+erstellt+werden."
+            "+Bitte+sp%C3%A4ter+erneut+versuchen.",
+            status_code=303,
+        )
+    return RedirectResponse(
+        "/studio/translations?msg=%C3%9Cbersetzung+gestartet.", status_code=303
+    )
+
+
+# ---------------------------------------------------------------------------
+# Publishing readiness (no external publishing integration yet)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/studio/publishing", response_class=HTMLResponse)
+async def studio_publishing(request: Request) -> HTMLResponse:
+    database = _database(request)
+    async with database.transaction() as session:
+        ready_projects = list(
+            await session.scalars(
+                select(LocalizationProject)
+                .where(
+                    LocalizationProject.status.in_(
+                        [
+                            LocalizationStatus.READY_FOR_VOICE,
+                            LocalizationStatus.APPROVED,
+                        ]
+                    )
+                )
+                .order_by(LocalizationProject.created_at.desc())
+                .limit(200)
+            )
+        )
+        master_ids = {p.lecture_master_version_id for p in ready_projects}
+        masters = (
+            {
+                m.id: m
+                for m in (
+                    await session.scalars(
+                        select(LectureMasterVersion).where(
+                            LectureMasterVersion.id.in_(master_ids)
+                        )
+                    )
+                ).all()
+            }
+            if master_ids
+            else {}
+        )
+        brief_ids = {m.content_brief_id for m in masters.values() if m.content_brief_id}
+        briefs = (
+            {
+                b.id: b
+                for b in (
+                    await session.scalars(
+                        select(ContentBrief).where(ContentBrief.id.in_(brief_ids))
+                    )
+                ).all()
+            }
+            if brief_ids
+            else {}
+        )
+        channel_ids = {b.editorial_channel_id for b in briefs.values()}
+        channels = (
+            {
+                c.id: c
+                for c in (
+                    await session.scalars(
+                        select(EditorialChannel).where(
+                            EditorialChannel.id.in_(channel_ids)
+                        )
+                    )
+                ).all()
+            }
+            if channel_ids
+            else {}
+        )
+        targets = list(await session.scalars(select(PublicationTarget)))
+    return await _render(
+        request,
+        "studio/publishing.html",
+        title="Veröffentlichung",
+        projects=ready_projects,
+        masters=masters,
+        briefs=briefs,
+        channels=channels,
+        targets=targets,
     )
 
 
@@ -355,9 +1079,184 @@ async def channel_strategy_activate(
         owner = await session.get(ChannelStrategyVersion, version_id)
     if owner is None or owner.editorial_channel_id != channel.id:
         return HTMLResponse("Strategy version not found", status_code=404)
-    with contextlib.suppress(ApplicationError):
+    try:
         await service.activate_strategy(version_id)
+    except ApplicationError:
+        return RedirectResponse(
+            f"/studio/channels/{slug}/strategy?error=invalid", status_code=303
+        )
     return RedirectResponse(f"/studio/channels/{slug}/strategy", status_code=303)
+
+
+async def _strategy_draft(
+    request: Request, slug: str, version_id: UUID
+) -> tuple[ChannelContext, ChannelStrategyVersion] | Response:
+    """Load channel context + a strategy version scoped to that channel."""
+
+    context = await _channel_context(request, slug)
+    if context is None:
+        return HTMLResponse("Channel not found", status_code=404)
+    async with _database(request).transaction() as session:
+        version = await session.get(ChannelStrategyVersion, version_id)
+    if version is None or version.editorial_channel_id != context["channel"].id:
+        return HTMLResponse("Strategy version not found", status_code=404)
+    return context, version
+
+
+def _lines(raw: object) -> list[str]:
+    return [line.strip() for line in str(raw or "").splitlines() if line.strip()]
+
+
+def _strategy_form(
+    form: Any,
+) -> tuple[str, str, dict[str, dict[str, object]], list[str]]:
+    """Parse the structured strategy editor into service-callable payloads."""
+
+    errors: list[str] = []
+    core_question = str(form.get("core_question") or "").strip()
+    editorial_language = str(form.get("editorial_language") or "fa").strip()
+    if editorial_language not in EDITORIAL_LANGUAGES:
+        errors.append(f"Editorial language '{editorial_language}' is not supported.")
+    weights: dict[str, float] = {}
+    for key in SCORING_WEIGHT_KEYS:
+        raw = str(form.get(f"w_{key}") or "0").strip()
+        try:
+            weights[key] = float(raw)
+        except ValueError:
+            errors.append(f"Scoring weight '{key}' is not a number.")
+    policies: dict[str, dict[str, object]] = {
+        "audience_json": {
+            "description": str(form.get("audience_description") or "").strip()
+        },
+        "audience_problems_json": {"problems": _lines(form.get("audience_problems"))},
+        "domains_json": {"domains": _lines(form.get("domains"))},
+        "preferred_angles_json": {"angles": _lines(form.get("preferred_angles"))},
+        "forbidden_angles_json": {"angles": _lines(form.get("forbidden_angles"))},
+        "source_policy_json": {
+            "channel_assigned_resources_only": bool(form.get("sp_channel_only")),
+            "shared_knowledge_base": bool(form.get("sp_shared_base")),
+        },
+        "evidence_policy_json": {
+            "require_source_provenance": bool(form.get("ep_provenance")),
+            "require_counterevidence_search": bool(form.get("ep_counter")),
+        },
+        "topic_scoring_policy_json": {"weights": weights},
+        "agent_profile_json": {"special_roles": _lines(form.get("special_roles"))},
+    }
+    for key, field in (
+        ("narrative_policy_json", "narrative_policy"),
+        ("style_policy_json", "style_policy"),
+        ("hook_policy_json", "hook_policy"),
+        ("ending_policy_json", "ending_policy"),
+    ):
+        raw = str(form.get(field) or "").strip()
+        if not raw:
+            policies[key] = {}
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            errors.append(f"{field.replace('_', ' ').title()} is not valid JSON.")
+            continue
+        if not isinstance(parsed, dict):
+            errors.append(f"{field.replace('_', ' ').title()} must be a JSON object.")
+            continue
+        policies[key] = parsed
+    return core_question, editorial_language, policies, errors
+
+
+@router.get("/studio/channels/{slug}/strategy/{version_id}/edit")
+async def strategy_edit_form(request: Request, slug: str, version_id: UUID) -> Response:
+    result = await _strategy_draft(request, slug, version_id)
+    if isinstance(result, Response):
+        return result
+    context, version = result
+    if version.status.value != "DRAFT":
+        return RedirectResponse(
+            f"/studio/channels/{slug}/strategy?error=immutable", status_code=303
+        )
+    return await _render(
+        request,
+        "studio/strategy_edit.html",
+        title=f"{context['channel'].name} — Edit strategy v{version.version_number}",
+        draft=version,
+        languages=sorted(EDITORIAL_LANGUAGES),
+        weight_keys=SCORING_WEIGHT_KEYS,
+        errors=[],
+        submitted=None,
+        **context,
+    )
+
+
+@router.post("/studio/channels/{slug}/strategy/{version_id}/edit")
+async def strategy_edit_save(request: Request, slug: str, version_id: UUID) -> Response:
+    result = await _strategy_draft(request, slug, version_id)
+    if isinstance(result, Response):
+        return result
+    context, version = result
+    if version.status.value != "DRAFT":
+        return RedirectResponse(
+            f"/studio/channels/{slug}/strategy?error=immutable", status_code=303
+        )
+    form = await request.form()
+    core_question, editorial_language, policies, form_errors = _strategy_form(form)
+    errors = form_errors
+    if not errors:
+        try:
+            await _service(request).update_strategy_draft(
+                version_id,
+                core_question=core_question,
+                editorial_language=editorial_language,
+                policies=policies,
+            )
+        except StrategyValidationError as exc:
+            errors = exc.errors
+        except ApplicationError as exc:
+            errors = [exc.public_message]
+    if errors:
+        return await _render(
+            request,
+            "studio/strategy_edit.html",
+            title=(
+                f"{context['channel'].name} — Edit strategy v{version.version_number}"
+            ),
+            draft=version,
+            languages=sorted(EDITORIAL_LANGUAGES),
+            weight_keys=SCORING_WEIGHT_KEYS,
+            errors=errors,
+            submitted={
+                "core_question": core_question,
+                "editorial_language": editorial_language,
+                "policies": policies,
+            },
+            **context,
+        )
+    return RedirectResponse(
+        f"/studio/channels/{slug}/strategy/{version_id}/compare", status_code=303
+    )
+
+
+@router.get("/studio/channels/{slug}/strategy/{version_id}/compare")
+async def strategy_compare(request: Request, slug: str, version_id: UUID) -> Response:
+    result = await _strategy_draft(request, slug, version_id)
+    if isinstance(result, Response):
+        return result
+    context, version = result
+    active = context["active_strategy"]
+    diffs = compare_strategies(
+        active if active is not None and active.id != version.id else None,
+        version,
+    )
+    return await _render(
+        request,
+        "studio/strategy_compare.html",
+        title=f"{context['channel'].name} — Strategy v{version.version_number} diff",
+        draft=version,
+        active=active,
+        diffs=diffs,
+        changed_count=sum(1 for diff in diffs if diff["changed"]),
+        **context,
+    )
 
 
 @router.get("/studio/channels/{slug}/resources", response_class=HTMLResponse)
@@ -633,41 +1532,369 @@ async def channel_published(request: Request, slug: str) -> Response:
     )
 
 
-@router.get("/studio/production/{brief_id}", response_class=HTMLResponse)
-async def brief_workspace(request: Request, brief_id: UUID) -> Response:
+# Owner-facing stage tabs in pipeline order.  ProductionStage also contains
+# LOCALIZATION/VOICE — post-approval lifecycle, shown inside the Approved tab.
+_WORKSPACE_TABS: tuple[ProductionStage, ...] = (
+    ProductionStage.BRIEF,
+    ProductionStage.THESIS,
+    ProductionStage.RESEARCH,
+    ProductionStage.EVIDENCE,
+    ProductionStage.ARGUMENT,
+    ProductionStage.NARRATIVE,
+    ProductionStage.MASTER,
+    ProductionStage.SCRIPT,
+    ProductionStage.REVIEW,
+    ProductionStage.APPROVED,
+)
+
+
+_UNCERTAIN_EPISTEMIC = {
+    "UNKNOWN",
+    "LIMITED_EVIDENCE",
+    "HYPOTHESIS",
+    "SPECULATION",
+    "CONTESTED",
+    "OPEN_QUESTION",
+    "ANECDOTAL",
+}
+
+
+def _stage_index(stage: ProductionStage) -> int:
+    if stage in _WORKSPACE_TABS:
+        return _WORKSPACE_TABS.index(stage)
+    # Post-approval stages map onto the last tab.
+    return len(_WORKSPACE_TABS) - 1
+
+
+async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any] | None:
+    """Load every persisted artifact for one brief — batched, one session."""
+
+    database = _database(request)
     try:
-        state = await ProductionService(_database(request)).state_for_brief(brief_id)
+        state = await ProductionService(database).state_for_brief(brief_id)
     except LookupError:
-        return HTMLResponse("Brief not found", status_code=404)
-    channel_slug = ""
-    async with _database(request).transaction() as session:
+        return None
+    async with database.transaction() as session:
         channel = await session.get(EditorialChannel, state.brief.editorial_channel_id)
-        if channel is not None:
-            channel_slug = channel.slug
+        strategy = await session.get(
+            ChannelStrategyVersion, state.brief.strategy_version_id
+        )
+        plans = list(
+            await session.scalars(
+                select(ResearchPlan)
+                .where(ResearchPlan.content_brief_id == brief_id)
+                .order_by(ResearchPlan.version_number.desc())
+            )
+        )
+        questions = (
+            list(
+                await session.scalars(
+                    select(ResearchPlanQuestion)
+                    .where(ResearchPlanQuestion.research_plan_id == plans[0].id)
+                    .order_by(ResearchPlanQuestion.ordinal)
+                )
+            )
+            if plans
+            else []
+        )
+        package = await session.scalar(
+            select(ResearchPackage)
+            .where(ResearchPackage.content_brief_id == brief_id)
+            .order_by(ResearchPackage.package_version.desc())
+            .limit(1)
+        )
+        matrices = list(
+            await session.scalars(
+                select(EvidenceMatrix)
+                .where(EvidenceMatrix.content_brief_id == brief_id)
+                .order_by(EvidenceMatrix.version_number.desc())
+            )
+        )
+        matrix_items = (
+            list(
+                await session.scalars(
+                    select(EvidenceMatrixItem)
+                    .where(EvidenceMatrixItem.evidence_matrix_id == matrices[0].id)
+                    .order_by(EvidenceMatrixItem.ordinal)
+                )
+            )
+            if matrices
+            else []
+        )
+        argument = await session.scalar(
+            select(ArgumentPlan)
+            .where(ArgumentPlan.content_brief_id == brief_id)
+            .options(selectinload(ArgumentPlan.sections))
+            .order_by(ArgumentPlan.version_number.desc())
+            .limit(1)
+        )
+        narrative = await session.scalar(
+            select(NarrativePlan)
+            .where(NarrativePlan.content_brief_id == brief_id)
+            .options(selectinload(NarrativePlan.sections))
+            .order_by(NarrativePlan.version_number.desc())
+            .limit(1)
+        )
+        master = await session.scalar(
+            select(LectureMasterVersion)
+            .where(
+                LectureMasterVersion.content_brief_id == brief_id,
+                LectureMasterVersion.origin_type == MasterOriginType.CONTENT_BRIEF,
+            )
+            .order_by(LectureMasterVersion.version_number.desc())
+            .limit(1)
+        )
+        master_sections = (
+            list(
+                await session.scalars(
+                    select(LectureSection)
+                    .where(LectureSection.lecture_master_version_id == master.id)
+                    .order_by(LectureSection.ordinal)
+                )
+            )
+            if master is not None
+            else []
+        )
+        master_claims = (
+            list(
+                await session.scalars(
+                    select(LectureClaim)
+                    .where(LectureClaim.lecture_master_version_id == master.id)
+                    .order_by(LectureClaim.sequence)
+                )
+            )
+            if master is not None
+            else []
+        )
+        drafts = list(
+            await session.scalars(
+                select(ScriptDraft)
+                .where(ScriptDraft.content_brief_id == brief_id)
+                .order_by(ScriptDraft.version_number.desc())
+            )
+        )
+        latest_draft = drafts[0] if drafts else None
+        approved_draft = next(
+            (draft for draft in drafts if draft.status is DraftStatus.APPROVED),
+            None,
+        )
+        findings = (
+            list(
+                await session.scalars(
+                    select(ReviewFinding)
+                    .where(ReviewFinding.script_draft_id == latest_draft.id)
+                    .order_by(ReviewFinding.critic_role, ReviewFinding.created_at)
+                )
+            )
+            if latest_draft is not None
+            else []
+        )
         signature = None
-        if state.latest_draft_id is not None:
+        if approved_draft is not None:
             signature = await session.scalar(
                 select(ScriptSignature).where(
-                    ScriptSignature.script_draft_id == state.latest_draft_id
+                    ScriptSignature.script_draft_id == approved_draft.id
                 )
             )
-        draft_status = None
-        if state.latest_draft_id is not None:
-            draft_status = await session.scalar(
-                select(ScriptDraft.status).where(
-                    ScriptDraft.id == state.latest_draft_id
+        elif latest_draft is not None:
+            signature = await session.scalar(
+                select(ScriptSignature).where(
+                    ScriptSignature.script_draft_id == latest_draft.id
                 )
             )
+        localizations = (
+            list(
+                await session.scalars(
+                    select(LocalizationProject).where(
+                        LocalizationProject.lecture_master_version_id == master.id
+                    )
+                )
+            )
+            if master is not None
+            else []
+        )
+        # Resolve every referenced unit/item/section in batched lookups.
+        unit_ids: set[UUID] = set()
+        item_ids: set[UUID] = set()
+        argument_section_ids: set[UUID] = set()
+        for item in matrix_items:
+            for collection in (
+                item.supporting_unit_ids,
+                item.counterevidence_unit_ids,
+                item.alternative_unit_ids,
+            ):
+                unit_ids.update(UUID(str(raw)) for raw in collection if _is_uuid(raw))
+        if argument is not None:
+            for section in argument.sections:
+                item_ids.update(
+                    UUID(str(raw)) for raw in section.evidence_item_ids if _is_uuid(raw)
+                )
+                for collection in (
+                    section.story_unit_ids,
+                    section.counterargument_ids,
+                    section.claim_ids,
+                ):
+                    unit_ids.update(
+                        UUID(str(raw)) for raw in collection if _is_uuid(raw)
+                    )
+        if narrative is not None:
+            for narr_section in narrative.sections:
+                argument_section_ids.update(
+                    UUID(str(raw))
+                    for raw in narr_section.argument_section_ids
+                    if _is_uuid(raw)
+                )
+                unit_ids.update(
+                    UUID(str(raw))
+                    for raw in narr_section.story_unit_ids
+                    if _is_uuid(raw)
+                )
+        if package is not None:
+            selected = package.retrieval_snapshot.get("selected_unit_ids", [])
+            if isinstance(selected, list):
+                for raw in selected:
+                    if _is_uuid(raw):
+                        unit_ids.add(UUID(str(raw)))
+        units = (
+            list(
+                await session.scalars(
+                    select(KnowledgeUnit).where(KnowledgeUnit.id.in_(unit_ids))
+                )
+            )
+            if unit_ids
+            else []
+        )
+        version_ids = {unit.source_version_id for unit in units}
+        source_rows = (
+            (
+                await session.execute(
+                    select(SourceVersion.id, Source.id, Source.title)
+                    .join(Source, Source.id == SourceVersion.source_id)
+                    .where(SourceVersion.id.in_(version_ids))
+                )
+            ).all()
+            if version_ids
+            else []
+        )
+        source_by_version = {
+            version_id: (source_id, title)
+            for version_id, source_id, title in source_rows
+        }
+    unit_map = {
+        str(unit.id): {
+            "title": unit.title,
+            "type": unit.unit_type.value,
+            "source_id": source_by_version.get(unit.source_version_id, (None, ""))[0],
+            "source_title": source_by_version.get(unit.source_version_id, (None, ""))[
+                1
+            ],
+        }
+        for unit in units
+    }
+    item_map = {str(item.id): item for item in matrix_items}
+    argument_section_map = (
+        {str(section.id): section for section in argument.sections}
+        if argument is not None
+        else {}
+    )
+    # Version lookup for master's persisted upstream provenance.
+    upstream_versions: dict[str, object] = {}
+    if master is not None:
+        upstream_versions = {
+            "package": master.research_package_version,
+            "package_hash": master.research_package_content_hash[:16],
+            "matrix": next(
+                (
+                    m.version_number
+                    for m in matrices
+                    if m.id == master.evidence_matrix_id
+                ),
+                None,
+            ),
+            "argument": (
+                argument.version_number
+                if argument is not None and argument.id == master.argument_plan_id
+                else None
+            ),
+            "narrative": (
+                narrative.version_number
+                if narrative is not None and narrative.id == master.narrative_plan_id
+                else None
+            ),
+        }
+    return {
+        "state": state,
+        "brief": state.brief,
+        "channel_slug": channel.slug if channel is not None else "",
+        "channel_name": channel.name if channel is not None else "",
+        "strategy_version": strategy.version_number if strategy else None,
+        "plan": plans[0] if plans else None,
+        "questions": questions,
+        "package": package,
+        "matrix": matrices[0] if matrices else None,
+        "matrix_items": matrix_items,
+        "argument": argument,
+        "narrative": narrative,
+        "master": master,
+        "master_sections": master_sections,
+        "master_claims": master_claims,
+        "upstream_versions": upstream_versions,
+        "drafts": drafts,
+        "latest_draft": latest_draft,
+        "approved_draft": approved_draft,
+        "findings": findings,
+        "signature": signature,
+        "localizations": localizations,
+        "unit_map": unit_map,
+        "item_map": item_map,
+        "argument_section_map": argument_section_map,
+    }
+
+
+def _is_uuid(raw: object) -> bool:
+    try:
+        UUID(str(raw))
+    except (ValueError, AttributeError):
+        return False
+    return True
+
+
+def _page_by_seq(version: SourceVersion | None) -> dict[int, int]:
+    """Page map from file-imported sources (sequence → 1-based page)."""
+
+    if version is None:
+        return {}
+    raw_pages = version.provider_metadata.get("segment_pages")
+    if not isinstance(raw_pages, dict):
+        return {}
+    return {
+        int(seq): int(page)
+        for seq, page in raw_pages.items()
+        if str(seq).isdigit() and isinstance(page, int) and page > 0
+    }
+
+
+@router.get("/studio/production/{brief_id}", response_class=HTMLResponse)
+async def brief_workspace(
+    request: Request, brief_id: UUID, stage: str | None = None
+) -> Response:
+    detail = await _production_detail(request, brief_id)
+    if detail is None:
+        return HTMLResponse("Brief not found", status_code=404)
+    state = detail["state"]
+    active_stage: ProductionStage = state.stage
+    if stage:
+        with contextlib.suppress(ValueError):
+            active_stage = ProductionStage(stage)
     return await _render(
         request,
         "studio/brief_workspace.html",
         title=f"Production — {state.brief.question[:60]}",
-        state=state,
-        brief=state.brief,
-        channel_slug=channel_slug,
-        stages=list(ProductionStage),
-        signature=signature,
-        draft_status=draft_status,
+        tabs=_WORKSPACE_TABS,
+        active_stage=active_stage,
+        current_index=_stage_index(state.stage),
+        uncertain_epistemic=_UNCERTAIN_EPISTEMIC,
+        **detail,
     )
 
 
@@ -889,14 +2116,67 @@ def _status_matches(state: SourceProcessingState | None, status: str) -> bool:
     return True
 
 
+@router.get("/library/import", response_class=HTMLResponse)
+async def library_import_form(request: Request) -> HTMLResponse:
+    channels = await _service(request).list_channels()
+    return await _render(
+        request,
+        "studio/resource_import.html",
+        title="Import Resource",
+        channels=channels,
+        errors=[],
+    )
+
+
+async def _assign_import_channels(
+    request: Request, source_id: UUID, slugs: list[str]
+) -> None:
+    service = _service(request)
+    for slug in slugs:
+        with contextlib.suppress(ChannelNotFoundError):
+            channel = await service.get_channel(slug)
+            await service.assign_resource(channel.id, source_id)
+
+
 @router.post("/library/import")
 async def library_import(request: Request) -> Response:
     form = await request.form()
-    locator = str(form.get("url", "")).strip()
-    try:
-        source_id = await import_youtube_resource(_database(request), locator)
-    except Exception:
-        return RedirectResponse("/library?import=failed", status_code=303)
+    resource_type = str(form.get("resource_type") or "youtube")
+    slugs = [str(slug) for slug in form.getlist("channel_slugs") if str(slug).strip()]
+    database = _database(request)
+    if resource_type == "youtube":
+        locator = str(form.get("url", "")).strip()
+        try:
+            source_id = await import_youtube_resource(database, locator)
+        except Exception:
+            return RedirectResponse("/library?import=failed", status_code=303)
+    else:
+        source_type = SourceType.PDF if resource_type == "pdf" else SourceType.BOOK
+        upload = form.get("file")
+        pasted = str(form.get("text") or "")
+        data: bytes
+        filename: str
+        if isinstance(upload, UploadFile) and upload.filename:
+            data = await upload.read()
+            filename = upload.filename
+        elif pasted.strip():
+            data = pasted.encode()
+            filename = "pasted-text.txt"
+        else:
+            return RedirectResponse("/library/import?error=missing", status_code=303)
+        try:
+            source_id = await import_file_resource(
+                database,
+                filename=filename,
+                data=data,
+                source_type=source_type,
+                title=str(form.get("title") or "") or None,
+                creator=str(form.get("creator") or "") or None,
+                language=str(form.get("language") or "en"),
+            )
+        except FileImportError:
+            return RedirectResponse("/library/import?error=invalid", status_code=303)
+    await _assign_import_channels(request, source_id, slugs)
     return RedirectResponse(f"/library/{source_id}", status_code=303)
 
 
@@ -1051,6 +2331,7 @@ async def resource_original(request: Request, source_id: UUID) -> Response:
         version=version,
         segments=segments,
         state=state,
+        page_by_seq=_page_by_seq(version),
         active_tab="original",
     )
 
@@ -1257,7 +2538,7 @@ async def resource_processing(request: Request, source_id: UUID) -> Response:
             if units and unmapped:
                 warnings.append(f"{unmapped} unit(s) have no concept links")
         if state is not None and state.last_error:
-            warnings.append(f"Last error: {state.last_error}")
+            warnings.append(f"Letzter Fehler: {human_error(state.last_error)}")
     return await _render(
         request,
         "studio/resource_processing.html",
@@ -1296,6 +2577,7 @@ async def resource_structure(
         source=source,
         state=state,
         tree=tree,
+        page_by_seq=_page_by_seq(version),
         selected_node=detail[0] if detail else None,
         node_segments=detail[1] if detail else [],
         active_tab="structure",
@@ -1511,4 +2793,398 @@ async def settings_page(request: Request) -> HTMLResponse:
         llm_provider=settings.llm_provider,
         youtube_mcp_enabled=settings.youtube_mcp_enabled,
         youtube_mcp_url=settings.youtube_mcp_url,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Global Knowledge browser — exploratory views over the shared base.
+# ---------------------------------------------------------------------------
+
+_KNOWLEDGE_SECTIONS = (
+    "concepts",
+    "units",
+    "stories",
+    "case_studies",
+    "claims",
+    "people",
+    "works",
+    "sources",
+)
+
+
+def _unit_epistemic(unit: KnowledgeUnit) -> str:
+    return classify_epistemic(
+        unit_type=unit.unit_type,
+        claim_type=unit.claim_type,
+        evidence_level=unit.evidence_level,
+    ).value
+
+
+async def _unit_sources(
+    session: AsyncSession, units: list[KnowledgeUnit]
+) -> dict[UUID, tuple[UUID, str, SourceType]]:
+    """Map source_version_id → (source_id, title, type) for unit lists."""
+
+    version_ids = {unit.source_version_id for unit in units}
+    rows = (
+        (
+            await session.execute(
+                select(SourceVersion.id, Source.id, Source.title, Source.source_type)
+                .join(Source, Source.id == SourceVersion.source_id)
+                .where(SourceVersion.id.in_(version_ids))
+            )
+        ).all()
+        if version_ids
+        else []
+    )
+    return {row[0]: (row[1], row[2], row[3]) for row in rows}
+
+
+@router.get("/knowledge", response_class=HTMLResponse)
+async def knowledge_browser(
+    request: Request,
+    section: str = "concepts",
+    q: str | None = None,
+    unit_type: str | None = None,
+    source_type: str | None = None,
+    epistemic: str | None = None,
+    atomic: str | None = None,
+    retrieval_role: str | None = None,
+    concept: UUID | None = None,
+) -> Response:
+    if section not in _KNOWLEDGE_SECTIONS:
+        section = "concepts"
+    database = _database(request)
+    context: dict[str, Any] = {
+        "title": "Knowledge",
+        "section": section,
+        "sections": _KNOWLEDGE_SECTIONS,
+        "query": q or "",
+        "filters": {
+            "unit_type": unit_type or "",
+            "source_type": source_type or "",
+            "epistemic": epistemic or "",
+            "atomic": atomic or "",
+            "retrieval_role": retrieval_role or "",
+            "concept": str(concept) if concept else "",
+        },
+        "unit_types": list(KnowledgeUnitType),
+        "source_types": list(SourceType),
+    }
+    async with database.transaction() as session:
+        if section == "concepts":
+            pattern = f"%{q.strip()}%" if q else None
+            statement = (
+                select(
+                    ExternalConcept.id,
+                    ExternalConcept.canonical_name,
+                    ExternalConcept.description,
+                    func.count(func.distinct(KnowledgeUnit.id)),
+                    func.count(func.distinct(KnowledgeUnit.source_version_id)),
+                )
+                .join(
+                    KnowledgeUnitConcept,
+                    KnowledgeUnitConcept.concept_id == ExternalConcept.id,
+                )
+                .join(
+                    KnowledgeUnit,
+                    KnowledgeUnit.id == KnowledgeUnitConcept.knowledge_unit_id,
+                )
+                .group_by(
+                    ExternalConcept.id,
+                    ExternalConcept.canonical_name,
+                    ExternalConcept.description,
+                )
+                .order_by(func.count(func.distinct(KnowledgeUnit.id)).desc())
+            )
+            if pattern:
+                statement = statement.where(
+                    ExternalConcept.canonical_name.ilike(pattern)
+                    | ExternalConcept.normalized_name.ilike(pattern)
+                )
+            rows = (await session.execute(statement.limit(300))).all()
+            concept_ids = [row[0] for row in rows]
+            usage_rows = (
+                (
+                    await session.execute(
+                        select(
+                            KnowledgeUnitConcept.concept_id,
+                            EditorialChannelResource.editorial_channel_id,
+                        )
+                        .join(
+                            KnowledgeUnit,
+                            KnowledgeUnit.id == KnowledgeUnitConcept.knowledge_unit_id,
+                        )
+                        .join(
+                            SourceVersion,
+                            SourceVersion.id == KnowledgeUnit.source_version_id,
+                        )
+                        .join(
+                            EditorialChannelResource,
+                            EditorialChannelResource.source_id
+                            == SourceVersion.source_id,
+                        )
+                        .where(KnowledgeUnitConcept.concept_id.in_(concept_ids))
+                    )
+                ).all()
+                if concept_ids
+                else []
+            )
+            slug_by_id = {
+                channel.id: channel.slug
+                for channel in (await session.scalars(select(EditorialChannel))).all()
+            }
+            usage: dict[UUID, set[str]] = {}
+            for concept_id, channel_id in usage_rows:
+                usage.setdefault(concept_id, set()).add(
+                    slug_by_id.get(channel_id, str(channel_id))
+                )
+            context["concepts"] = [
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "unit_count": int(row[3]),
+                    "version_count": int(row[4]),
+                    "channels": sorted(usage.get(row[0], ())),
+                }
+                for row in rows
+            ]
+        elif section in {"units", "stories", "case_studies", "claims"}:
+            forced_type = {
+                "stories": KnowledgeUnitType.STORY,
+                "case_studies": KnowledgeUnitType.CASE_STUDY,
+                "claims": KnowledgeUnitType.CLAIM,
+            }.get(section)
+            unit_stmt = select(KnowledgeUnit)
+            if forced_type is not None:
+                unit_stmt = unit_stmt.where(KnowledgeUnit.unit_type == forced_type)
+            elif unit_type:
+                with contextlib.suppress(ValueError):
+                    unit_stmt = unit_stmt.where(
+                        KnowledgeUnit.unit_type == KnowledgeUnitType(unit_type)
+                    )
+            if atomic == "1":
+                unit_stmt = unit_stmt.where(KnowledgeUnit.atomic.is_(True))
+            if retrieval_role:
+                unit_stmt = unit_stmt.where(
+                    KnowledgeUnit.metadata_json["retrieval_role"].astext
+                    == retrieval_role
+                )
+            if concept is not None:
+                unit_stmt = unit_stmt.join(
+                    KnowledgeUnitConcept,
+                    KnowledgeUnitConcept.knowledge_unit_id == KnowledgeUnit.id,
+                ).where(KnowledgeUnitConcept.concept_id == concept)
+            if q:
+                pattern = f"%{q.strip()}%"
+                unit_stmt = unit_stmt.where(
+                    KnowledgeUnit.title.ilike(pattern)
+                    | KnowledgeUnit.summary.ilike(pattern)
+                )
+            units = list(
+                await session.scalars(
+                    unit_stmt.order_by(KnowledgeUnit.created_at.desc()).limit(500)
+                )
+            )
+            source_map = await _unit_sources(session, units)
+            if source_type:
+                with contextlib.suppress(ValueError):
+                    wanted = SourceType(source_type)
+                    units = [
+                        unit
+                        for unit in units
+                        if source_map.get(unit.source_version_id, (None, "", None))[2]
+                        is wanted
+                    ]
+            epistemic_map = {unit.id: _unit_epistemic(unit) for unit in units}
+            if epistemic == "UNCERTAIN":
+                units = [
+                    unit
+                    for unit in units
+                    if epistemic_map[unit.id] in _UNCERTAIN_EPISTEMIC
+                ]
+            elif epistemic:
+                units = [unit for unit in units if epistemic_map[unit.id] == epistemic]
+            units = units[:200]
+            concept_rows = (
+                (
+                    await session.execute(
+                        select(
+                            KnowledgeUnitConcept.knowledge_unit_id,
+                            ExternalConcept.canonical_name,
+                        )
+                        .join(
+                            ExternalConcept,
+                            ExternalConcept.id == KnowledgeUnitConcept.concept_id,
+                        )
+                        .where(
+                            KnowledgeUnitConcept.knowledge_unit_id.in_(
+                                [unit.id for unit in units]
+                            )
+                        )
+                    )
+                ).all()
+                if units
+                else []
+            )
+            concepts_by_unit: dict[UUID, list[str]] = {}
+            for unit_id, name in concept_rows:
+                concepts_by_unit.setdefault(unit_id, []).append(name)
+            used_ids: set[str] = set()
+            if section in {"stories", "case_studies"}:
+                for raw_ids in (
+                    await session.scalars(select(ScriptSignature.story_unit_ids))
+                ).all():
+                    used_ids.update(str(unit_id) for unit_id in raw_ids)
+            context["units"] = [
+                {
+                    "unit": unit,
+                    "epistemic": epistemic_map[unit.id],
+                    "uncertain": epistemic_map[unit.id] in _UNCERTAIN_EPISTEMIC,
+                    "role": unit_retrieval_role(unit.metadata_json),
+                    "concepts": sorted(concepts_by_unit.get(unit.id, ())),
+                    "source_id": source_map.get(
+                        unit.source_version_id, (None, "", None)
+                    )[0],
+                    "source_title": source_map.get(
+                        unit.source_version_id, (None, "", None)
+                    )[1],
+                    "source_type": source_map.get(
+                        unit.source_version_id, (None, "", None)
+                    )[2],
+                    "used": str(unit.id) in used_ids,
+                }
+                for unit in units
+            ]
+        elif section == "people":
+            person_stmt = select(Person).order_by(Person.canonical_name)
+            if q:
+                person_stmt = person_stmt.where(
+                    Person.canonical_name.ilike(f"%{q.strip()}%")
+                )
+            people = list(await session.scalars(person_stmt.limit(300)))
+            label_rows = (
+                (
+                    await session.execute(
+                        select(EntityLabel.person_id, func.count(EntityLabel.id))
+                        .where(EntityLabel.person_id.in_([p.id for p in people]))
+                        .group_by(EntityLabel.person_id)
+                    )
+                ).all()
+                if people
+                else []
+            )
+            label_counts = {row[0]: int(row[1]) for row in label_rows}
+            context["people"] = [
+                {"person": person, "labels": label_counts.get(person.id, 0)}
+                for person in people
+            ]
+        elif section == "works":
+            work_stmt = select(Work).order_by(Work.canonical_title)
+            if q:
+                work_stmt = work_stmt.where(
+                    Work.canonical_title.ilike(f"%{q.strip()}%")
+                )
+            context["works"] = list(await session.scalars(work_stmt.limit(300)))
+        elif section == "sources":
+            sources = list(
+                await session.scalars(
+                    select(Source).order_by(Source.created_at.desc()).limit(300)
+                )
+            )
+            stats = await _source_stats(request, [s.id for s in sources])
+            context["sources"] = [
+                {"source": source, "stats": stats.get(source.id, {})}
+                for source in sources
+            ]
+    return await _render(request, "studio/knowledge.html", **context)
+
+
+@router.get("/knowledge/concepts/{concept_id}", response_class=HTMLResponse)
+async def knowledge_concept_detail(request: Request, concept_id: UUID) -> Response:
+    async with _database(request).transaction() as session:
+        concept = await session.get(ExternalConcept, concept_id)
+        if concept is None:
+            return HTMLResponse("Concept not found", status_code=404)
+        labels = list(
+            await session.scalars(
+                select(EntityLabel).where(EntityLabel.concept_id == concept_id)
+            )
+        )
+        link_rows = (
+            await session.execute(
+                select(KnowledgeUnit, KnowledgeUnitConcept.confidence)
+                .join(
+                    KnowledgeUnitConcept,
+                    KnowledgeUnitConcept.knowledge_unit_id == KnowledgeUnit.id,
+                )
+                .where(KnowledgeUnitConcept.concept_id == concept_id)
+                .order_by(KnowledgeUnitConcept.confidence.desc())
+                .limit(200)
+            )
+        ).all()
+        units = [row[0] for row in link_rows]
+        confidence_by_unit = {row[0].id: float(row[1]) for row in link_rows}
+        source_map = await _unit_sources(session, units)
+        source_ids = {value[0] for value in source_map.values() if value[0] is not None}
+        channels = (
+            (
+                await session.execute(
+                    select(
+                        EditorialChannelResource.source_id,
+                        EditorialChannel.slug,
+                    )
+                    .join(
+                        EditorialChannel,
+                        EditorialChannel.id
+                        == EditorialChannelResource.editorial_channel_id,
+                    )
+                    .where(EditorialChannelResource.source_id.in_(source_ids))
+                )
+            ).all()
+            if source_ids
+            else []
+        )
+        related_rows = (
+            await session.execute(
+                select(
+                    KnowledgeUnitConcept.concept_id,
+                    func.count(),
+                )
+                .where(
+                    KnowledgeUnitConcept.knowledge_unit_id.in_(
+                        select(KnowledgeUnitConcept.knowledge_unit_id).where(
+                            KnowledgeUnitConcept.concept_id == concept_id
+                        )
+                    ),
+                    KnowledgeUnitConcept.concept_id != concept_id,
+                )
+                .group_by(KnowledgeUnitConcept.concept_id)
+                .order_by(func.count().desc())
+                .limit(10)
+            )
+        ).all()
+        related = (
+            list(
+                await session.scalars(
+                    select(ExternalConcept).where(
+                        ExternalConcept.id.in_([row[0] for row in related_rows])
+                    )
+                )
+            )
+            if related_rows
+            else []
+        )
+    return await _render(
+        request,
+        "studio/knowledge_concept.html",
+        title=f"Concept — {concept.canonical_name}",
+        concept=concept,
+        labels=labels,
+        units=units,
+        confidence_by_unit=confidence_by_unit,
+        source_map=source_map,
+        channels=sorted({slug for _sid, slug in channels}),
+        related=related,
     )

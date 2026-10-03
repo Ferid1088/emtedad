@@ -1,0 +1,97 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow"><a href="/library">Ressourcen</a></p>
+    <h1>Ressource importieren</h1>
+    <p class="lede">Eine gemeinsame Bibliothek — jeder Import wird eine einzelne Source, aus der alle Kanäle schöpfen können.</p>
+  </div>
+</div>
+{% if request.query_params.get('error') == 'missing' %}
+<p class="error">Bitte eine Datei wählen oder Text einfügen, bevor du importierst.</p>
+{% elif request.query_params.get('error') == 'invalid' %}
+<p class="error">Die Datei konnte nicht importiert werden — Format und Größe prüfen (max. 20 MB), dann erneut versuchen.</p>
+{% endif %}
+
+<section class="card">
+  <h2>YouTube-Video importieren</h2>
+  <form method="post" action="/library/import" class="assign-form">
+    <input type="hidden" name="resource_type" value="youtube">
+    <label>YouTube-URL
+      <input type="url" name="url" placeholder="https://www.youtube.com/watch?v=…" required>
+    </label>
+    <label>Kanälen zuordnen (optional)
+      <select name="channel_slugs" multiple size="{{ channels|length }}">
+        {% for channel in channels %}<option value="{{ channel.slug }}">{{ channel.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="button" type="submit">Video importieren</button>
+  </form>
+  <p class="muted" style="font-size:.8rem">Ganze Kanäle beobachten statt einzelner Videos:
+  <a href="/studio/youtube">YouTube-Kanäle →</a></p>
+</section>
+
+<section class="card">
+  <h2>PDF hinzufügen</h2>
+  <form method="post" action="/library/import" enctype="multipart/form-data">
+    <input type="hidden" name="resource_type" value="pdf">
+    <div class="form-grid">
+      <label>PDF-Datei (max. 20 MB)
+        <input type="file" name="file" accept="application/pdf,.pdf" required>
+      </label>
+      <label>Titel (optional)
+        <input type="text" name="title" placeholder="Standard: Dateiname">
+      </label>
+      <label>Autor (optional)
+        <input type="text" name="creator">
+      </label>
+      <label>Sprache
+        <input type="text" name="language" value="en" maxlength="8">
+      </label>
+      <label>Kanälen zuordnen (optional)
+        <select name="channel_slugs" multiple size="{{ channels|length }}">
+          {% for channel in channels %}<option value="{{ channel.slug }}">{{ channel.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <button class="button" type="submit">PDF importieren</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Buch / Text hinzufügen</h2>
+  <form method="post" action="/library/import" enctype="multipart/form-data">
+    <input type="hidden" name="resource_type" value="book">
+    <div class="form-grid">
+      <label>Textdatei (.txt / .md, UTF-8)
+        <input type="file" name="file" accept=".txt,.md,.markdown,text/plain,text/markdown">
+      </label>
+      <label>Oder Text einfügen
+        <textarea name="text" rows="6" placeholder="Volltext hier einfügen …"></textarea>
+      </label>
+      <label>Titel
+        <input type="text" name="title" placeholder="Erforderlich bei eingefügtem Text">
+      </label>
+      <label>Autor (optional)
+        <input type="text" name="creator">
+      </label>
+      <label>Sprache
+        <input type="text" name="language" value="en" maxlength="8">
+      </label>
+      <label>Kanälen zuordnen (optional)
+        <select name="channel_slugs" multiple size="{{ channels|length }}">
+          {% for channel in channels %}<option value="{{ channel.slug }}">{{ channel.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <button class="button" type="submit">Text importieren</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Was passiert nach dem Import?</h2>
+  <p class="muted">Die Datei wird einmal gespeichert und durchläuft dieselbe Pipeline wie jede andere Ressource:
+  Vortragsstruktur → Knowledge Units → Konzept-Mapping → Retrieval-Index.
+  Den Fortschritt siehst du im Reiter „Verarbeitung" der Ressource.</p>
+</section>
+{% endblock %}

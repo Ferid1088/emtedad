@@ -1,0 +1,67 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow"><a href="/studio/youtube">YouTube-Kanäle</a></p>
+    <h1 dir="auto">{{ yt_channel.name }}</h1>
+    <p class="lede" dir="auto">{{ yt_channel.handle or yt_channel.channel_url }} ·
+      {% if yt_channel.active %}aktiv{% else %}inaktiv{% endif %}
+      {% if yt_channel.last_checked_at %}· zuletzt geprüft {{ yt_channel.last_checked_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+    </p>
+  </div>
+  <div class="button-row">
+    <form method="post" action="/studio/youtube/{{ yt_channel.id }}/check">
+      <button class="button" type="submit">Neue Videos prüfen</button>
+    </form>
+    <form method="post" action="/studio/youtube/{{ yt_channel.id }}/delete"
+          onsubmit="return confirm('Kanal wirklich entfernen? Bereits importierte Ressourcen bleiben erhalten.')">
+      <button class="button danger" type="submit">Kanal entfernen</button>
+    </form>
+  </div>
+</div>
+
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>Gefundene Videos</h2>
+  {% if candidates %}
+  <form method="post" action="/studio/youtube/{{ yt_channel.id }}/import">
+    <div class="table-wrap">
+      <table class="yt-table">
+        <thead><tr><th></th><th>Video</th><th>Veröffentlicht</th><th>Dauer</th><th>Status</th><th>Aktionen</th></tr></thead>
+        <tbody>
+          {% for c in candidates %}
+          <tr>
+            <td>{% if c.status.value in ['NEW', 'FAILED'] %}<input type="checkbox" name="candidate_ids" value="{{ c.id }}">{% endif %}</td>
+            <td>
+              {% if c.thumbnail_url %}<img class="candidate-thumb" src="{{ c.thumbnail_url }}" alt="" loading="lazy">{% endif %}
+              <div class="yt-name" dir="auto">{{ c.title }}</div>
+              <div class="yt-url"><a href="https://www.youtube.com/watch?v={{ c.youtube_video_id }}" target="_blank" rel="noopener">Auf YouTube öffnen ↗</a></div>
+            </td>
+            <td class="muted">{{ c.published_at.strftime('%d.%m.%Y') if c.published_at else '—' }}</td>
+            <td class="muted">{% if c.duration_seconds %}{{ (c.duration_seconds // 60) }}:{{ '%02d' % (c.duration_seconds % 60) }} Min{% else %}—{% endif %}</td>
+            <td>
+              <span class="badge {{ 'success' if c.status.value == 'IMPORTED' else ('danger' if c.status.value == 'FAILED' else ('muted' if c.status.value == 'IGNORED' else 'warning')) }}">{{ c.status.value }}</span>
+              {% if c.imported_source_id %}<br><a class="linkbutton" href="/library/{{ c.imported_source_id }}">Ressource öffnen</a>{% endif %}
+              {% if c.last_error %}<details class="tech-details"><summary>Technische Details</summary><pre>{{ c.last_error }}</pre></details>{% endif %}
+            </td>
+            <td>
+              {% if c.status.value == 'NEW' %}
+              <button class="linkbutton" formaction="/studio/youtube/{{ yt_channel.id }}/candidates/{{ c.id }}/ignore" formnovalidate type="submit">Ignorieren</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="button-row" style="margin-top:.75rem">
+      <button class="button" type="submit">Ausgewählte importieren</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="empty-state">Noch keine Videos gefunden. „Neue Videos prüfen" sucht nach Inhalten dieses Kanals.</p>
+  {% endif %}
+</section>
+{% endblock %}

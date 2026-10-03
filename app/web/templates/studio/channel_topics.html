@@ -2,33 +2,39 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Channel</p>
-    <h1>{{ channel.name }} — Topics</h1>
-    <p class="lede">Video questions mined from this channel's assigned knowledge.</p>
+    <p class="eyebrow"><a href="/studio/channels">Meine Kanäle</a></p>
+    <h1 dir="auto">{{ channel.name }} — Themen</h1>
+    <p class="lede">Video-Fragen, aus dem zugeordneten Wissen des Kanals generiert oder manuell angelegt.</p>
   </div>
 </div>
 {% include "studio/_channel_nav.html" %}
 
-<section class="card">
-  <h2>Mine topics</h2>
-  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/mine" class="inline-form">
-    <input type="text" name="instruction" placeholder="Owner instruction (optional)" />
-    <button type="submit" class="button">Mine topics</button>
-  </form>
-  <p class="muted">Mining uses this channel's assigned resources only and applies the active strategy's scoring weights.</p>
-</section>
+<div class="columns">
+  <section class="card">
+    <h2>+ Neues Thema</h2>
+    <form method="post" action="/studio/channels/{{ channel.slug }}/topics/manual" class="form-grid">
+      <label>Video-Frage (erforderlich)
+        <input type="text" name="video_question" placeholder="Welche Frage beantwortet das Video?" required />
+      </label>
+      <label>Tentative These (optional)
+        <input type="text" name="tentative_thesis" placeholder="Erste These zur Frage" />
+      </label>
+      <div class="button-row"><button type="submit" class="button">Thema anlegen</button></div>
+    </form>
+  </section>
 
-<section class="card">
-  <h2>Add a question manually</h2>
-  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/manual" class="inline-form">
-    <input type="text" name="video_question" placeholder="Video question" required />
-    <input type="text" name="tentative_thesis" placeholder="Tentative thesis (optional)" />
-    <button type="submit" class="button secondary">Add question</button>
-  </form>
-</section>
+  <section class="card">
+    <h2>Themen generieren</h2>
+    <form method="post" action="/studio/channels/{{ channel.slug }}/topics/mine" class="inline-form">
+      <input type="text" name="instruction" placeholder="Hinweis an den Generator (optional)" />
+      <button type="submit" class="button secondary">Themen generieren</button>
+    </form>
+    <p class="muted">Das Mining nutzt nur die diesem Kanal zugeordneten Ressourcen und die Scoring-Gewichte der aktiven Strategie.</p>
+  </section>
+</div>
 
-<nav class="tabs" aria-label="Topic status filter">
-  <a href="/studio/channels/{{ channel.slug }}/topics" {% if not status_filter %}class="active"{% endif %}>All</a>
+<nav class="tabs" aria-label="Status-Filter">
+  <a href="/studio/channels/{{ channel.slug }}/topics" {% if not status_filter %}class="active"{% endif %}>Alle</a>
   {% for s in statuses %}
   <a href="/studio/channels/{{ channel.slug }}/topics?status={{ s.value }}" {% if status_filter and status_filter.value == s.value %}class="active"{% endif %}>{{ s.value.replace('_', ' ') }}</a>
   {% endfor %}
@@ -36,9 +42,9 @@
 
 {% if not candidates %}
 <section class="card empty-state">
-  <h2>No topics{% if status_filter %} with this status{% endif %}</h2>
-  <p>Topic mining becomes available once the channel has assigned resources with extracted knowledge. Assign resources first.</p>
-  <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Manage resources</a>
+  <h2>Keine Themen{% if status_filter %} mit diesem Status{% endif %}</h2>
+  <p>Das Themen-Mining wird verfügbar, sobald dem Kanal Ressourcen mit extrahiertem Wissen zugeordnet sind. Zuerst Ressourcen zuordnen.</p>
+  <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Ressourcen verwalten</a>
 </section>
 {% endif %}
 
@@ -47,32 +53,32 @@
   <header class="topic-head">
     <div>
       <p class="eyebrow">{{ candidate.status.value.replace('_', ' ') }}</p>
-      <h2><a href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">{{ candidate.title }}</a></h2>
-      <p class="lede">{{ candidate.video_question }}</p>
+      <h2><a href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}" dir="auto">{{ candidate.title }}</a></h2>
+      <p class="lede" dir="auto">{{ candidate.video_question }}</p>
     </div>
     <div class="score-block">
       <span class="score-total">{{ '%.2f' | format(candidate.total_score) }}</span>
-      <span class="muted">total</span>
+      <span class="muted">Gesamt</span>
     </div>
   </header>
 
   <dl class="score-grid">
-    <div><dt>Coverage</dt><dd>{{ '%.2f' | format(candidate.knowledge_coverage_score) }}</dd></div>
-    <div><dt>Channel fit</dt><dd>{{ '%.2f' | format(candidate.channel_fit_score) }}</dd></div>
-    <div><dt>Novelty</dt><dd>{{ '%.2f' | format(candidate.novelty_score) }}</dd></div>
-    <div><dt>Curiosity</dt><dd>{{ '%.2f' | format(candidate.curiosity_score) }}</dd></div>
+    <div><dt>Abdeckung</dt><dd>{{ '%.2f' | format(candidate.knowledge_coverage_score) }}</dd></div>
+    <div><dt>Kanal-Fit</dt><dd>{{ '%.2f' | format(candidate.channel_fit_score) }}</dd></div>
+    <div><dt>Neuheit</dt><dd>{{ '%.2f' | format(candidate.novelty_score) }}</dd></div>
+    <div><dt>Neugier</dt><dd>{{ '%.2f' | format(candidate.curiosity_score) }}</dd></div>
     <div><dt>Emotional</dt><dd>{{ '%.2f' | format(candidate.emotional_score) }}</dd></div>
-    <div><dt>Practical</dt><dd>{{ '%.2f' | format(candidate.practical_value_score) }}</dd></div>
+    <div><dt>Praktisch</dt><dd>{{ '%.2f' | format(candidate.practical_value_score) }}</dd></div>
   </dl>
 
-  <p class="muted">{{ unit_count.get(candidate.id, 0) }} supporting units
+  <p class="muted">{{ unit_count.get(candidate.id, 0) }} tragende Knowledge Units
     {% if concept_names.get(candidate.id) %}— {{ concept_names[candidate.id] | join(", ") }}{% endif %}
   </p>
 
   <div class="button-row">
-    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">Open topic</a>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">Öffnen</a>
     <form method="post" action="/studio/topics/{{ candidate.id }}/brief" class="inline-form">
-      <button type="submit" class="button">Create brief & open production</button>
+      <button type="submit" class="button">Produktion starten</button>
     </form>
   </div>
 </article>

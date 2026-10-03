@@ -2,27 +2,27 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Channel</p>
-    <h1>{{ channel.name }} — Production</h1>
-    <p class="lede">Active productions derived from persisted pipeline artifacts.</p>
+    <p class="eyebrow"><a href="/studio/channels">Meine Kanäle</a></p>
+    <h1>{{ channel.name }} — Produktion</h1>
+    <p class="lede">Aktive Produktionen, abgeleitet aus gespeicherten Pipeline-Ergebnissen.</p>
   </div>
 </div>
 {% include "studio/_channel_nav.html" %}
 
 {% if productions %}
 <section class="card">
-  <h2>Active ({{ productions|length }})</h2>
+  <h2>Aktiv ({{ productions|length }})</h2>
   <table>
-    <thead><tr><th>Question</th><th>Stage</th><th>Brief status</th><th>Blockers</th><th>Next actions</th><th></th></tr></thead>
+    <thead><tr><th>Video-Frage</th><th>Stufe</th><th>Brief-Status</th><th>Blocker</th><th>Nächste Aktion</th><th></th></tr></thead>
     <tbody>
       {% for state in productions %}
       <tr>
         <td>{{ state.brief.question[:120] }}</td>
         <td><span class="badge">{{ state.stage.value.replace('_', ' ') }}</span></td>
         <td>{{ state.brief.status.value }}</td>
-        <td>{% if state.open_blockers %}<span class="badge">{{ state.open_blockers }} blocker(s)</span>{% else %}—{% endif %}</td>
+        <td>{% if state.open_blockers %}<span class="badge">{{ state.open_blockers }} Blocker</span>{% else %}—{% endif %}</td>
         <td class="muted">{{ state.allowed_actions | join(', ') or '—' }}</td>
-        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
+        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Öffnen</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -32,15 +32,15 @@
 
 {% if approved %}
 <section class="card">
-  <h2>Approved ({{ approved|length }})</h2>
+  <h2>Freigegeben ({{ approved|length }})</h2>
   <table>
-    <thead><tr><th>Question</th><th>Stage</th><th></th></tr></thead>
+    <thead><tr><th>Video-Frage</th><th>Stufe</th><th></th></tr></thead>
     <tbody>
       {% for state in approved %}
       <tr>
         <td>{{ state.brief.question[:120] }}</td>
         <td><span class="badge success">APPROVED</span></td>
-        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
+        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Öffnen</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -50,9 +50,9 @@
 
 {% if not productions and not approved %}
 <section class="card empty-state">
-  <h2>No productions yet</h2>
-  <p>Productions start when a channel topic is selected and a content brief is created.</p>
-  <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics">Open topics</a>
+  <h2>Noch keine Produktionen</h2>
+  <p>Produktionen starten, wenn ein Kanal-Thema ausgewählt und ein Content Brief erstellt wird.</p>
+  <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics">Themen öffnen</a>
 </section>
 {% endif %}
 {% endblock %}

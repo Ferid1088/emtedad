@@ -42,19 +42,16 @@ from app.content_strategy.text_library import (
     publish_project,
     restore_project,
 )
-from app.core.ayin.models import CanonDocument
 from app.core.config import get_settings
 from app.db.session import Database
 from app.knowledge.adapters.youtube_mcp import YouTubeMcpClient
 from app.knowledge.models import (
     ExternalClaim,
     Mention,
-    Person,
     ReviewFlag,
     Source,
     SourceSegment,
     SourceVersion,
-    Work,
 )
 from app.knowledge.structure.scheduler import (
     collect_source_infos,
@@ -289,61 +286,8 @@ async def source_detail(request: Request, source_id: UUID) -> HTMLResponse:
     )
 
 
-@router.get("/knowledge", response_class=HTMLResponse)
-async def knowledge(request: Request, section: str = "sources") -> HTMLResponse:
-    async with _database(request).transaction() as session:
-        data: object
-        if section == "script_archive":
-            data = await load_library_items(session, status="PUBLISHED")
-        elif section == "ayin_source":
-            data = list(
-                await session.scalars(
-                    select(CanonDocument).order_by(CanonDocument.created_at.desc())
-                )
-            )
-        elif section == "people":
-            data = list(
-                await session.scalars(select(Person).order_by(Person.canonical_name))
-            )
-        elif section == "works":
-            data = list(
-                await session.scalars(select(Work).order_by(Work.canonical_title))
-            )
-        elif section == "claims":
-            data = list(
-                await session.scalars(
-                    select(ExternalClaim).order_by(ExternalClaim.created_at.desc())
-                )
-            )
-        elif section == "references":
-            data = list(
-                await session.scalars(
-                    select(Mention).order_by(Mention.created_at.desc())
-                )
-            )
-        elif section == "review":
-            data = list(
-                await session.scalars(
-                    select(ReviewFlag).order_by(
-                        ReviewFlag.status, ReviewFlag.created_at
-                    )
-                )
-            )
-        else:
-            data = list(
-                await session.scalars(select(Source).order_by(Source.created_at.desc()))
-            )
-    return await _render(
-        request,
-        "knowledge.html",
-        title="Wissensbasis",
-        section=section,
-        data=data,
-        ayin_zone_labels={
-            "AYIN_CANON": "Ayin-Kanon",
-            "AYIN_WORKING": "Ayin-Arbeitsstand",
-        },
-    )
+# NOTE: `/knowledge` is served by the Studio browser in
+# `app/web/studio_routes.py`; the legacy German list view was retired.
 
 
 @router.get("/lessons")

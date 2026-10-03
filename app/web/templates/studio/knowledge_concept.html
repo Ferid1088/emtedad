@@ -1,0 +1,56 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow"><a href="/knowledge">Wissen</a> — Konzept</p>
+    <h1>{{ concept.canonical_name }}</h1>
+    <p class="lede">{{ concept.description or 'Geteiltes Konzept der Wissensbasis.' }}</p>
+  </div>
+</div>
+
+<div class="columns">
+  <section class="card">
+    <h2>Identität</h2>
+    <dl class="metadata">
+      <div><dt>Kanonischer Name</dt><dd>{{ concept.canonical_name }}</dd></div>
+      <div><dt>Verknüpfte Units</dt><dd>{{ units | length }}</dd></div>
+      <div><dt>Kanäle</dt><dd>{% for slug in channels %}<a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a>{% else %}—{% endfor %}</dd></div>
+    </dl>
+    {% if labels %}
+    <p><strong>Labels.</strong> {% for label in labels %}<span class="chip">{{ label.label }}{% if label.language %} ({{ label.language }}){% endif %}</span>{% endfor %}</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Verwandte Konzepte</h2>
+    {% if related %}
+    {% for item in related %}
+    <a class="chip" href="/knowledge/concepts/{{ item.id }}">{{ item.canonical_name }}</a>
+    {% endfor %}
+    {% else %}
+    <p class="muted">Keine verwandten Konzepte.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Verknüpfte Knowledge Units ({{ units | length }})</h2>
+  <ul class="unit-list">
+    {% for unit in units %}
+    {% set source = source_map.get(unit.source_version_id) %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <span class="chip">{{ unit.unit_type.value.replace('_', ' ') }}</span>
+        <span class="badge">confidence {{ '%.2f' | format(confidence_by_unit.get(unit.id, 0)) }}</span>
+      </div>
+      <p><strong>{{ unit.title }}</strong></p>
+      <p dir="auto">{{ unit.summary[:300] }}</p>
+      {% if source and source[0] %}
+      <p class="muted"><a href="/library/{{ source[0] }}/units">{{ source[1] }}</a></p>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="muted">Noch keine Units mit diesem Konzept verknüpft.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

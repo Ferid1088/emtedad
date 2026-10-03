@@ -3,16 +3,16 @@
 <div class="pagehead">
   <div>
     <p class="eyebrow">Studio</p>
-    <h1>Settings</h1>
+    <h1>Einstellungen</h1>
   </div>
 </div>
 <section class="card">
-  <h2>Environment</h2>
+  <h2>Umgebung</h2>
   <dl class="metadata">
-    <div><dt>Environment</dt><dd>{{ environment }}</dd></div>
-    <div><dt>Storage root</dt><dd><code>{{ storage_root }}</code></dd></div>
-    <div><dt>LLM provider</dt><dd>{{ llm_provider or 'none' }}</dd></div>
-    <div><dt>YouTube MCP</dt><dd>{{ 'enabled' if youtube_mcp_enabled else 'disabled' }}{% if youtube_mcp_enabled %} · <code>{{ youtube_mcp_url }}</code>{% endif %}</dd></div>
+    <div><dt>Umgebung</dt><dd>{{ environment }}</dd></div>
+    <div><dt>Speicherpfad</dt><dd><code>{{ storage_root }}</code></dd></div>
+    <div><dt>LLM-Provider</dt><dd>{{ llm_provider or 'keiner' }}</dd></div>
+    <div><dt>YouTube MCP</dt><dd>{{ 'aktiviert' if youtube_mcp_enabled else 'deaktiviert' }}{% if youtube_mcp_enabled %} · <code>{{ youtube_mcp_url }}</code>{% endif %}</dd></div>
   </dl>
 </section>
 {% endblock %}

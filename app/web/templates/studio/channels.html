@@ -2,23 +2,23 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Studio</p>
-    <h1>Channels</h1>
-    <p class="lede">Editorial verticals over the shared knowledge base.</p>
+    <p class="eyebrow">Inhalt</p>
+    <h1>Meine Kanäle</h1>
+    <p class="lede">Deine fünf redaktionellen Kanäle über der gemeinsamen Wissensbasis.</p>
   </div>
 </div>
 <section class="channel-grid" aria-label="Editorial channels">
   {% for channel in channels %}
   <a class="card channel-card interactive" href="/studio/channels/{{ channel.slug }}">
-    <h2>{{ channel.name }}</h2>
+    <h2 dir="auto">{{ channel.name }}</h2>
     <p class="muted">{{ channel.description }}</p>
     <dl class="channel-stats">
-      <div><dt>Resources</dt><dd>{{ channel.resource_count }}</dd></div>
-      <div><dt>Topics</dt><dd>{{ channel.topic_count }}</dd></div>
-      <div><dt>Productions</dt><dd>{{ channel.active_production_count }}</dd></div>
-      <div><dt>Published</dt><dd>{{ channel.published_count }}</dd></div>
+      <div><dt>Ressourcen</dt><dd>{{ channel.resource_count }}</dd></div>
+      <div><dt>Themen</dt><dd>{{ channel.topic_count }}</dd></div>
+      <div><dt>Produktion</dt><dd>{{ channel.active_production_count }}</dd></div>
+      <div><dt>Publiziert</dt><dd>{{ channel.published_count }}</dd></div>
     </dl>
-    <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ channel.status.value }}</span>
+    <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ 'aktiv' if channel.status.value == 'ACTIVE' else channel.status.value }}</span>
   </a>
   {% endfor %}
 </section>

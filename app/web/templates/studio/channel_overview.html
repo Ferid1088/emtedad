@@ -2,45 +2,45 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Channel</p>
-    <h1>{{ channel.name }}</h1>
+    <p class="eyebrow"><a href="/studio/channels">Meine Kanäle</a></p>
+    <h1 dir="auto">{{ channel.name }}</h1>
     <p class="lede">{{ channel.description }}</p>
   </div>
-  <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ channel.status.value }}</span>
+  <span class="badge {% if channel.status.value == 'ACTIVE' %}success{% endif %}">{{ 'aktiv' if channel.status.value == 'ACTIVE' else channel.status.value }}</span>
 </div>
 {% include "studio/_channel_nav.html" %}
 
 <div class="columns">
   <section class="card">
-    <h2>Channel Strategy</h2>
+    <h2>Kanal-Strategie</h2>
     {% if active_strategy %}
-    <p><strong>Core question.</strong> {{ active_strategy.core_question }}</p>
-    <p class="muted">Language {{ active_strategy.editorial_language or '—' }} · version {{ active_strategy.version_number }} · {{ active_strategy.status.value }}</p>
+    <p><strong>Kernfrage.</strong> <span dir="auto">{{ active_strategy.core_question }}</span></p>
+    <p class="muted">Sprache {{ active_strategy.editorial_language or '—' }} · Version {{ active_strategy.version_number }} · {{ active_strategy.status.value }}</p>
     {% else %}
-    <p class="muted">No active strategy.</p>
+    <p class="muted">Keine aktive Strategie.</p>
     {% endif %}
-    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/strategy">View Strategy</a>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/strategy">Strategie öffnen</a>
   </section>
 
   <section class="card">
-    <h2>Recent Resources</h2>
+    <h2>Neueste Ressourcen</h2>
     {% for source in sources[:6] %}
     {% set stats = source_stats.get(source.id, {}) %}
-    <p><a href="/library/{{ source.id }}">{{ source.title }}</a><br>
-      <small class="muted">{{ stats.get('status') or source.ingestion_status.value }} · {{ stats.get('units', 0) }} units · {{ stats.get('concepts', 0) }} concepts</small></p>
+    <p><a href="/library/{{ source.id }}" dir="auto">{{ source.title }}</a><br>
+      <small class="muted">{{ stats.get('status') or source.ingestion_status.value }} · {{ stats.get('units', 0) }} Units · {{ stats.get('concepts', 0) }} Konzepte</small></p>
     {% else %}
-    <p class="muted">No resources assigned yet.</p>
+    <p class="muted">Noch keine Ressourcen zugeordnet.</p>
     {% endfor %}
     <div class="button-row">
-      <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Manage resources</a>
-      <a class="button secondary" href="/library">Import in library</a>
+      <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Ressourcen verwalten</a>
+      <a class="button secondary" href="/library/import">Ressource importieren</a>
     </div>
   </section>
 </div>
 
 <div class="columns">
   <section class="card">
-    <h2>Topic Pipeline</h2>
+    <h2>Themen-Pipeline</h2>
     {% if topic_counts %}
     <dl class="metadata">
       {% for status, count in topic_counts.items() %}
@@ -48,24 +48,24 @@
       {% endfor %}
     </dl>
     {% else %}
-    <p class="muted">No topic candidates yet.</p>
+    <p class="muted">Noch keine Themen-Kandidaten.</p>
     {% endif %}
     {% for candidate in top_candidates %}
-    <p><a href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">{{ candidate.video_question[:100] }}</a> <span class="muted">{{ '%.2f' | format(candidate.total_score) }}</span></p>
+    <p><a href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}" dir="auto">{{ candidate.video_question[:100] }}</a> <span class="muted">{{ '%.2f' | format(candidate.total_score) }}</span></p>
     {% endfor %}
-    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics">Open topics</a>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics">Themen öffnen</a>
   </section>
 
   <section class="card">
-    <h2>Production Queue</h2>
+    <h2>Produktions-Warteschlange</h2>
     {% for state in productions[:6] %}
-    <p><a href="/studio/production/{{ state.brief.id }}">{{ state.brief.question[:90] }}</a><br>
+    <p><a href="/studio/production/{{ state.brief.id }}" dir="auto">{{ state.brief.question[:90] }}</a><br>
       <small><span class="badge">{{ state.stage.value.replace('_', ' ') }}</span>
-      {% if state.open_blockers %}<span class="badge">{{ state.open_blockers }} blocker(s)</span>{% endif %}</small></p>
+      {% if state.open_blockers %}<span class="badge warning">{{ state.open_blockers }} Blocker</span>{% endif %}</small></p>
     {% else %}
-    <p class="muted">No productions in this channel.</p>
+    <p class="muted">Keine Produktionen in diesem Kanal.</p>
     {% endfor %}
-    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/production">Open production</a>
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/production">Produktion öffnen</a>
   </section>
 </div>
 {% endblock %}
