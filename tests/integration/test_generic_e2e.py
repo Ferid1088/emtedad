@@ -32,7 +32,12 @@ from app.knowledge.adapters.base import (
 from app.knowledge.domain import RunStatus, SourceType
 from app.knowledge.extraction_schema import WindowExtraction
 from app.knowledge.importer import ExternalKnowledgeImporter
-from app.knowledge.models import ExtractionRun, Source, SourceSegment
+from app.knowledge.models import (
+    ExternalConcept,
+    ExtractionRun,
+    Source,
+    SourceSegment,
+)
 from app.knowledge.processing import SourceProcessingService
 from app.knowledge.structure.domain import SourceProcessingStatus
 from app.knowledge.structure.models import (
@@ -40,6 +45,7 @@ from app.knowledge.structure.models import (
     SourceStructureNode,
 )
 from app.knowledge.structure.service import SourceStructureService
+from app.knowledge.units.models import KnowledgeUnit, KnowledgeUnitConcept
 from app.lecture.domain import MasterOriginType, MasterStatus
 from app.research.generic import GenericResearchService
 from app.research.models import EvidenceMatrixItem, ResearchPackage
@@ -216,6 +222,29 @@ async def test_full_generic_production_from_youtube_import(
             )
         assert node_count == 2  # replace_nodes, not append
         assert run_count == 1  # upserted, not duplicated
+
+        # Canonical processing already ran concept mapping + indexing —
+        # no manual ConceptMappingService invocation required.
+        async with database.transaction() as session:
+            link_count = await session.scalar(
+                select(func.count(KnowledgeUnitConcept.knowledge_unit_id))
+            )
+            concept_count = await session.scalar(select(func.count(ExternalConcept.id)))
+        assert link_count == 2  # two fixture concepts on the story unit
+        assert concept_count == 2
+
+        # Re-processing is idempotent end to end: no duplicate units,
+        # concept links, or concept rows.
+        state = await processing.process_source(source.id)
+        assert state.status is SourceProcessingStatus.READY
+        async with database.transaction() as session:
+            assert (await session.scalar(select(func.count(KnowledgeUnit.id)))) == 1
+            assert (
+                await session.scalar(
+                    select(func.count(KnowledgeUnitConcept.knowledge_unit_id))
+                )
+            ) == 2
+            assert (await session.scalar(select(func.count(ExternalConcept.id)))) == 2
 
         # Assign to EditorialChannel → mine topic → select Video Question.
         channel_service = EditorialChannelService(database)

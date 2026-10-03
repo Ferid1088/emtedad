@@ -32,6 +32,7 @@ class StagedUnit:
     evidence_level: EvidenceLevel
     claim_type: ClaimType
     content_hash: str
+    quality_flags: dict[str, object] | None = None
 
 
 class KnowledgeUnitValidator:

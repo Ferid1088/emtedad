@@ -41,6 +41,7 @@ from app.knowledge.units.domain import (
 )
 from app.knowledge.units.extractor import KnowledgeUnitExtractor
 from app.knowledge.units.models import KnowledgeUnit
+from app.knowledge.units.quality import unit_quality_flags
 from app.knowledge.units.schemas import UnitMetadataProposal
 from app.knowledge.units.validator import (
     KnowledgeUnitValidator,
@@ -137,7 +138,7 @@ class KnowledgeUnitService:
             await session.flush()
 
             try:
-                proposals = await KnowledgeUnitExtractor(
+                proposals, rejections = await KnowledgeUnitExtractor(
                     self.provider,
                     model=self.model,
                     batch_size=self.batch_size,
@@ -148,8 +149,23 @@ class KnowledgeUnitService:
                         for segment in sorted(segments, key=lambda item: item.sequence)
                     },
                 )
+                run.stats_json = {
+                    **(run.stats_json or {}),
+                    "rejected_proposals": rejections,
+                    "proposal_coverage": {
+                        "eligible_nodes": len(eligible),
+                        "accepted": len(proposals),
+                        "rejected": sum(rejections.values()),
+                    },
+                }
+                parent_ids = {node.parent_id for node in eligible if node.parent_id}
                 staged = [
-                    self._stage_unit(node, segments, proposals.get(str(node.id)))
+                    self._stage_unit(
+                        node,
+                        segments,
+                        proposals.get(str(node.id)),
+                        has_unit_children=node.id in parent_ids,
+                    )
                     for node in eligible
                 ]
                 report = KnowledgeUnitValidator().validate(staged)
@@ -184,7 +200,10 @@ class KnowledgeUnitService:
                             content_hash=unit.content_hash,
                             extraction_version=UNIT_EXTRACTION_VERSION,
                             extraction_run_id=run.id,
-                            metadata_json={"node_id": str(unit.structure_node_id)},
+                            metadata_json={
+                                "node_id": str(unit.structure_node_id),
+                                **(unit.quality_flags or {}),
+                            },
                         )
                     )
                 run.status = RunStatus.SUCCEEDED
@@ -210,6 +229,68 @@ class KnowledgeUnitService:
                     extra={"source_id": str(source_id)},
                 )
                 return state
+
+    async def refresh_retrieval_roles(self, source_version_id: UUID) -> int:
+        """Recompute quality flags (size warning / SUMMARY role) on units.
+
+        Deterministic backfill: uses the persisted structure tree and
+        segment spans; no LLM calls. Returns the number of units whose
+        metadata changed.
+        """
+
+        async with self.database.transaction() as session:
+            units = list(
+                await session.scalars(
+                    select(KnowledgeUnit).where(
+                        KnowledgeUnit.source_version_id == source_version_id
+                    )
+                )
+            )
+            nodes = {
+                node.id: node
+                for node in await session.scalars(
+                    select(SourceStructureNode).where(
+                        SourceStructureNode.source_version_id == source_version_id
+                    )
+                )
+            }
+            unit_node_ids = {unit.structure_node_id for unit in units}
+            parent_ids = {
+                node.parent_id for node in nodes.values() if node.parent_id
+            } & unit_node_ids
+            segments = {
+                segment.id: segment
+                for segment in await session.scalars(
+                    select(SourceSegment).where(
+                        SourceSegment.source_version_id == source_version_id
+                    )
+                )
+            }
+            changed = 0
+            for unit in units:
+                start = segments.get(unit.start_segment_id)
+                end = segments.get(unit.end_segment_id)
+                duration = (
+                    float(end.end_seconds - start.start_seconds)
+                    if start is not None and end is not None
+                    else 0.0
+                )
+                flags = unit_quality_flags(
+                    full_text=unit.full_text,
+                    duration_seconds=duration,
+                    atomic=unit.atomic,
+                    has_unit_children=unit.structure_node_id in parent_ids,
+                )
+                merged = {
+                    key: value
+                    for key, value in (unit.metadata_json or {}).items()
+                    if key not in {"size_warning", "retrieval_role"}
+                }
+                merged.update(flags)
+                if merged != unit.metadata_json:
+                    unit.metadata_json = merged
+                    changed += 1
+            return changed
 
     async def list_units(
         self, source_version_id: UUID, query: str | None = None
@@ -247,6 +328,8 @@ class KnowledgeUnitService:
         node: SourceStructureNode,
         segments: list[SourceSegment],
         proposal: UnitMetadataProposal | None,
+        *,
+        has_unit_children: bool = False,
     ) -> StagedUnit:
         by_id = {segment.id: segment for segment in segments}
         start = by_id.get(node.start_segment_id)
@@ -264,6 +347,7 @@ class KnowledgeUnitService:
             if proposal is not None
             else default_unit_type(node.node_type)
         )
+        atomic = unit_type in ATOMIC_UNIT_TYPES
         return StagedUnit(
             structure_node_id=node.id,
             node_version_id=node.source_version_id,
@@ -276,7 +360,7 @@ class KnowledgeUnitService:
             end_segment_id=node.end_segment_id,
             start_sequence=start.sequence if start else 0,
             end_sequence=end.sequence if end else 0,
-            atomic=unit_type in ATOMIC_UNIT_TYPES,
+            atomic=atomic,
             evidence_level=(
                 proposal.evidence_level if proposal is not None else EvidenceLevel.NONE
             ),
@@ -284,6 +368,14 @@ class KnowledgeUnitService:
                 proposal.claim_type if proposal is not None else ClaimType.UNKNOWN
             ),
             content_hash=hashlib.sha256(full_text.encode()).hexdigest(),
+            quality_flags=unit_quality_flags(
+                full_text=full_text,
+                duration_seconds=(
+                    float(span[-1].end_seconds - span[0].start_seconds) if span else 0.0
+                ),
+                atomic=atomic,
+                has_unit_children=has_unit_children,
+            ),
         )
 
     @staticmethod

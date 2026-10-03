@@ -31,6 +31,7 @@ from app.knowledge.structure.models import SourceProcessingState
 
 if TYPE_CHECKING:
     from app.core.config import Settings
+    from app.retrieval.embeddings import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
@@ -243,16 +244,19 @@ class SourceProcessingScheduler:
         max_attempts: int = 3,
         retry_backoff_seconds: int = 300,
         quota_backoff_seconds: int = 1800,
-        service_factory: Callable[[Database], SourceProcessingService] = (
-            SourceProcessingService
-        ),
+        service_factory: Callable[[Database], SourceProcessingService] | None = None,
+        embedding_provider: "EmbeddingProvider | None" = None,
     ) -> None:
         self._database = database
         self._semaphore = asyncio.Semaphore(concurrency)
         self.max_attempts = max_attempts
         self.retry_backoff_seconds = retry_backoff_seconds
         self.quota_backoff_seconds = quota_backoff_seconds
-        self._service_factory = service_factory
+        self._service_factory = service_factory or (
+            lambda db: SourceProcessingService(
+                db, embedding_provider=embedding_provider
+            )
+        )
         self._queued: set[UUID] = set()
         self._active: set[UUID] = set()
         self._phases: dict[UUID, str] = {}
@@ -381,7 +385,10 @@ _scheduler: SourceProcessingScheduler | None = None
 
 
 def init_scheduler(
-    database: Database, settings: "Settings"
+    database: Database,
+    settings: "Settings",
+    *,
+    embedding_provider: "EmbeddingProvider | None" = None,
 ) -> SourceProcessingScheduler:
     """Bind the process-wide scheduler during app startup."""
 
@@ -392,6 +399,7 @@ def init_scheduler(
         max_attempts=settings.speech_structure_max_attempts,
         retry_backoff_seconds=settings.speech_structure_retry_backoff_seconds,
         quota_backoff_seconds=settings.speech_structure_quota_backoff_seconds,
+        embedding_provider=embedding_provider,
     )
     return _scheduler
 

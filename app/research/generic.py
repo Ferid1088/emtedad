@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.briefs.models import ContentBrief
 from app.db.session import Database
+from app.editorial_channels.models import EditorialChannel
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.models import KnowledgeUnit
 from app.research.domain import (
@@ -19,6 +21,7 @@ from app.research.domain import (
     ResearchQuestionKind,
     ResearchQuestionStatus,
 )
+from app.research.epistemic import classify_epistemic, unknown_evidence_warnings
 from app.research.models import (
     EvidenceMatrix,
     EvidenceMatrixItem,
@@ -29,6 +32,8 @@ from app.research.models import (
 )
 from app.retrieval.models import RetrievalConfiguration
 from app.topics.models import TopicCandidateUnit
+
+logger = logging.getLogger(__name__)
 
 
 def _hash(payload: object) -> str:
@@ -174,7 +179,16 @@ class GenericResearchService:
             )
             session.add(matrix)
             await session.flush()
+            channel = await session.get(EditorialChannel, brief.editorial_channel_id)
+            channel_slug = channel.slug if channel is not None else ""
+            status_pairs: list[tuple[str, str]] = []
             for ordinal, unit in enumerate(units, start=1):
+                epistemic = classify_epistemic(
+                    unit_type=unit.unit_type,
+                    claim_type=unit.claim_type,
+                    evidence_level=unit.evidence_level,
+                )
+                status_pairs.append((str(ordinal), epistemic.value))
                 session.add(
                     EvidenceMatrixItem(
                         evidence_matrix_id=matrix.id,
@@ -182,7 +196,7 @@ class GenericResearchService:
                         role=_unit_role(unit),
                         claim_text=unit.summary,
                         claim_type=unit.claim_type.value,
-                        epistemic_status=unit.evidence_level.value,
+                        epistemic_status=epistemic.value,
                         supporting_unit_ids=[str(unit.id)],
                         source_quality=unit.evidence_level.value,
                         limitations=(
@@ -192,6 +206,17 @@ class GenericResearchService:
                         allowed_wording=unit.summary,
                         forbidden_wording="; ".join(brief.forbidden_claims_json),
                     )
+                )
+            for warning in unknown_evidence_warnings(
+                status_pairs, channel_slug=channel_slug
+            ):
+                logger.warning(
+                    "evidence_matrix.unknown_epistemic",
+                    extra={
+                        "matrix_id": str(matrix.id),
+                        "channel": channel_slug,
+                        "warning": warning,
+                    },
                 )
             return matrix
 

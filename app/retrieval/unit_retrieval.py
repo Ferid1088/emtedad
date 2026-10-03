@@ -15,11 +15,21 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
-from app.knowledge.models import ExternalConcept, Source, SourceVersion
+from app.knowledge.models import (
+    ExternalConcept,
+    Source,
+    SourceSegment,
+    SourceVersion,
+)
 from app.knowledge.structure.models import SourceStructureNode
 from app.knowledge.units.models import (
     KnowledgeUnit,
     KnowledgeUnitConcept,
+)
+from app.knowledge.units.quality import (
+    SUMMARY_ROLE,
+    span_overlap_ratio,
+    unit_retrieval_role,
 )
 from app.retrieval.embeddings import EmbeddingProvider
 from app.retrieval.models import EmbeddingModel, KnowledgeUnitEmbedding
@@ -203,7 +213,8 @@ class KnowledgeUnitSearchService:
                 lists.append(concept)
             fused = self._fuse(lists, limit=limit)
             ranked = await self._rerank(session, query, fused, limit=limit)
-            return await self._hydrate(session, ranked, expansion)
+            ranked = await self._dedup_nested(session, ranked)
+            return await self._hydrate(session, ranked[:limit], expansion)
 
     async def _lexical(
         self, session: AsyncSession, query: str, *, limit: int
@@ -368,11 +379,142 @@ class KnowledgeUnitSearchService:
                 + 0.25 * overlap
                 + 0.20 * max(signals, default=0.0)
             )
+            # Oversized parent units marked SUMMARY stay reachable through
+            # structural expansion but lose as independent evidence — the
+            # more specific child units are the writer-facing material.
+            if unit_retrieval_role(unit.metadata_json) == SUMMARY_ROLE:
+                score *= 0.15
             output.append(replace(item, reranker_score=score))
         return sorted(
             output,
             key=lambda item: (-item.reranker_score, str(item.unit_id)),
         )[:limit]
+
+    async def _dedup_nested(
+        self, session: AsyncSession, candidates: list[UnitCandidate]
+    ) -> list[UnitCandidate]:
+        """Prefer the most specific unit among ancestor/descendant pairs.
+
+        When a parent unit and its child unit both match with ≥50%
+        segment-span overlap, keep the descendant — the parent stays
+        available through structural expansion. A SUMMARY-role
+        descendant never displaces a regular unit ancestor. Spans are
+        SourceSegment *sequences*, so the metric is identical for
+        video, PDF, book, and article sources — timestamps are never
+        required.
+        """
+
+        if len(candidates) < 2:
+            return candidates
+        units = {
+            item.id: item
+            for item in await session.scalars(
+                select(KnowledgeUnit).where(
+                    KnowledgeUnit.id.in_([item.unit_id for item in candidates])
+                )
+            )
+        }
+        segment_ids = {
+            segment_id
+            for unit in units.values()
+            for segment_id in (unit.start_segment_id, unit.end_segment_id)
+            if segment_id is not None
+        }
+        sequences = {
+            segment_id: sequence
+            for segment_id, sequence in await session.execute(
+                select(SourceSegment.id, SourceSegment.sequence).where(
+                    SourceSegment.id.in_(segment_ids)
+                )
+            )
+        }
+        nodes = {
+            item.id: item
+            for item in await session.scalars(
+                select(SourceStructureNode).where(
+                    SourceStructureNode.id.in_(
+                        [u.structure_node_id for u in units.values()]
+                    )
+                )
+            )
+        }
+        all_nodes = {
+            item.id: item
+            for item in await session.scalars(
+                select(SourceStructureNode).where(
+                    SourceStructureNode.source_version_id.in_(
+                        {u.source_version_id for u in units.values()}
+                    )
+                )
+            )
+        }
+
+        def ancestors(node: SourceStructureNode) -> set[UUID]:
+            chain: set[UUID] = set()
+            current = node
+            while current.parent_id and current.parent_id in all_nodes:
+                current = all_nodes[current.parent_id]
+                chain.add(current.id)
+            return chain
+
+        drop: set[UUID] = set()
+        node_of = {
+            item.unit_id: nodes.get(units[item.unit_id].structure_node_id)
+            for item in candidates
+            if item.unit_id in units
+        }
+        for index, item in enumerate(candidates):
+            node = node_of.get(item.unit_id)
+            if node is None or item.unit_id in drop:
+                continue
+            ancestor_ids = ancestors(node)
+            for other in candidates[index + 1 :]:
+                other_node = node_of.get(other.unit_id)
+                if other_node is None or other.unit_id in drop:
+                    continue
+                if other_node.id in ancestor_ids:
+                    ancestor_cand, child_cand = other, item
+                elif node.id in ancestors(other_node):
+                    ancestor_cand, child_cand = item, other
+                else:
+                    continue
+                ancestor_span = self._unit_span(ancestor_cand, units, sequences)
+                child_span = self._unit_span(child_cand, units, sequences)
+                if ancestor_span is None or child_span is None:
+                    continue
+                overlap = span_overlap_ratio(ancestor_span, child_span)
+                if overlap < 0.5:
+                    continue
+                ancestor_role = unit_retrieval_role(
+                    units[ancestor_cand.unit_id].metadata_json
+                )
+                child_role = unit_retrieval_role(
+                    units[child_cand.unit_id].metadata_json
+                )
+                # Prefer the specific descendant; a SUMMARY descendant
+                # never displaces a regular ancestor unit.
+                if child_role != SUMMARY_ROLE:
+                    drop.add(ancestor_cand.unit_id)
+                elif ancestor_role == SUMMARY_ROLE:
+                    drop.add(child_cand.unit_id)
+        return [item for item in candidates if item.unit_id not in drop]
+
+    @staticmethod
+    def _unit_span(
+        candidate: UnitCandidate,
+        units: dict[UUID, KnowledgeUnit],
+        sequences: dict[UUID, int],
+    ) -> tuple[int, int] | None:
+        """Segment-sequence span of a candidate unit (generic metric)."""
+
+        unit = units.get(candidate.unit_id)
+        if unit is None:
+            return None
+        start = sequences.get(unit.start_segment_id)
+        end = sequences.get(unit.end_segment_id)
+        if start is None or end is None:
+            return None
+        return (start, end)
 
     async def _hydrate(
         self,

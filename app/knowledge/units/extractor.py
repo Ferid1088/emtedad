@@ -27,6 +27,14 @@ Knowledge Units.
 For each node return: node_id (echo the given id), unit_type, title, summary, \
 evidence_level, claim_type.
 
+unit_type MUST be exactly one of:
+CLAIM, DEFINITION, EXPLANATION, STORY, CASE_STUDY, EXAMPLE, EXPERIMENT, \
+QUOTE, COUNTERARGUMENT, OPEN_QUESTION, SYNTHESIS.
+
+ARGUMENT is a SourceStructureNode type, NOT a KnowledgeUnit type — never \
+emit it. A node arguing a position is usually a CLAIM (single proposition), \
+EXPLANATION (reasoned account), or SYNTHESIS (wrapping an answer).
+
 Rules:
 - Do not invent information. Describe only what the transcript says.
 - The summary describes the unit; it never replaces the original text.
@@ -34,8 +42,10 @@ Rules:
 - evidence_level reflects what the source itself provides (PRIMARY for \
 first-hand material, SECONDARY for reported material, ANECDOTAL for \
 personal accounts, NONE when no evidence is offered).
-- claim_type reflects the statement kind (FACT, INTERPRETATION, OPINION, \
-NORMATIVE, UNKNOWN).
+- claim_type reflects the statement kind. Decide from the content:
+  FACT for verifiable claims, INTERPRETATION for reasoned readings of \
+evidence, OPINION for personal judgments, NORMATIVE for should/ought \
+claims, UNKNOWN only when none of these apply.
 """.strip()
 
 
@@ -57,8 +67,16 @@ class KnowledgeUnitExtractor:
         self,
         nodes: list[SourceStructureNode],
         segments_by_id: dict[UUID, SourceSegment],
-    ) -> dict[str, UnitMetadataProposal]:
+    ) -> tuple[dict[str, UnitMetadataProposal], dict[str, int]]:
+        """Return accepted proposals plus telemetry on rejected ones.
+
+        ``rejections`` counts dropped proposals by offending field value
+        (e.g. ``{"unit_type:ARGUMENT": 3}``) — persisted upstream for
+        observability without storing raw provider payloads.
+        """
+
         proposals: dict[str, UnitMetadataProposal] = {}
+        rejections: dict[str, int] = {}
         for start in range(0, len(nodes), self.batch_size):
             batch = nodes[start : start + self.batch_size]
             payload = json.dumps(
@@ -91,19 +109,29 @@ class KnowledgeUnitExtractor:
                 except ValidationError:
                     # One malformed proposal must not poison the batch; the
                     # node falls back to deterministic metadata instead.
+                    rejected_type = str(raw.get("unit_type", "malformed"))
+                    key = f"unit_type:{rejected_type}"
+                    rejections[key] = rejections.get(key, 0) + 1
                     logger.warning(
                         "knowledge_units.invalid_proposal",
-                        extra={"raw": str(raw)[:500]},
+                        extra={
+                            "rejected_unit_type": rejected_type,
+                            "prompt_version": UNIT_PROMPT_VERSION,
+                            "model": self.model,
+                        },
                     )
                     continue
                 if proposal.node_id not in known:
+                    rejections["unknown_node_reference"] = (
+                        rejections.get("unknown_node_reference", 0) + 1
+                    )
                     logger.warning(
                         "knowledge_units.unknown_node_reference",
                         extra={"node_id": proposal.node_id},
                     )
                     continue
                 proposals[proposal.node_id] = proposal
-        return proposals
+        return proposals, rejections
 
     @staticmethod
     def _excerpt(

@@ -52,6 +52,11 @@ from app.knowledge.structure.schemas import (
     StructureNodeProposal,
 )
 from app.knowledge.structure.service import SourceStructureService
+from app.knowledge.units.concepts import (
+    ConceptProposal,
+    UnitConceptMapping,
+    UnitsConceptBatch,
+)
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.schemas import (
     UnitMetadataBatch,
@@ -169,6 +174,28 @@ class _Provider:
                         summary=item["summary"],
                     )
                     for item in nodes
+                ]
+            )
+        if request.task == "unit_concept_mapping":
+            units = json.loads(request.input_text)
+            return UnitsConceptBatch(
+                mappings=[
+                    UnitConceptMapping(
+                        unit_ref=item["unit_ref"],
+                        concepts=[
+                            ConceptProposal(
+                                canonical_name="Sunk cost fallacy",
+                                relation_role="PRIMARY",
+                                confidence=0.9,
+                            ),
+                            ConceptProposal(
+                                canonical_name="Decision making",
+                                relation_role="CONTEXT",
+                                confidence=0.7,
+                            ),
+                        ],
+                    )
+                    for item in units
                 ]
             )
         if request.task == "argument_plan":

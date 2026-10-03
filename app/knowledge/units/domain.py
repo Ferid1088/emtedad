@@ -74,4 +74,4 @@ def node_is_unit_eligible(node_type: StructureNodeType, *, has_children: bool) -
 
 UNIT_EXTRACTION_TASK = "knowledge_units"
 UNIT_EXTRACTION_VERSION = "knowledge_unit_v1"
-UNIT_PROMPT_VERSION = "knowledge_unit_metadata_v1"
+UNIT_PROMPT_VERSION = "knowledge_unit_metadata_v2"

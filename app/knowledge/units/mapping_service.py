@@ -1,8 +1,10 @@
 """Concept mapping service: units -> ExternalConcept links and relations."""
 
+import json
 import logging
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,9 +15,13 @@ from app.knowledge.models import ExternalConcept
 from app.knowledge.units.concepts import (
     CONCEPT_INSTRUCTIONS,
     CONCEPT_PROMPT_VERSION,
-    UnitConceptBatch,
+    ConceptProposal,
+    UnitConceptMapping,
+    UnitsConceptBatchRaw,
     normalize_concept_name,
+    normalize_role,
     resolve_concept,
+    validate_concept_proposal,
 )
 from app.knowledge.units.models import (
     ConceptRelationship,
@@ -25,6 +31,8 @@ from app.knowledge.units.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MAX_UNIT_CONCEPTS = 5
 
 
 class ConceptMappingService:
@@ -36,17 +44,19 @@ class ConceptMappingService:
         provider: LLMProvider | None = None,
         *,
         model: str = "configured-default",
+        batch_size: int = 10,
     ) -> None:
         self.database = database
         self.provider = provider or resolve_llm_provider()
         self.model = model
+        self.batch_size = batch_size
 
     async def map_source_units(self, source_version_id: UUID) -> dict[str, int]:
         """Extract concepts for every unit of one source version.
 
         Idempotent: existing unit-concept links are reused, new concepts are
-        resolved by normalized name so multiple sources converge on one
-        shared concept row.
+        resolved reuse-first (canonical name → alias label) so multiple
+        sources converge on one shared concept row.
         """
 
         async with self.database.transaction() as session:
@@ -57,46 +67,106 @@ class ConceptMappingService:
                     )
                 )
             )
-            linked = 0
-            for unit in units:
-                linked += await self._map_unit(session, unit)
-            return {"units": len(units), "links": linked}
+            stats = {"units": len(units), "links": 0, "rejected": 0, "reused": 0}
+            for start in range(0, len(units), self.batch_size):
+                batch_stats = await self._map_batch(
+                    session, units[start : start + self.batch_size]
+                )
+                for key, value in batch_stats.items():
+                    stats[key] = stats.get(key, 0) + value
+            return stats
 
-    async def _map_unit(self, session: AsyncSession, unit: KnowledgeUnit) -> int:
+    async def _map_batch(
+        self, session: AsyncSession, units: list[KnowledgeUnit]
+    ) -> dict[str, int]:
+        labels = {f"u{index}": unit for index, unit in enumerate(units, 1)}
+        payload = json.dumps(
+            [
+                {
+                    "unit_ref": ref,
+                    "unit_type": unit.unit_type.value,
+                    "title": unit.title,
+                    "summary": unit.summary,
+                    "excerpt": unit.full_text[:3000],
+                }
+                for ref, unit in labels.items()
+            ],
+            ensure_ascii=False,
+        )
         request = StructuredExtractionRequest(
             task="unit_concept_mapping",
             prompt_version=CONCEPT_PROMPT_VERSION,
             model=self.model,
             instructions=CONCEPT_INSTRUCTIONS,
-            input_text=f"{unit.title}\n\n{unit.summary}\n\n{unit.full_text[:4000]}",
-            output_model=UnitConceptBatch,
+            input_text=payload,
+            output_model=UnitsConceptBatchRaw,
         )
         result = await self.provider.extract(request)
-        batch = UnitConceptBatch.model_validate(result.model_dump())
-        linked = 0
-        concepts: list[ExternalConcept] = []
-        for proposal in batch.concepts:
-            concept = await resolve_concept(session, proposal.canonical_name)
-            concepts.append(concept)
-            existing = await session.scalar(
-                select(KnowledgeUnitConcept).where(
-                    KnowledgeUnitConcept.knowledge_unit_id == unit.id,
-                    KnowledgeUnitConcept.concept_id == concept.id,
-                    KnowledgeUnitConcept.relation_role == proposal.relation_role,
+        parsed = UnitsConceptBatchRaw.model_validate(result.model_dump())
+        stats: dict[str, int] = {"links": 0, "rejected": 0, "reused": 0}
+        for raw in parsed.mappings:
+            try:
+                mapping = UnitConceptMapping.model_validate(raw)
+            except ValidationError:
+                stats["rejected"] += 1
+                logger.warning(
+                    "concept_mapping.invalid_mapping",
+                    extra={"prompt_version": CONCEPT_PROMPT_VERSION},
                 )
-            )
-            if existing is None:
-                session.add(
-                    KnowledgeUnitConcept(
-                        knowledge_unit_id=unit.id,
-                        concept_id=concept.id,
-                        confidence=proposal.confidence,
-                        relation_role=proposal.relation_role,
+                continue
+            unit = labels.get(mapping.unit_ref)
+            if unit is None:
+                stats["rejected"] += 1
+                logger.warning(
+                    "concept_mapping.unknown_unit_ref",
+                    extra={"unit_ref": mapping.unit_ref},
+                )
+                continue
+            accepted: list[tuple[ConceptProposal, ExternalConcept]] = []
+            for proposal in mapping.concepts[:_MAX_UNIT_CONCEPTS]:
+                reason = validate_concept_proposal(proposal)
+                if reason is not None:
+                    stats["rejected"] += 1
+                    logger.info(
+                        "concept_mapping.proposal_rejected",
+                        extra={"reason": reason, "name": proposal.canonical_name[:80]},
+                    )
+                    continue
+                before = await session.scalar(
+                    select(ExternalConcept.id).where(
+                        ExternalConcept.normalized_name
+                        == normalize_concept_name(proposal.canonical_name)
                     )
                 )
-                linked += 1
-        await self._link_cooccurrence(session, unit, concepts)
-        return linked
+                concept = await resolve_concept(
+                    session, proposal.canonical_name, proposal.labels
+                )
+                if before is not None:
+                    stats["reused"] += 1
+                accepted.append((proposal, concept))
+            for proposal, concept in accepted:
+                role = normalize_role(proposal.relation_role)
+                existing = await session.scalar(
+                    select(KnowledgeUnitConcept).where(
+                        KnowledgeUnitConcept.knowledge_unit_id == unit.id,
+                        KnowledgeUnitConcept.concept_id == concept.id,
+                        KnowledgeUnitConcept.relation_role == role,
+                    )
+                )
+                if existing is None:
+                    session.add(
+                        KnowledgeUnitConcept(
+                            knowledge_unit_id=unit.id,
+                            concept_id=concept.id,
+                            confidence=proposal.confidence,
+                            relation_role=role,
+                        )
+                    )
+                    stats["links"] += 1
+            await self._link_cooccurrence(
+                session, unit, [concept for _p, concept in accepted]
+            )
+        return stats
 
     async def _link_cooccurrence(
         self,
@@ -182,6 +252,5 @@ class ConceptMappingService:
 __all__ = [
     "ConceptMappingService",
     "CONCEPT_PROMPT_VERSION",
-    "UnitConceptBatch",
     "normalize_concept_name",
 ]

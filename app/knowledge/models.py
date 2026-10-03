@@ -242,6 +242,7 @@ class ExtractionRun(Base):
     window_size: Mapped[int] = mapped_column(Integer)
     overlap: Mapped[int] = mapped_column(Integer)
     status: Mapped[RunStatus] = mapped_column(_enum(RunStatus, "run_status"))
+    stats_json: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

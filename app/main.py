@@ -71,7 +71,11 @@ def create_app(
 
         scanner_task: asyncio.Task[None] | None = None
         if database is not None:
-            scheduler = init_scheduler(database, resolved_settings)
+            scheduler = init_scheduler(
+                database,
+                resolved_settings,
+                embedding_provider=app.state.embedding_provider,
+            )
             app.state.speech_scheduler = scheduler
             scanner_task = asyncio.create_task(
                 scheduler.run_forever(

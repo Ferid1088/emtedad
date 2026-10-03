@@ -29,7 +29,11 @@ from app.knowledge.structure.schemas import (
     StructureNodeProposal,
 )
 from app.knowledge.structure.service import SourceStructureService
-from app.knowledge.units.concepts import ConceptProposal, UnitConceptBatch
+from app.knowledge.units.concepts import (
+    ConceptProposal,
+    UnitConceptMapping,
+    UnitsConceptBatch,
+)
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.mapping_service import ConceptMappingService
 from app.knowledge.units.models import ConceptRelationship
@@ -133,18 +137,25 @@ class _Provider:
                 ]
             )
         if request.task == "unit_concept_mapping":
-            return UnitConceptBatch(
-                concepts=[
-                    ConceptProposal(
-                        canonical_name="Sunk cost fallacy",
-                        relation_role="PRIMARY_TOPIC",
-                        confidence=0.9,
-                    ),
-                    ConceptProposal(
-                        canonical_name="Decision making",
-                        relation_role="MENTIONED",
-                        confidence=0.7,
-                    ),
+            units = json.loads(request.input_text)
+            return UnitsConceptBatch(
+                mappings=[
+                    UnitConceptMapping(
+                        unit_ref=item["unit_ref"],
+                        concepts=[
+                            ConceptProposal(
+                                canonical_name="Sunk cost fallacy",
+                                relation_role="PRIMARY_TOPIC",
+                                confidence=0.9,
+                            ),
+                            ConceptProposal(
+                                canonical_name="Decision making",
+                                relation_role="MENTIONED",
+                                confidence=0.7,
+                            ),
+                        ],
+                    )
+                    for item in units
                 ]
             )
         raise AssertionError(f"unexpected task: {request.task}")
@@ -265,5 +276,237 @@ async def test_concepts_retrieval_and_structural_expansion(
 
         family = await search.search("sunk cost", expansion=ExpansionMode.SUBTREE)
         assert family
+    finally:
+        await database.dispose()
+
+
+class _NestedProvider(_Provider):
+    """Structure with an eligible ARGUMENT parent and a STORY child."""
+
+    async def extract(self, request):
+        import json
+
+        if request.task == "source_structure_local":
+            return SourceStructureOutput(
+                nodes=[
+                    StructureNodeProposal(
+                        temp_id="t1",
+                        node_type=StructureNodeType.TOPIC,
+                        title="Decision making",
+                        summary="How decisions are made",
+                        start_segment_sequence=1,
+                        end_segment_sequence=10,
+                        ordinal=1,
+                    ),
+                    StructureNodeProposal(
+                        temp_id="a1",
+                        parent_temp_id="t1",
+                        node_type=StructureNodeType.ARGUMENT,
+                        title="Sunk cost argument",
+                        summary="Broad argument about sunk cost",
+                        start_segment_sequence=1,
+                        end_segment_sequence=10,
+                        ordinal=1,
+                    ),
+                    StructureNodeProposal(
+                        temp_id="s1",
+                        parent_temp_id="a1",
+                        node_type=StructureNodeType.STORY,
+                        title="Sunk cost story",
+                        summary="A story about sunk cost",
+                        start_segment_sequence=3,
+                        end_segment_sequence=8,
+                        ordinal=1,
+                    ),
+                ]
+            )
+        if request.task == "knowledge_unit_metadata":
+            nodes = json.loads(request.input_text)
+            return UnitMetadataBatch(
+                units=[
+                    UnitMetadataProposal(
+                        node_id=item["node_id"],
+                        unit_type=(
+                            KnowledgeUnitType.STORY
+                            if item["node_type"] == "STORY"
+                            else KnowledgeUnitType.CLAIM
+                        ),
+                        title=item["title"],
+                        summary=item["summary"],
+                    )
+                    for item in nodes
+                ]
+            )
+        return await super().extract(request)
+
+
+@pytest.mark.asyncio
+async def test_nested_dedup_prefers_specific_child(
+    migrated_database_url: str,
+) -> None:
+    database = Database(migrated_database_url)
+    try:
+        source = await _build_units(database)
+        provider = _NestedProvider()
+        structure = SourceStructureService(database, provider=provider)
+        await structure.process_source(source.id)
+        units = KnowledgeUnitService(database, provider=provider)
+        await units.extract_for_source(source.id)
+
+        search = KnowledgeUnitSearchService(database)
+        results = await search.search("sunk cost")
+        assert results
+        # The fully-nested ancestor unit is dropped as independent
+        # evidence; the specific story is the result.
+        assert [item.unit_type for item in results] == ["STORY"]
+
+        expanded = await search.search("sunk cost", expansion=ExpansionMode.PARENT)
+        assert expanded
+        context_titles = {str(item["title"]) for item in expanded[0].expanded_context}
+        assert "Sunk cost argument" in context_titles
+        # Expansion context carries title/summary only — never the
+        # ancestor's full_text (the SUMMARY/oversized-parent guard).
+        for item in expanded[0].expanded_context:
+            assert "full_text" not in item
+    finally:
+        await database.dispose()
+
+
+async def _build_untimed_units(database: Database) -> Source:
+    """Book-style fixture: sequences are authoritative, timestamps absent.
+
+    ``SourceSegment.start_seconds`` is non-nullable, so segments carry
+    ``0`` — and the child node's segments get deliberately disjoint
+    pseudo-timestamps so a seconds-based overlap would fail while the
+    sequence-based one still sees the nesting.
+    """
+
+    async with database.transaction() as session:
+        source = Source(
+            source_type=SourceType.BOOK,
+            platform="upload",
+            external_id=f"book{uuid4().hex[:8]}",
+            canonical_url="https://example.test/book",
+            title="Untimed fixture",
+            language="en",
+            ingestion_status=IngestionStatus.INGESTED,
+        )
+        session.add(source)
+        await session.flush()
+        version = SourceVersion(
+            source_id=source.id,
+            content_hash=hashlib.sha256(b"content").hexdigest(),
+            transcript_hash=hashlib.sha256(b"transcript").hexdigest(),
+            acquisition_tool="fixture",
+            acquisition_version="0",
+            normalization_version="0",
+            acquired_at=datetime.now(UTC),
+        )
+        session.add(version)
+        await session.flush()
+        for index in range(1, 11):
+            # Child segments (3–8) report seconds far outside the
+            # parent span — only sequence ordering reflects nesting.
+            start = Decimal(index * 100 if 3 <= index <= 8 else index * 10)
+            session.add(
+                SourceSegment(
+                    source_version_id=version.id,
+                    sequence=index,
+                    start_seconds=start,
+                    end_seconds=start + 9,
+                    raw_text=f"segment {index} about sunk cost decisions",
+                    normalized_text=f"segment {index} about sunk cost decisions",
+                    language="en",
+                    content_hash=hashlib.sha256(f"seg{index}".encode()).hexdigest(),
+                )
+            )
+        await session.flush()
+        return source
+
+
+@pytest.mark.asyncio
+async def test_nested_dedup_works_without_timestamps(
+    migrated_database_url: str,
+) -> None:
+    """Segment-sequence overlap applies identically to non-timed sources."""
+
+    database = Database(migrated_database_url)
+    try:
+        source = await _build_untimed_units(database)
+        provider = _NestedProvider()
+        structure = SourceStructureService(database, provider=provider)
+        await structure.process_source(source.id)
+        units = KnowledgeUnitService(database, provider=provider)
+        await units.extract_for_source(source.id)
+
+        search = KnowledgeUnitSearchService(database)
+        results = await search.search("sunk cost")
+        assert [item.unit_type for item in results] == ["STORY"]
+    finally:
+        await database.dispose()
+
+
+class _NoiseConceptProvider(_Provider):
+    async def extract(self, request):
+        if request.task == "unit_concept_mapping":
+            import json
+
+            units = json.loads(request.input_text)
+            return UnitsConceptBatch(
+                mappings=[
+                    UnitConceptMapping(
+                        unit_ref=item["unit_ref"],
+                        concepts=[
+                            ConceptProposal(canonical_name="people", confidence=0.9),
+                            ConceptProposal(
+                                canonical_name="Sunk cost fallacy",
+                                confidence=0.9,
+                            ),
+                            ConceptProposal(
+                                canonical_name="a very long sentence about the way "
+                                "humans make decisions over time",
+                                confidence=0.9,
+                            ),
+                        ],
+                    )
+                    for item in units
+                ]
+            )
+        return await super().extract(request)
+
+
+@pytest.mark.asyncio
+async def test_noise_concepts_rejected_and_concepts_reused(
+    migrated_database_url: str,
+) -> None:
+    database = Database(migrated_database_url)
+    try:
+        source = await _build_units(database)
+        provider = _NoiseConceptProvider()
+        structure = SourceStructureService(database, provider=provider)
+        await structure.process_source(source.id)
+        units = KnowledgeUnitService(database, provider=provider)
+        await units.extract_for_source(source.id)
+
+        async with database.transaction() as session:
+            version_id = (
+                await session.scalars(
+                    select(SourceVersion.id).where(SourceVersion.source_id == source.id)
+                )
+            ).first()
+        assert version_id is not None
+
+        mapping = ConceptMappingService(database, provider=provider)
+        stats = await mapping.map_source_units(version_id)
+        assert stats["links"] == 1
+        assert stats["rejected"] == 2  # noise word + sentence-length
+
+        # Second run reuses the existing concept row; no duplicates.
+        stats = await mapping.map_source_units(version_id)
+        assert stats["links"] == 0
+        async with database.transaction() as session:
+            concepts = list(await session.scalars(select(ExternalConcept)))
+        assert len(concepts) == 1
+        assert concepts[0].normalized_name == "sunk cost fallacy"
     finally:
         await database.dispose()
