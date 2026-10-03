@@ -1,0 +1,23 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Resource — Original</p>
+    <h1>{{ source.title }}</h1>
+    <p class="lede">The source transcript remains authoritative. Generated summaries never replace it.</p>
+  </div>
+</div>
+{% include "studio/_resource_tabs.html" %}
+<section class="card">
+  <h2>Transcript ({{ segments|length }} segments)</h2>
+  {% for segment in segments[:300] %}
+  <div class="transcript">
+    <span class="muted">{% if segment.start_seconds is not none %}[{{ segment.start_seconds }}s → {{ segment.end_seconds }}s]{% else %}[segment {{ segment.sequence }}]{% endif %}</span>
+    <span>{{ segment.normalized_text }}</span>
+  </div>
+  {% else %}
+  <p class="muted">No transcript segments stored.</p>
+  {% endfor %}
+  {% if segments|length > 300 %}<p class="muted">Showing first 300 of {{ segments|length }} segments.</p>{% endif %}
+</section>
+{% endblock %}

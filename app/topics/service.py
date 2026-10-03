@@ -212,6 +212,39 @@ class TopicService:
                 statement = statement.where(TopicCandidate.status == status)
             return list((await session.scalars(statement)).all())
 
+    async def create_manual(
+        self,
+        channel_id: UUID,
+        strategy_version_id: UUID,
+        *,
+        question: str,
+        title: str = "",
+        thesis: str = "",
+        angle: str = "",
+    ) -> TopicCandidate:
+        """Owner-entered candidate. Scores stay 0 until mining/evidence exists."""
+
+        async with self.database.transaction() as session:
+            candidate = TopicCandidate(
+                editorial_channel_id=channel_id,
+                strategy_version_id=strategy_version_id,
+                title=(title or question)[:1024],
+                video_question=question,
+                tentative_thesis=thesis,
+                angle=angle or "manual",
+                knowledge_coverage_score=0.0,
+                channel_fit_score=0.0,
+                novelty_score=0.0,
+                curiosity_score=0.0,
+                emotional_score=0.0,
+                practical_value_score=0.0,
+                total_score=0.0,
+                provenance_json={"origin": "manual"},
+            )
+            session.add(candidate)
+            await session.flush()
+            return candidate
+
     async def set_status(
         self, candidate_id: UUID, status: TopicStatus
     ) -> TopicCandidate:

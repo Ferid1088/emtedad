@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">Studio</p>
     <h1>Resource Library</h1>
-    <p class="lede">Shared sources feed every editorial channel. Importing a YouTube video stores the transcript with timestamps and provenance.</p>
+    <p class="lede">One shared library feeds every editorial channel. Assigning a resource never duplicates it.</p>
   </div>
 </div>
 {% if request.query_params.get('import') == 'failed' %}
@@ -20,28 +20,45 @@
   </form>
 </section>
 <section class="card">
+  <form method="get" action="/library" class="inline-form">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search title, URL, external ID">
+    <select name="source_type">
+      <option value="">All types</option>
+      {% for t in source_types %}<option value="{{ t.value }}" {% if type_filter == t.value %}selected{% endif %}>{{ t.value }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">All states</option>
+      {% for s in status_options %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    <button class="button secondary" type="submit">Filter</button>
+  </form>
+</section>
+<section class="card">
   <h2>Resources ({{ sources|length }})</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Title</th><th>Type</th><th>Language</th><th>Segments</th><th>Channels</th><th>Ingestion</th><th>Added</th><th></th></tr></thead>
+    <thead><tr><th>Title</th><th>Type</th><th>Language</th><th>Segments</th><th>Units</th><th>Concepts</th><th>Processing</th><th>Channels</th><th>Added</th><th></th></tr></thead>
     <tbody>
       {% for source in sources %}
+      {% set stats = source_stats.get(source.id, {}) %}
       <tr>
         <td><a href="/library/{{ source.id }}">{{ source.title }}</a></td>
         <td>{{ source.source_type.value }}</td>
         <td>{{ source.language }}</td>
         <td>{{ segment_counts.get(source.id, 0) }}</td>
+        <td>{{ stats.get('units', 0) }}</td>
+        <td>{{ stats.get('concepts', 0) }}</td>
+        <td><span class="badge {% if stats.get('status') == 'READY' %}success{% endif %}">{{ (stats.get('status') or source.ingestion_status.value).replace('_', ' ') }}</span></td>
         <td>
           {% for slug in assignments.get(source.id, []) %}
           <a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a>
           {% else %}<span class="muted">—</span>{% endfor %}
         </td>
-        <td><span class="badge">{{ source.ingestion_status.value }}</span></td>
         <td>{{ source.created_at.strftime('%Y-%m-%d') }}</td>
         <td><a class="linkbutton" href="/library/{{ source.id }}">Inspect</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted">No resources yet. Import a YouTube video above.</td></tr>
+      <tr><td colspan="10" class="muted">No resources match. Import a YouTube video above.</td></tr>
       {% endfor %}
     </tbody>
   </table>

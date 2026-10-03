@@ -7,25 +7,46 @@
     <p class="lede">Active productions across all channels.</p>
   </div>
 </div>
-<section class="lesson-grid" aria-label="Active productions">
-  {% for item in items %}
-  <article class="card lesson-card interactive">
-    <div class="topic-card-head">
-      <span class="badge">{{ item.origin_label }}</span>
-      <span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span>
-    </div>
-    <h2><a href="/production/{{ item.project.id }}">{{ item.project.title }}</a></h2>
-    {% if item.lesson %}<p><strong>Historical lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
-    {% elif item.topic %}<p class="muted">{{ item.topic.title }}</p>{% endif %}
-    <p>{{ item.project.human_question }}</p>
-    <div class="button-row"><a class="button" href="/production/{{ item.project.id }}">Open</a></div>
-  </article>
-  {% else %}
-  <section class="card empty-state">
-    <h2>No active productions</h2>
-    <p>Productions start from a selected channel topic with a content brief.</p>
-    <a class="button secondary" href="/studio/channels">Choose a channel</a>
-  </section>
-  {% endfor %}
+<section class="card">
+  <h2>Brief productions ({{ productions|length }})</h2>
+  <table>
+    <thead><tr><th>Video Question</th><th>Channel</th><th>Stage</th><th>Status</th><th>Blockers</th><th>Next actions</th><th></th></tr></thead>
+    <tbody>
+      {% for state in productions %}
+      <tr>
+        <td>{{ state.brief.question[:110] }}</td>
+        <td><a class="badge" href="/studio/channels/{{ brief_channels.get(state.brief.id) }}/production">{{ brief_channels.get(state.brief.id) }}</a></td>
+        <td><span class="badge {% if state.stage.value == 'APPROVED' %}success{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span></td>
+        <td>{{ state.brief.status.value }}</td>
+        <td>{{ state.open_blockers or '—' }}</td>
+        <td class="muted">{{ state.allowed_actions | join(', ') or '—' }}</td>
+        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">No brief productions. Select a channel topic to start one.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
+
+{% if items %}
+<section class="card">
+  <h2>Historical productions</h2>
+  <p class="muted">Lesson-era projects kept for provenance. New productions use the brief pipeline above.</p>
+  <section class="lesson-grid" aria-label="Historical productions">
+    {% for item in items %}
+    <article class="card lesson-card">
+      <div class="topic-card-head">
+        <span class="badge">{{ item.origin_label }}</span>
+        <span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span>
+      </div>
+      <h2><a href="/production/{{ item.project.id }}">{{ item.project.title }}</a></h2>
+      {% if item.lesson %}<p><strong>Historical lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
+      {% elif item.topic %}<p class="muted">{{ item.topic.title }}</p>{% endif %}
+      <p>{{ item.project.human_question }}</p>
+    </article>
+    {% endfor %}
+  </section>
+</section>
+{% endif %}
 {% endblock %}

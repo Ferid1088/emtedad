@@ -1,0 +1,59 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Resource — Processing</p>
+    <h1>{{ source.title }}</h1>
+    <p class="lede">Pipeline state in owner terms. Every stage below is derived from persisted artifacts.</p>
+  </div>
+  {% if state %}
+  <span class="badge {% if state.status.value == 'READY' %}success{% endif %}">{{ state.status.value.replace('_', ' ') }}</span>
+  {% endif %}
+</div>
+{% include "studio/_resource_tabs.html" %}
+
+<section class="card">
+  <h2>Pipeline stages</h2>
+  <table>
+    <thead><tr><th>Stage</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      {% for stage in stages %}
+      <tr>
+        <td>{{ stage.name }}</td>
+        <td><span class="badge {% if stage.status == 'Ready' %}success{% endif %}">{{ stage.status }}</span></td>
+        <td class="muted">{{ stage.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if state %}
+  <p class="muted">Attempts: {{ state.attempt_count }} · Updated: {{ state.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+  {% endif %}
+</section>
+
+{% if warnings %}
+<section class="card">
+  <h2>Warnings</h2>
+  <ul>
+    {% for warning in warnings %}<li>{{ warning }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Actions</h2>
+  <div class="button-row">
+    <form method="post" action="/library/{{ source.id }}/structure">
+      <button class="button" type="submit">
+        {% if state and state.status.value == 'FAILED' %}Retry failed processing{% else %}Reprocess resource{% endif %}
+      </button>
+    </form>
+    <form method="post" action="/library/{{ source.id }}/units">
+      <button class="button secondary" type="submit">Re-extract units</button>
+    </form>
+    <form method="post" action="/library/{{ source.id }}/concepts">
+      <button class="button secondary" type="submit">Re-map concepts</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

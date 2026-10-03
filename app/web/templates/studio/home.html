@@ -3,7 +3,7 @@
 <div class="pagehead">
   <div>
     <p class="eyebrow">Emtedad Studio</p>
-    <h1>Editorial Channels</h1>
+    <h1>What needs my attention?</h1>
     <p class="lede">Five channels share one structured knowledge base. Pick a channel to work in.</p>
   </div>
 </div>
@@ -11,12 +11,63 @@
   <div class="card"><span class="metric-number">{{ source_count }}</span><small>Resources in library</small></div>
   <div class="card"><span class="metric-number">{{ production_count }}</span><small>Active productions</small></div>
   <div class="card"><span class="metric-number">{{ channels|length }}</span><small>Editorial channels</small></div>
+  <div class="card"><span class="metric-number">{{ attention|length }}</span><small>Resources need attention</small></div>
 </section>
+
+{% if attention %}
+<section class="card">
+  <h2>Resources requiring review</h2>
+  <table>
+    <thead><tr><th>Resource</th><th>Status</th><th>Error</th><th></th></tr></thead>
+    <tbody>
+      {% for item in attention %}
+      <tr>
+        <td><a href="/library/{{ item.source.id }}">{{ item.source.title }}</a></td>
+        <td><span class="badge">{{ item.status.replace('_', ' ') }}</span></td>
+        <td class="muted">{{ (item.error or '—')[:120] }}</td>
+        <td><a class="linkbutton" href="/library/{{ item.source.id }}/processing">Inspect</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if productions %}
+<section class="card">
+  <h2>Active productions</h2>
+  <table>
+    <thead><tr><th>Question</th><th>Stage</th><th>Blockers</th><th>Next actions</th><th></th></tr></thead>
+    <tbody>
+      {% for state in productions %}
+      <tr>
+        <td>{{ state.brief.question[:110] }}</td>
+        <td><span class="badge {% if state.stage.value == 'APPROVED' %}success{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span></td>
+        <td>{{ state.open_blockers or '—' }}</td>
+        <td class="muted">{{ state.allowed_actions | join(', ') or '—' }}</td>
+        <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if recent_signatures %}
+<section class="card">
+  <h2>Recent approvals</h2>
+  <ul>
+    {% for sig in recent_signatures %}
+    <li>{{ sig.question[:110] }} <span class="muted">· approved {{ sig.created_at.strftime('%Y-%m-%d') }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="channel-grid" aria-label="Editorial channels">
   {% for channel in channels %}
   <a class="card channel-card interactive" href="/studio/channels/{{ channel.slug }}">
     <h2>{{ channel.name }}</h2>
-    <p class="muted">{{ channel.description }}</p>
     <dl class="channel-stats">
       <div><dt>Resources</dt><dd>{{ channel.resource_count }}</dd></div>
       <div><dt>Topics</dt><dd>{{ channel.topic_count }}</dd></div>

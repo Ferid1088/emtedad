@@ -2,11 +2,108 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Topic</p>
-    <h1>{{ topic.title if topic else 'Topic' }}</h1>
+    <p class="eyebrow">Topic — {{ channel.name }}</p>
+    <h1>{{ candidate.title }}</h1>
+    <p class="lede">{{ candidate.video_question }}</p>
+  </div>
+  <div class="score-block">
+    <span class="score-total">{{ '%.2f' | format(candidate.total_score) }}</span>
+    <span class="muted">total</span>
+    <span class="badge">{{ candidate.status.value.replace('_', ' ') }}</span>
   </div>
 </div>
-<section class="card empty-state">
-  <p class="muted">Topic candidates appear once channel topic mining runs.</p>
+{% include "studio/_channel_nav.html" %}
+
+<div class="columns">
+<section class="card">
+  <h2>Video question</h2>
+  <p>{{ candidate.video_question }}</p>
+  {% if candidate.tentative_thesis %}<p><strong>Tentative thesis.</strong> {{ candidate.tentative_thesis }}</p>{% endif %}
+  {% if candidate.angle %}<p><strong>Angle.</strong> {{ candidate.angle }}</p>{% endif %}
+  <dl class="score-grid">
+    <div><dt>Coverage</dt><dd>{{ '%.2f' | format(candidate.knowledge_coverage_score) }}</dd></div>
+    <div><dt>Channel fit</dt><dd>{{ '%.2f' | format(candidate.channel_fit_score) }}</dd></div>
+    <div><dt>Novelty</dt><dd>{{ '%.2f' | format(candidate.novelty_score) }}</dd></div>
+    <div><dt>Curiosity</dt><dd>{{ '%.2f' | format(candidate.curiosity_score) }}</dd></div>
+    <div><dt>Emotional</dt><dd>{{ '%.2f' | format(candidate.emotional_score) }}</dd></div>
+    <div><dt>Practical</dt><dd>{{ '%.2f' | format(candidate.practical_value_score) }}</dd></div>
+  </dl>
+  <p class="muted">Created {{ candidate.created_at.strftime('%Y-%m-%d') }}
+    {% if candidate.provenance_json.get('origin') == 'manual' %}· added manually{% endif %}
+    {% if candidate.provenance_json.get('language_review_required') %}· <strong>language review required</strong>{% endif %}
+  </p>
 </section>
+
+<aside class="card">
+  <h2>Distinctiveness</h2>
+  {% if verdict %}
+  <p><span class="badge {% if verdict.value == 'ACCEPT' %}success{% endif %}">{{ verdict.value.replace('_', ' ') }}</span></p>
+  <dl class="score-grid">
+    <div><dt>Topic</dt><dd>{{ '%.2f' | format(report.topic) }}</dd></div>
+    <div><dt>Thesis</dt><dd>{{ '%.2f' | format(report.thesis) }}</dd></div>
+    <div><dt>Story</dt><dd>{{ '%.2f' | format(report.story) }}</dd></div>
+    <div><dt>Argument</dt><dd>{{ '%.2f' | format(report.argument) }}</dd></div>
+    <div><dt>Hook</dt><dd>{{ '%.2f' | format(report.hook) }}</dd></div>
+    <div><dt>Ending</dt><dd>{{ '%.2f' | format(report.ending) }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="muted">No active strategy — distinctiveness cannot be assessed.</p>
+  {% endif %}
+
+  <h2>Actions</h2>
+  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}/status" class="inline-form">
+    <select name="status">
+      {% for s in actionable_statuses %}
+      <option value="{{ s.value }}">{{ s.value.replace('_', ' ') }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="button secondary">Set status</button>
+  </form>
+  <form method="post" action="/studio/topics/{{ candidate.id }}/brief" class="inline-form">
+    <button type="submit" class="button">Select for production — create brief</button>
+  </form>
+</aside>
+</div>
+
+<section class="card">
+  <h2>Knowledge support</h2>
+  <p class="muted">{{ units|length }} supporting Knowledge Units · {{ sources|length }} sources · {{ candidate.concepts|length }} concepts</p>
+  {% if candidate.concepts %}
+  <p>Concepts: {% for link in candidate.concepts %}<span class="badge">{{ link.concept.canonical_name }}</span> {% endfor %}</p>
+  {% endif %}
+  <ul class="unit-list">
+    {% for unit in units %}
+    <li class="unit-row">
+      <div class="unit-head">
+        <strong>{{ unit.title }}</strong>
+        <span class="chip">{{ unit.unit_type.value }}</span>
+        {% if unit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
+        <span class="muted">{{ epistemic.get(unit.id, '') }}</span>
+      </div>
+      <p>{{ unit.summary }}</p>
+    </li>
+    {% else %}
+    <li class="muted">No supporting units recorded for this candidate.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if sources %}
+<section class="card">
+  <h2>Supporting resources</h2>
+  <ul>
+    {% for source in sources %}
+    <li><a href="/library/{{ source.id }}">{{ source.title }}</a> <span class="muted">· {{ source.platform }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% set gaps = candidate.provenance_json.get('knowledge_gaps', []) %}
+{% if gaps %}
+<section class="card">
+  <h2>Knowledge gaps</h2>
+  <ul>{% for gap in gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
 {% endblock %}

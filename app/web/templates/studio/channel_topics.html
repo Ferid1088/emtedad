@@ -18,9 +18,25 @@
   <p class="muted">Mining uses this channel's assigned resources only and applies the active strategy's scoring weights.</p>
 </section>
 
+<section class="card">
+  <h2>Add a question manually</h2>
+  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/manual" class="inline-form">
+    <input type="text" name="video_question" placeholder="Video question" required />
+    <input type="text" name="tentative_thesis" placeholder="Tentative thesis (optional)" />
+    <button type="submit" class="button secondary">Add question</button>
+  </form>
+</section>
+
+<nav class="tabs" aria-label="Topic status filter">
+  <a href="/studio/channels/{{ channel.slug }}/topics" {% if not status_filter %}class="active"{% endif %}>All</a>
+  {% for s in statuses %}
+  <a href="/studio/channels/{{ channel.slug }}/topics?status={{ s.value }}" {% if status_filter and status_filter.value == s.value %}class="active"{% endif %}>{{ s.value.replace('_', ' ') }}</a>
+  {% endfor %}
+</nav>
+
 {% if not candidates %}
 <section class="card empty-state">
-  <h2>No topics yet</h2>
+  <h2>No topics{% if status_filter %} with this status{% endif %}</h2>
   <p>Topic mining becomes available once the channel has assigned resources with extracted knowledge. Assign resources first.</p>
   <a class="button secondary" href="/studio/channels/{{ channel.slug }}/resources">Manage resources</a>
 </section>
@@ -31,7 +47,7 @@
   <header class="topic-head">
     <div>
       <p class="eyebrow">{{ candidate.status.value.replace('_', ' ') }}</p>
-      <h2>{{ candidate.title }}</h2>
+      <h2><a href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">{{ candidate.title }}</a></h2>
       <p class="lede">{{ candidate.video_question }}</p>
     </div>
     <div class="score-block">
@@ -49,30 +65,16 @@
     <div><dt>Practical</dt><dd>{{ '%.2f' | format(candidate.practical_value_score) }}</dd></div>
   </dl>
 
-  <p><strong>Thesis.</strong> {{ candidate.tentative_thesis }}</p>
-  <p><strong>Angle.</strong> {{ candidate.angle }}</p>
   <p class="muted">{{ unit_count.get(candidate.id, 0) }} supporting units
     {% if concept_names.get(candidate.id) %}— {{ concept_names[candidate.id] | join(", ") }}{% endif %}
   </p>
-  {% set gaps = candidate.provenance_json.get('knowledge_gaps', []) %}
-  {% if gaps %}
-  <details>
-    <summary>Knowledge gaps</summary>
-    <ul>{% for gap in gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
-  </details>
-  {% endif %}
 
-  <form method="post" action="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}/status" class="inline-form">
-    <select name="status">
-      {% for s in actionable_statuses %}
-      <option value="{{ s.value }}">{{ s.value.replace('_', ' ') }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" class="button secondary">Set status</button>
-  </form>
-  <form method="post" action="/studio/topics/{{ candidate.id }}/brief" class="inline-form">
-    <button type="submit" class="button">Create brief & open production</button>
-  </form>
+  <div class="button-row">
+    <a class="button secondary" href="/studio/channels/{{ channel.slug }}/topics/{{ candidate.id }}">Open topic</a>
+    <form method="post" action="/studio/topics/{{ candidate.id }}/brief" class="inline-form">
+      <button type="submit" class="button">Create brief & open production</button>
+    </form>
+  </div>
 </article>
 {% endfor %}
 {% endblock %}

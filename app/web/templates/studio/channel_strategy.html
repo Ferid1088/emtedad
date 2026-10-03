@@ -4,9 +4,40 @@
   <div>
     <p class="eyebrow">Channel</p>
     <h1>{{ channel.name }} — Strategy</h1>
+    <p class="lede">Strategies are versioned. The active version is never edited in place — create a draft, then activate it.</p>
   </div>
 </div>
 {% include "studio/_channel_nav.html" %}
+
+{% set draft = strategies | selectattr('status.value', 'equalto', 'DRAFT') | first %}
+
+{% if draft %}
+<section class="card">
+  <div class="split-head">
+    <h2>Draft — v{{ draft.version_number }}</h2>
+    <span class="badge">DRAFT</span>
+  </div>
+  <p><strong>Core question:</strong> {{ draft.core_question }}</p>
+  <dl class="metadata">
+    <div><dt>Domains</dt><dd>{{ draft.domains_json.get('domains', [])|join(', ') }}</dd></div>
+    <div><dt>Preferred angles</dt><dd>{{ draft.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>
+    <div><dt>Forbidden angles</dt><dd>{{ draft.forbidden_angles_json.get('angles', [])|join(', ') }}</dd></div>
+  </dl>
+  <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/{{ draft.id }}/activate">
+    <button class="button" type="submit">Activate draft</button>
+  </form>
+  <p class="muted">Activating archives the current active version.</p>
+</section>
+{% else %}
+<section class="card">
+  <h2>{% if active_strategy %}Create draft version{% else %}No draft strategy{% endif %}</h2>
+  <form method="post" action="/studio/channels/{{ channel.slug }}/strategy/draft" class="inline-form">
+    <input type="text" name="core_question" placeholder="New core question (optional — clones active if empty)">
+    <button class="button secondary" type="submit">Create draft</button>
+  </form>
+</section>
+{% endif %}
+
 {% if active_strategy %}
 <section class="card">
   <div class="split-head">
@@ -15,6 +46,7 @@
   </div>
   <p><strong>Core question:</strong> {{ active_strategy.core_question }}</p>
   <dl class="metadata">
+    <div><dt>Language</dt><dd>{{ active_strategy.editorial_language or '—' }}</dd></div>
     <div><dt>Activated</dt><dd>{{ active_strategy.activated_at.strftime('%Y-%m-%d %H:%M') if active_strategy.activated_at else '—' }}</dd></div>
     <div><dt>Domains</dt><dd>{{ active_strategy.domains_json.get('domains', [])|join(', ') }}</dd></div>
     <div><dt>Preferred angles</dt><dd>{{ active_strategy.preferred_angles_json.get('angles', [])|join(', ') }}</dd></div>

@@ -303,12 +303,12 @@ class EditorialChannelService:
             )
 
     async def channel_summaries(self) -> list[ChannelSummary]:
-        """Real per-channel counts for the Studio switcher cards.
+        """Real per-channel counts for the Studio switcher cards."""
 
-        Topic/production/published counts query channel-scoped tables as they
-        are introduced by later phases; until then they report zero rather
-        than fabricated numbers.
-        """
+        from app.briefs.models import ContentBrief
+        from app.content_engine.domain import DraftStatus
+        from app.content_engine.models import ScriptDraft
+        from app.topics.models import ScriptSignature, TopicCandidate
 
         async with self.database.transaction() as session:
             channels = list(
@@ -325,6 +325,52 @@ class EditorialChannelService:
                 )
             ).all()
             resource_counts: dict[UUID, int] = {row[0]: int(row[1]) for row in rows}
+            topic_rows = (
+                await session.execute(
+                    select(
+                        TopicCandidate.editorial_channel_id,
+                        func.count(),
+                    ).group_by(TopicCandidate.editorial_channel_id)
+                )
+            ).all()
+            topic_counts: dict[UUID, int] = {row[0]: int(row[1]) for row in topic_rows}
+            brief_rows = (
+                await session.execute(
+                    select(
+                        ContentBrief.editorial_channel_id,
+                        func.count(),
+                    ).group_by(ContentBrief.editorial_channel_id)
+                )
+            ).all()
+            brief_counts: dict[UUID, int] = {row[0]: int(row[1]) for row in brief_rows}
+            approved_rows = (
+                await session.execute(
+                    select(
+                        ContentBrief.editorial_channel_id,
+                        func.count(func.distinct(ScriptDraft.content_brief_id)),
+                    )
+                    .join(
+                        ScriptDraft,
+                        ScriptDraft.content_brief_id == ContentBrief.id,
+                    )
+                    .where(ScriptDraft.status == DraftStatus.APPROVED)
+                    .group_by(ContentBrief.editorial_channel_id)
+                )
+            ).all()
+            approved_counts: dict[UUID, int] = {
+                row[0]: int(row[1]) for row in approved_rows
+            }
+            published_rows = (
+                await session.execute(
+                    select(
+                        ScriptSignature.editorial_channel_id,
+                        func.count(),
+                    ).group_by(ScriptSignature.editorial_channel_id)
+                )
+            ).all()
+            published_counts: dict[UUID, int] = {
+                row[0]: int(row[1]) for row in published_rows
+            }
             return [
                 ChannelSummary(
                     id=channel.id,
@@ -333,9 +379,10 @@ class EditorialChannelService:
                     description=channel.description,
                     status=channel.status,
                     resource_count=int(resource_counts.get(channel.id, 0)),
-                    topic_count=0,
-                    active_production_count=0,
-                    published_count=0,
+                    topic_count=topic_counts.get(channel.id, 0),
+                    active_production_count=brief_counts.get(channel.id, 0)
+                    - approved_counts.get(channel.id, 0),
+                    published_count=published_counts.get(channel.id, 0),
                 )
                 for channel in channels
             ]

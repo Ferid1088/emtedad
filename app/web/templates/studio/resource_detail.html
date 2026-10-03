@@ -6,8 +6,12 @@
     <h1>{{ source.title }}</h1>
     <p class="lede"><a href="{{ source.canonical_url }}">{{ source.canonical_url }}</a></p>
   </div>
+  {% if state %}
+  <span class="badge {% if state.status.value == 'READY' %}success{% endif %}">{{ state.status.value.replace('_', ' ') }}</span>
+  {% endif %}
 </div>
 {% include "studio/_resource_tabs.html" %}
+
 <section class="card">
   <h2>Metadata</h2>
   <dl class="metadata">
@@ -15,13 +19,35 @@
     <div><dt>Platform</dt><dd>{{ source.platform }}</dd></div>
     <div><dt>Language</dt><dd>{{ source.language }}</dd></div>
     <div><dt>Ingestion</dt><dd>{{ source.ingestion_status.value }}</dd></div>
+    <div><dt>Processing</dt><dd>{{ state.status.value.replace('_', ' ') if state else 'Not started' }}</dd></div>
     <div><dt>Duration</dt><dd>{% if source.duration_seconds %}{{ (source.duration_seconds / 60)|round(1) }} min{% else %}—{% endif %}</dd></div>
     <div><dt>Published</dt><dd>{{ source.published_at.strftime('%Y-%m-%d') if source.published_at else '—' }}</dd></div>
+    <div><dt>Imported</dt><dd>{{ source.created_at.strftime('%Y-%m-%d') }}</dd></div>
   </dl>
   {% if source.description %}<p class="muted">{{ source.description[:600] }}</p>{% endif %}
 </section>
+
 <section class="card">
-  <h2>Assigned channels</h2>
+  <h2>Knowledge journey</h2>
+  <nav class="stepper" aria-label="Resource pipeline">
+    <a class="step{% if counts.segments %} done{% endif %}" href="/library/{{ source.id }}/original">Source · {{ counts.segments }} segments</a>
+    <a class="step{% if counts.nodes %} done{% endif %}" href="/library/{{ source.id }}/structure">Vortragsstruktur · {{ counts.nodes }} nodes</a>
+    <a class="step{% if counts.units %} done{% endif %}" href="/library/{{ source.id }}/units">Knowledge Units · {{ counts.units }}</a>
+    <a class="step{% if counts.concepts %} done{% endif %}" href="/library/{{ source.id }}/concepts">Concepts · {{ counts.concepts }}</a>
+  </nav>
+  {% if state and state.status.value not in ('READY',) %}
+  <form method="post" action="/library/{{ source.id }}/structure" class="inline-form">
+    <button class="button" type="submit">
+      {% if state.status.value == 'FAILED' %}Retry processing{% else %}Process resource{% endif %}
+    </button>
+    {% if state.last_error %}<span class="muted">{{ state.last_error }}</span>{% endif %}
+  </form>
+  {% endif %}
+  {% if review_warnings %}<p class="muted">{{ review_warnings }} review warning(s) — see the Processing tab.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Channel use</h2>
   {% if assigned_slugs %}
   <p>{% for slug in assigned_slugs %}<a class="badge" href="/studio/channels/{{ slug }}">{{ slug }}</a> {% endfor %}</p>
   {% else %}
@@ -36,6 +62,7 @@
     <button class="button secondary" type="submit">Assign to Channel</button>
   </form>
 </section>
+
 <section class="card">
   <h2>Versions ({{ versions|length }})</h2>
   <table>
@@ -51,17 +78,5 @@
       {% endfor %}
     </tbody>
   </table>
-</section>
-<section class="card">
-  <h2>Transcript ({{ segments|length }} segments)</h2>
-  {% for segment in segments[:200] %}
-  <div class="transcript">
-    <span class="muted">[{{ segment.start_seconds }}s → {{ segment.end_seconds }}s]</span>
-    <span>{{ segment.normalized_text }}</span>
-  </div>
-  {% else %}
-  <p class="muted">No transcript segments stored.</p>
-  {% endfor %}
-  {% if segments|length > 200 %}<p class="muted">Showing first 200 of {{ segments|length }} segments.</p>{% endif %}
 </section>
 {% endblock %}

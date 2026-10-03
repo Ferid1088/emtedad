@@ -255,3 +255,122 @@ async def test_production_workspace_generic_master_flow(studio_client) -> None:
         assert "lesson" not in page.text.lower()
     finally:
         await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_resource_tabs_and_topic_detail(studio_client) -> None:
+    """Resource tab family + channel topic detail render persisted state."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        provider = _Provider()
+        source = await _build_source_with_units(database)
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        channel_service = EditorialChannelService(database)
+        channel = await channel_service.get_channel("emtedad")
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+
+        for suffix in (
+            "",
+            "/original",
+            "/structure",
+            "/units",
+            "/concepts",
+            "/processing",
+        ):
+            response = client.get(f"/library/{source.id}{suffix}")
+            assert response.status_code == 200, suffix
+
+        overview = client.get(f"/library/{source.id}")
+        assert "Knowledge journey" in overview.text
+        assert "Vortragsstruktur" in overview.text
+
+        processing = client.get(f"/library/{source.id}/processing")
+        assert "Vortragsstruktur" in processing.text
+        assert "Retrieval Index" in processing.text
+
+        # Library search narrows by title.
+        filtered = client.get("/library", params={"q": "no-such-title-xyz"})
+        assert filtered.status_code == 200
+        assert f"/library/{source.id}" not in filtered.text
+        filtered = client.get("/library", params={"q": "fixture"})
+        assert filtered.status_code == 200
+
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        assert candidates
+        detail = client.get(f"/studio/channels/emtedad/topics/{candidates[0].id}")
+        assert detail.status_code == 200
+        assert "Distinctiveness" in detail.text
+        assert "Knowledge support" in detail.text
+
+        # Cross-channel isolation: another channel must not see the candidate.
+        other = client.get(
+            f"/studio/channels/science-mystery/topics/{candidates[0].id}"
+        )
+        assert other.status_code == 404
+
+        # Manual question creates a real candidate.
+        manual = client.post(
+            "/studio/channels/emtedad/topics/manual",
+            data={"video_question": "Why do manual topics exist?"},
+            follow_redirects=False,
+        )
+        assert manual.status_code == 303
+        topics_page = client.get("/studio/channels/emtedad/topics")
+        assert "Why do manual topics exist?" in topics_page.text
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_strategy_draft_and_activation_flow(studio_client) -> None:
+    """Draft creation clones active; activation archives the old version."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        response = client.post(
+            "/studio/channels/emtedad/strategy/draft",
+            data={"core_question": "Sprint draft question?"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        page = client.get("/studio/channels/emtedad/strategy")
+        assert "Sprint draft question?" in page.text
+        assert "Activate draft" in page.text
+
+        service = EditorialChannelService(database)
+        channel = await service.get_channel("emtedad")
+        strategies = await service.list_strategies(channel.id)
+        draft = next(s for s in strategies if s.status.value == "DRAFT")
+        active_before = next(s for s in strategies if s.status.value == "ACTIVE")
+
+        activate = client.post(
+            f"/studio/channels/emtedad/strategy/{draft.id}/activate",
+            follow_redirects=False,
+        )
+        assert activate.status_code == 303
+        strategies = await service.list_strategies(channel.id)
+        by_id = {s.id: s for s in strategies}
+        assert by_id[draft.id].status.value == "ACTIVE"
+        assert by_id[active_before.id].status.value == "ARCHIVED"
+
+        # Cross-channel: a foreign version id must not activate via this route.
+        science = await service.get_channel("science-mystery")
+        wrong = client.post(
+            f"/studio/channels/emtedad/strategy/{science.id}/activate",
+            follow_redirects=False,
+        )
+        assert wrong.status_code == 404
+    finally:
+        await database.dispose()

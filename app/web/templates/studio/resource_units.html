@@ -38,7 +38,9 @@
         <span class="chip">{{ unit.unit_type.value }}</span>
         {% if unit.atomic %}<span class="chip chip-story">atomic</span>{% endif %}
         <span class="muted">{{ unit.evidence_level.value }} ·
-          {{ unit.claim_type.value }}</span>
+          {{ unit.claim_type.value }} ·
+          {{ epistemic.get(unit.id, '') }}
+          {% if retrieval_roles.get(unit.id) == 'SUMMARY' %}· <strong>summary role</strong>{% endif %}</span>
       </div>
       {% set unit_concepts = concepts_by_unit.get(unit.id, []) %}
       {% if unit_concepts %}

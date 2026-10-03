@@ -245,3 +245,31 @@ body.studio {
   flex: 1;
   min-width: 16rem;
 }
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.step {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--line, #d7dde2);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: #354349;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.step.active {
+  border-color: var(--studio-accent);
+  background: var(--studio-accent);
+  color: #fff;
+}
+
+.step.done {
+  border-color: #2f6b3a;
+  color: #2f6b3a;
+}

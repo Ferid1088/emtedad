@@ -2,7 +2,7 @@
 {% block content %}
 <div class="pagehead">
   <div>
-    <p class="eyebrow">Production{% if channel_slug %} — {{ channel_slug }}{% endif %}</p>
+    <p class="eyebrow">Production{% if channel_slug %} — <a href="/studio/channels/{{ channel_slug }}/production">{{ channel_slug }}</a>{% endif %}</p>
     <h1>{{ brief.question }}</h1>
     <p class="lede">{{ brief.thesis }}</p>
   </div>
@@ -20,48 +20,70 @@
 
 <div class="columns">
   <section class="card">
-    <h2>Current artifact</h2>
+    <h2>Content brief</h2>
+    <dl class="metadata">
+      <div><dt>Status</dt><dd>{{ brief.status.value }}</dd></div>
+      <div><dt>Duration</dt><dd>{{ brief.target_duration_minutes }} min</dd></div>
+      <div><dt>Angle</dt><dd>{{ brief.angle or '—' }}</dd></div>
+    </dl>
+    {% if brief.target_audience %}<p><strong>Audience.</strong> {{ brief.target_audience }}</p>{% endif %}
+    {% if brief.primary_concepts_json %}<p><strong>Concepts.</strong> {{ brief.primary_concepts_json | join(', ') }}</p>{% endif %}
+    {% if brief.required_evidence_roles_json %}<p><strong>Required evidence.</strong> {{ brief.required_evidence_roles_json | join(', ') }}</p>{% endif %}
+    {% if brief.required_counterargument %}<p><strong>Counterargument required.</strong> {{ brief.required_counterargument }}</p>{% endif %}
+    {% if brief.forbidden_claims_json %}<p><strong>Forbidden claims.</strong> {{ brief.forbidden_claims_json | join(', ') }}</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Persisted artifacts</h2>
     <dl>
-      <div><dt>Stage</dt><dd>{{ state.stage.value }}</dd></div>
-      <div><dt>Brief status</dt><dd>{{ brief.status.value }}</dd></div>
-      <div><dt>Evidence matrix</dt><dd>{{ state.latest_matrix_id or '—' }}</dd></div>
-      <div><dt>Argument plan</dt><dd>{{ state.latest_argument_id or '—' }}</dd></div>
-      <div><dt>Narrative plan</dt><dd>{{ state.latest_narrative_id or '—' }}</dd></div>
-      <div><dt>Semantic master</dt><dd>{{ state.latest_master_id or '—' }}</dd></div>
-      <div><dt>Latest draft</dt><dd>{{ state.latest_draft_id or '—' }}</dd></div>
+      <div><dt>Evidence matrix</dt><dd>{{ 'ready' if state.latest_matrix_id else '—' }}</dd></div>
+      <div><dt>Argument plan</dt><dd>{{ 'ready' if state.latest_argument_id else '—' }}</dd></div>
+      <div><dt>Narrative plan</dt><dd>{{ 'ready' if state.latest_narrative_id else '—' }}</dd></div>
+      <div><dt>Semantic master</dt><dd>{{ 'ready' if state.latest_master_id else '—' }}</dd></div>
+      <div><dt>Latest draft</dt><dd>{{ draft_status.value if draft_status else '—' }}</dd></div>
       <div><dt>Open blockers</dt><dd>{{ state.open_blockers }}</dd></div>
     </dl>
   </section>
-
-  <aside class="card">
-    <h2>Allowed actions</h2>
-    {% if state.allowed_actions %}
-    {% set action_labels = {
-      'plan_research': 'Plan research',
-      'build_evidence': 'Build evidence matrix',
-      'build_argument': 'Build argument plan',
-      'build_narrative': 'Build narrative plan',
-      'build_master': 'Build Semantic Master',
-      'build_script': 'Build script',
-      'run_review': 'Run review',
-      'revise': 'Revise draft',
-      'approve': 'Approve draft',
-    } %}
-    <ul class="action-list">
-      {% for action in state.allowed_actions %}
-      <li>
-        <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
-          <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="muted">No actions available in this stage.</p>
-    {% endif %}
-    {% if state.open_blockers %}
-    <p class="muted">{{ state.open_blockers }} blocking finding(s) must be resolved before approval.</p>
-    {% endif %}
-  </aside>
 </div>
+
+{% if signature %}
+<section class="card">
+  <h2>Approved</h2>
+  <p><span class="badge success">Signature saved</span> · approved {{ signature.created_at.strftime('%Y-%m-%d %H:%M') }} · hash <code>{{ signature.content_hash[:16] }}…</code></p>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Actions</h2>
+  {% if state.allowed_actions %}
+  {% set action_labels = {
+    'plan_research': 'Plan research',
+    'build_evidence': 'Build evidence matrix',
+    'build_argument': 'Build argument plan',
+    'build_narrative': 'Build narrative plan',
+    'build_master': 'Build Semantic Master',
+    'build_script': 'Build script',
+    'run_review': 'Run review',
+    'revise': 'Revise draft',
+    'approve': 'Approve draft',
+    'localize': 'Localize',
+  } %}
+  <ul class="action-list">
+    {% for action in state.allowed_actions %}
+    <li>
+      <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
+        <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No actions available in this stage.
+    {% if brief.status.value == 'DRAFT' %}The brief is still a draft — finalize it before planning research.{% endif %}
+  </p>
+  {% endif %}
+  {% if state.open_blockers %}
+  <p class="muted">{{ state.open_blockers }} blocking finding(s) must be resolved before approval.</p>
+  {% endif %}
+</section>
 {% endblock %}
