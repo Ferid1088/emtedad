@@ -171,7 +171,14 @@ class TopicService:
                     },
                 )
             weights = _scoring_weights(strategy)
-            concepts_by_name = await _concept_index(session)
+            concepts_by_name = await _concept_index(
+                session,
+                {
+                    name
+                    for proposal in batch.topics
+                    for name in proposal.supporting_concepts
+                },
+            )
             return [
                 await self._persist(
                     session,
@@ -409,25 +416,37 @@ async def _channel_candidate_concepts(
 
 
 async def _published_signatures(session: AsyncSession, channel_id: UUID) -> list[str]:
-    """Semantic signatures of existing candidates used for novelty."""
+    """Questions of every persisted candidate — the miner must not re-derive them.
+
+    Restricting this to PUBLISHED let a second ``mine()`` run regenerate
+    near-identical questions already sitting as open candidates.
+    """
 
     rows = (
         await session.scalars(
             select(TopicCandidate.video_question).where(
-                TopicCandidate.editorial_channel_id == channel_id,
-                TopicCandidate.status == TopicStatus.PUBLISHED,
+                TopicCandidate.editorial_channel_id == channel_id
             )
         )
     ).all()
     return list(rows)
 
 
-async def _concept_index(session: AsyncSession) -> dict[str, UUID]:
-    """normalized name -> concept id, for resolving proposal concept names."""
+async def _concept_index(session: AsyncSession, names: set[str]) -> dict[str, UUID]:
+    """normalized name -> concept id, for resolving proposal concept names.
 
+    Only the concepts the batch actually cites are loaded — scanning the
+    whole ``external_concepts`` table per mining call is wasteful.
+    """
+
+    normalized = {normalize_concept_name(name) for name in names if name.strip()}
+    if not normalized:
+        return {}
     rows = (
         await session.execute(
-            select(ExternalConcept.normalized_name, ExternalConcept.id)
+            select(ExternalConcept.normalized_name, ExternalConcept.id).where(
+                ExternalConcept.normalized_name.in_(normalized)
+            )
         )
     ).all()
     return {name: cid for name, cid in rows}

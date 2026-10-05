@@ -18,6 +18,7 @@ from app.db.session import Database
 from app.knowledge.models import (
     ExternalConcept,
     Source,
+    SourceQuality,
     SourceSegment,
     SourceVersion,
 )
@@ -58,6 +59,7 @@ class UnitCandidate:
     concept_score: float | None = None
     fusion_score: float = 0.0
     reranker_score: float = 0.0
+    quality_weight: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,7 +179,7 @@ class UnitEmbeddingService:
             created += len(batch)
         logger.info(
             "knowledge_units.embedded",
-            extra={"created": created, "total": len(pending)},
+            extra={"embedded": created, "total": len(pending)},
         )
         return created
 
@@ -360,6 +362,11 @@ class KnowledgeUnitSearchService:
             )
         }
         max_fusion = max(item.fusion_score for item in candidates) or 1.0
+        # Source quality (per source's persisted retrieval_weight) is a
+        # bounded ±15% modifier: it re-orders candidates of comparable
+        # relevance but can never let an irrelevant prestigious source beat
+        # a relevant modest one — relevance terms dominate the score.
+        quality_weights = await self._source_quality_weights(session, units)
         output: list[UnitCandidate] = []
         for item in candidates:
             unit = units[item.unit_id]
@@ -374,11 +381,13 @@ class KnowledgeUnitSearchService:
                 )
                 if value is not None
             ]
+            quality = quality_weights.get(unit.source_version_id, 1.0)
             score = (
                 0.55 * (item.fusion_score / max_fusion)
                 + 0.25 * overlap
                 + 0.20 * max(signals, default=0.0)
-            )
+            ) * (0.85 + 0.15 * min(max(quality, 0.0), 1.0))
+            item = replace(item, quality_weight=quality)
             # Oversized parent units marked SUMMARY stay reachable through
             # structural expansion but lose as independent evidence — the
             # more specific child units are the writer-facing material.
@@ -389,6 +398,24 @@ class KnowledgeUnitSearchService:
             output,
             key=lambda item: (-item.reranker_score, str(item.unit_id)),
         )[:limit]
+
+    async def _source_quality_weights(
+        self, session: AsyncSession, units: dict[UUID, KnowledgeUnit]
+    ) -> dict[UUID, float]:
+        """source_version_id → persisted retrieval_weight (default 1.0)."""
+
+        version_ids = {u.source_version_id for u in units.values()}
+        if not version_ids:
+            return {}
+        rows = await session.execute(
+            select(SourceVersion.id, SourceQuality.retrieval_weight)
+            .join(
+                SourceQuality,
+                SourceQuality.source_id == SourceVersion.source_id,
+            )
+            .where(SourceVersion.id.in_(version_ids))
+        )
+        return {version_id: float(weight) for version_id, weight in rows}
 
     async def _dedup_nested(
         self, session: AsyncSession, candidates: list[UnitCandidate]
@@ -607,6 +634,7 @@ class KnowledgeUnitSearchService:
                         "concept": candidate.concept_score or 0.0,
                         "fusion": candidate.fusion_score,
                         "reranker": candidate.reranker_score,
+                        "source_quality": candidate.quality_weight,
                     },
                     source_id=source.id,
                     source_version_id=version.id,

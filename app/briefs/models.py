@@ -4,7 +4,13 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -62,7 +68,7 @@ class ContentBrief(Base):
     forbidden_claims_json: Mapped[list[str]] = mapped_column(JSONB, default=list)
     forbidden_repetitions_json: Mapped[list[str]] = mapped_column(JSONB, default=list)
 
-    target_duration_minutes: Mapped[int] = mapped_column(Integer)
+    target_duration_minutes: Mapped[float] = mapped_column(Float)
 
     status: Mapped[BriefStatus] = mapped_column(
         _enum(BriefStatus, "content_brief_status"),

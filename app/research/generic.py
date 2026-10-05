@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.briefs.models import ContentBrief
 from app.db.session import Database
 from app.editorial_channels.models import EditorialChannel
+from app.knowledge.models import SourceVersion
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.models import KnowledgeUnit
 from app.research.domain import (
@@ -21,7 +22,11 @@ from app.research.domain import (
     ResearchQuestionKind,
     ResearchQuestionStatus,
 )
-from app.research.epistemic import classify_epistemic, unknown_evidence_warnings
+from app.research.epistemic import (
+    EpistemicStatus,
+    classify_epistemic,
+    unknown_evidence_warnings,
+)
 from app.research.models import (
     EvidenceMatrix,
     EvidenceMatrixItem,
@@ -218,6 +223,173 @@ class GenericResearchService:
                         "warning": warning,
                     },
                 )
+            # §16 truth: a matrix becomes READY only after its own validation
+            # pass — created rows are DRAFT until the checks below pass.
+            report = await self._validate_matrix(session, matrix, brief)
+            matrix.validation_report = report
+            if report["passed"]:
+                matrix.status = EvidenceMatrixStatus.READY
+            return matrix
+
+    async def _validate_matrix(
+        self,
+        session: AsyncSession,
+        matrix: EvidenceMatrix,
+        brief: ContentBrief,
+    ) -> dict[str, object]:
+        """§16 pre-READY validation: structure must be sound before READY.
+
+        Hard failures (missing items, dead references, invalid epistemic
+        fields) keep the matrix DRAFT. Content gaps (missing
+        counterevidence/alternatives) are persisted as unresolved gaps —
+        a READY matrix with documented gaps is honest; faking coverage
+        is not.
+        """
+
+        items = list(
+            (
+                await session.scalars(
+                    select(EvidenceMatrixItem).where(
+                        EvidenceMatrixItem.evidence_matrix_id == matrix.id
+                    )
+                )
+            ).all()
+        )
+        checks: dict[str, bool] = {}
+        failures: list[str] = []
+        gaps: list[dict[str, str]] = []
+
+        checks["items_present"] = bool(items)
+        if not items:
+            failures.append("matrix contains no evidence items")
+
+        epistemic_values = {status.value for status in EpistemicStatus}
+        bad_epistemic = [
+            item.ordinal
+            for item in items
+            if not item.claim_text.strip()
+            or item.epistemic_status not in epistemic_values
+        ]
+        checks["epistemic_fields_valid"] = not bad_epistemic
+        if bad_epistemic:
+            failures.append(
+                f"items {bad_epistemic} have empty claim or invalid epistemic status"
+            )
+
+        ref_ids: set[str] = set()
+        for item in items:
+            for raw in (
+                *item.supporting_unit_ids,
+                *item.counterevidence_unit_ids,
+                *item.alternative_unit_ids,
+            ):
+                ref_ids.add(str(raw))
+        parseable: set[UUID] = set()
+        dead_refs = 0
+        for raw in ref_ids:
+            try:
+                parseable.add(UUID(raw))
+            except (ValueError, AttributeError):
+                dead_refs += 1
+        existing_units: dict[UUID, KnowledgeUnit] = {}
+        if parseable:
+            existing_units = {
+                row.id: row
+                for row in (
+                    await session.scalars(
+                        select(KnowledgeUnit).where(KnowledgeUnit.id.in_(parseable))
+                    )
+                ).all()
+            }
+        missing = parseable - set(existing_units)
+        checks["evidence_references_valid"] = not dead_refs and not missing
+        if dead_refs or missing:
+            failures.append(
+                f"{dead_refs} unparseable and {len(missing)} dangling unit references"
+            )
+
+        unsupported = [item.ordinal for item in items if not item.supporting_unit_ids]
+        checks["supporting_evidence_structured"] = not unsupported
+        if unsupported:
+            failures.append(f"items {unsupported} have no supporting evidence units")
+
+        source_versions = {row.source_version_id for row in existing_units.values()}
+        existing_versions = (
+            set(
+                (
+                    await session.scalars(
+                        select(SourceVersion.id).where(
+                            SourceVersion.id.in_(source_versions)
+                        )
+                    )
+                ).all()
+            )
+            if source_versions
+            else set()
+        )
+        checks["provenance_valid"] = source_versions == existing_versions
+        if not checks["provenance_valid"]:
+            failures.append(
+                "referenced units point at source versions that do not exist"
+            )
+
+        has_counter = any(
+            item.counterevidence_unit_ids
+            or item.role is EvidenceSelectionRole.COUNTEREVIDENCE
+            for item in items
+        )
+        if brief.required_counterargument and not has_counter:
+            gaps.append(
+                {
+                    "kind": "counterevidence_missing",
+                    "detail": "Brief requires a counterargument but no "
+                    "counterevidence unit is linked.",
+                }
+            )
+        has_alternative = any(item.alternative_unit_ids for item in items)
+        channel = await session.get(EditorialChannel, brief.editorial_channel_id)
+        strict_channels = {"science-mystery", "psychology-evolution"}
+        if (
+            channel is not None
+            and channel.slug in strict_channels
+            and not has_alternative
+        ):
+            gaps.append(
+                {
+                    "kind": "alternative_explanation_missing",
+                    "detail": "Channel requires alternative explanations "
+                    "but none are linked.",
+                }
+            )
+        return {
+            "validator": "evidence_matrix_v1",
+            "checks": checks,
+            "failures": failures,
+            "unresolved_gaps": gaps,
+            "passed": not failures,
+        }
+
+    async def revalidate_matrix(self, matrix_id: UUID) -> EvidenceMatrix:
+        """Re-run §16 validation on an existing matrix.
+
+        Used by tests and by the owner to re-check a matrix after its
+        underlying material changed. A failing matrix drops/stays DRAFT;
+        a passing one is promoted to READY.
+        """
+
+        async with self.database.transaction() as session:
+            matrix = await session.get(EvidenceMatrix, matrix_id)
+            if matrix is None:
+                raise LookupError(f"Unknown evidence matrix {matrix_id}")
+            brief = await session.get(ContentBrief, matrix.content_brief_id)
+            if brief is None:
+                raise LookupError("Matrix brief is missing")
+            report = await self._validate_matrix(session, matrix, brief)
+            matrix.validation_report = report
+            if report["passed"] and matrix.status is EvidenceMatrixStatus.DRAFT:
+                matrix.status = EvidenceMatrixStatus.READY
+            elif not report["passed"] and matrix.status is EvidenceMatrixStatus.READY:
+                matrix.status = EvidenceMatrixStatus.DRAFT
             return matrix
 
     async def freeze_package(
@@ -241,6 +413,14 @@ class GenericResearchService:
             )
             if matrix is None:
                 raise ValueError("Build an evidence matrix first")
+            if matrix.status not in {
+                EvidenceMatrixStatus.READY,
+                EvidenceMatrixStatus.FROZEN,
+            }:
+                raise ValueError(
+                    "Evidence matrix failed validation — cannot freeze "
+                    "research on an unvalidated matrix"
+                )
             items = list(
                 (
                     await session.scalars(

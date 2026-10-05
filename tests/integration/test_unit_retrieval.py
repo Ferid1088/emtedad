@@ -11,7 +11,7 @@ import psycopg
 import pytest
 from alembic.config import Config
 from psycopg import sql
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.engine import make_url
 
 from alembic import command
@@ -36,7 +36,7 @@ from app.knowledge.units.concepts import (
 )
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.mapping_service import ConceptMappingService
-from app.knowledge.units.models import ConceptRelationship
+from app.knowledge.units.models import ConceptRelationship, KnowledgeUnit
 from app.knowledge.units.schemas import (
     UnitMetadataBatch,
     UnitMetadataProposal,
@@ -508,5 +508,116 @@ async def test_noise_concepts_rejected_and_concepts_reused(
             concepts = list(await session.scalars(select(ExternalConcept)))
         assert len(concepts) == 1
         assert concepts[0].normalized_name == "sunk cost fallacy"
+    finally:
+        await database.dispose()
+
+
+async def _processed_units(
+    database: Database, provider: "_Provider"
+) -> tuple[object, list[object]]:
+    """Build a source, run structure + units, return (source, units)."""
+
+    source = await _build_units(database)
+    await SourceStructureService(database, provider=provider).process_source(source.id)
+    await KnowledgeUnitService(database, provider=provider).extract_for_source(
+        source.id
+    )
+    async with database.transaction() as session:
+        units = list(
+            await session.scalars(
+                select(KnowledgeUnit).where(
+                    KnowledgeUnit.source_version_id
+                    == select(SourceVersion.id)
+                    .where(SourceVersion.source_id == source.id)
+                    .scalar_subquery()
+                )
+            )
+        )
+    return source, units
+
+
+@pytest.mark.asyncio
+async def test_source_quality_weight_bounds_reranking(
+    migrated_database_url: str,
+) -> None:
+    """§9: quality re-orders equal-relevance hits but never lets an
+    irrelevant prestigious source beat a relevant modest one."""
+
+    from app.knowledge.models import SourceQuality
+    from app.retrieval.unit_retrieval import UnitCandidate
+
+    database = Database(migrated_database_url)
+    try:
+        provider = _Provider()
+        src_hi, units_hi = await _processed_units(database, provider)
+        src_lo, units_lo = await _processed_units(database, provider)
+        async with database.transaction() as session:
+            session.add(
+                SourceQuality(
+                    source_id=src_hi.id,
+                    publication_type="scholarly",
+                    primary_or_secondary="secondary",
+                    retrieval_weight=1.0,
+                )
+            )
+            session.add(
+                SourceQuality(
+                    source_id=src_lo.id,
+                    publication_type="personal_blog",
+                    primary_or_secondary="secondary",
+                    retrieval_weight=0.4,
+                )
+            )
+            # The scholarly unit is made irrelevant to the query; the blog
+            # unit stays fully on-topic. DML update: search_vector is a
+            # generated column and cannot be written by the ORM.
+            await session.execute(
+                update(KnowledgeUnit)
+                .where(KnowledgeUnit.id.in_([u.id for u in units_hi]))
+                .values(
+                    title="Quantum field theory",
+                    summary="unrelated physics content",
+                )
+            )
+
+        search = KnowledgeUnitSearchService(database, _FakeEmbeddings())
+        query = "sunk cost decision"
+        async with database.transaction() as session:
+            reranked = await search._rerank(
+                session,
+                query,
+                [
+                    UnitCandidate(units_hi[0].id, lexical_rank=1, lexical_score=0.6),
+                    UnitCandidate(units_lo[0].id, lexical_rank=1, lexical_score=0.6),
+                ],
+                limit=10,
+            )
+        # Relevance dominates: the on-topic blog unit still wins over the
+        # off-topic scholarly unit.
+        assert reranked[0].unit_id == units_lo[0].id
+        assert reranked[0].quality_weight == 0.4
+        assert reranked[1].quality_weight == 1.0
+
+        # Equal relevance (both units on-topic) → higher quality leads.
+        async with database.transaction() as session:
+            await session.execute(
+                update(KnowledgeUnit)
+                .where(KnowledgeUnit.id.in_([u.id for u in units_hi]))
+                .values(
+                    title="Sunk cost decision",
+                    summary="sunk cost decision behavior",
+                )
+            )
+        async with database.transaction() as session:
+            reranked = await search._rerank(
+                session,
+                query,
+                [
+                    UnitCandidate(units_hi[0].id, lexical_rank=1, lexical_score=0.6),
+                    UnitCandidate(units_lo[0].id, lexical_rank=1, lexical_score=0.6),
+                ],
+                limit=10,
+            )
+        assert reranked[0].unit_id == units_hi[0].id
     finally:
         await database.dispose()

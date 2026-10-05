@@ -30,6 +30,37 @@
     <p class="muted">Noch nicht erstellt. {{ reason }}</p>
   </section>
 {%- endmacro %}
+{% macro book_refs_table(rows) -%}
+  {% if rows %}
+  <div style="margin: 0.4rem 0 0.8rem;">
+    <table>
+      <thead><tr>
+        <th>Autor</th><th>Buch</th><th>Originaltitel</th>
+        <th>Quellsprache</th><th>Verwendung</th>
+      </tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.ref.author_fa or row.ref.author }}{% if row.ref.author_fa %} <span class="muted">({{ row.ref.author }})</span>{% endif %}</td>
+          <td>{{ row.ref.title_fa or '—' }}</td>
+          <td><em>{{ row.ref.title }}</em></td>
+          <td>{{ row.ref.original_language }}</td>
+          <td>
+            {% if row.used %}<span class="badge success">verwendet</span>
+            {% else %}<span class="badge">verfügbar</span>{% endif %}
+            {% if row.ref.verified_quote %}<span class="chip" title="Wörtliches Zitat verifiziert">Zitat ✓</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top: 0.3rem;">
+      Buchreferenzen (Allow-List) — Quellsprache ist die Sprache des Werks,
+      nicht der im Skript gezeigte Titel.
+    </p>
+  </div>
+  {% endif %}
+{%- endmacro %}
 {% block content %}
 <div class="pagehead">
   <div>
@@ -49,10 +80,18 @@
   'REVIEW': 'Review', 'APPROVED': 'Freigegeben', 'LOCALIZATION': 'Übersetzung',
   'VOICE': 'Voice', 'PUBLISHED': 'Veröffentlicht'
 } %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
 <nav class="stepper" aria-label="Produktions-Stufen">
+  {% set health_icons = {
+    'READY': '✓', 'APPROVED': '✓', 'IN_PROGRESS': '…',
+    'REVIEW_REQUIRED': '!', 'FAILED': '✕', 'NOT_STARTED': ''
+  } %}
   {% for tab in tabs %}
-  <a class="step {% if tab == active_stage %}active{% elif loop.index0 < current_index %}done{% endif %}"
-     href="/studio/production/{{ brief.id }}?stage={{ tab.value }}">{{ stage_names.get(tab.value, tab.value.replace('_', ' ')) }}</a>
+  {% set health = state.stage_states.get(tab) %}
+  <a class="step {% if tab == active_stage %}active{% endif %} {% if health and health.value in ('READY', 'APPROVED') %}done{% elif health and health.value in ('REVIEW_REQUIRED', 'FAILED') %}attention{% endif %}"
+     href="/studio/production/{{ brief.id }}?stage={{ tab.value }}"
+     title="{{ health.value if health else 'NOT_STARTED' }}">
+     {% if health and health_icons.get(health.value) %}<span class="step-icon">{{ health_icons[health.value] }}</span>{% endif %}{{ stage_names.get(tab.value, tab.value.replace('_', ' ')) }}</a>
   {% endfor %}
 </nav>
 
@@ -62,16 +101,54 @@
     <dl class="metadata">
       <div><dt>Kanal</dt><dd>{{ channel_name or '—' }}</dd></div>
       <div><dt>Strategie-Version</dt><dd>v{{ strategy_version if strategy_version else '—' }}</dd></div>
-      <div><dt>Ziel-Dauer</dt><dd>{{ brief.target_duration_minutes }} Min</dd></div>
+      <div><dt>Ziel</dt><dd>{{ duration_min or '?' }}–{{ duration_max or '?' }} Min.
+        · Planungsziel: {{ brief.target_duration_minutes }} Min.</dd></div>
+      {% if latest_draft %}
+      <div><dt>Geschätzt</dt><dd>{{ (latest_draft.estimated_duration_seconds / 60) | round(1) }} Min.
+        ({{ latest_draft.actual_word_count }} Wörter)</dd></div>
+      {% endif %}
+      {% if state.final_duration_minutes is not none %}
+      <div><dt>Freigabe-Dauer</dt><dd>{{ state.final_duration_minutes }} Min.
+        {% if state.final_duration_in_band %}<span class="badge success">im Endband</span>
+        {% else %}<span class="badge warning">außerhalb {{ duration_min or '?' }}–{{ duration_max or '?' }} Min.</span>{% endif %}
+      </dd></div>
+      {% endif %}
+      <div><dt>Review-Zyklus</dt><dd>#{{ state.current_review_cycle }} ·
+        {{ state.cycle_revisions_used }} Revision(en) verbraucht
+        {% if state.revision_budget_exhausted %}<span class="badge warning">Eigentümer-Freigabe nötig</span>{% endif %}
+      </dd></div>
       <div><dt>Brief-Status</dt><dd>{{ brief.status.value }}</dd></div>
       <div><dt>Offene Blocker</dt><dd>{{ state.open_blockers }}</dd></div>
+      <div><dt>Material</dt><dd>
+        {% if gap.has_gap %}
+          <span class="badge warning">Lücke: {{ gap.units_available }}/{{ gap.units_required }} Units</span>
+        {% else %}
+          <span class="badge success">Ausreichend ({{ gap.units_available }} Units)</span>
+        {% endif %}
+      </dd></div>
     </dl>
+    {% if gap.has_gap %}
+    <p class="muted">Für {{ gap.target_minutes }} Minuten fehlen ca.
+    {{ gap.missing }} tragende Knowledge Units.
+    {% if web_research_enabled %}Internet-Recherche kann die Lücke füllen.
+    {% else %}Aktiviere Internet-Recherche in den <a href="/settings">Einstellungen</a>,
+    oder füge weitere Quellen hinzu.{% endif %}</p>
+    {% endif %}
+    {% if research_notice %}
+    <p class="notice">{{ research_notice }}</p>
+    {% endif %}
+    {% if gap.has_gap and web_research_enabled %}
+    <form method="post" action="/studio/production/{{ brief.id }}/web-research" class="inline-form">
+      <button class="button secondary" type="submit">Im Internet recherchieren</button>
+    </form>
+    {% endif %}
   </section>
   <section class="card">
     <h2>Aktionen</h2>
     {% set action_labels = {
       'plan_research': 'Recherche planen',
       'build_evidence': 'Evidence-Matrix erstellen',
+      'freeze_research': 'Recherche einfrieren',
       'build_argument': 'Argument-Plan erstellen',
       'build_narrative': 'Narrativ-Plan erstellen',
       'build_master': 'Semantic Master erstellen',
@@ -79,14 +156,29 @@
       'run_review': 'Review starten',
       'revise': 'Entwurf überarbeiten',
       'approve': 'Freigeben',
+      'start_review_cycle': 'Neuen Review-Zyklus starten',
       'localize': 'Übersetzen',
     } %}
     {% if state.allowed_actions %}
+    {# The action that advances the *current* stage is the primary button;
+       rebuild/optional actions stay secondary. #}
+    {% set primary_for_stage = {
+      'BRIEF': 'plan_research', 'THESIS': 'plan_research',
+      'RESEARCH': 'build_evidence', 'EVIDENCE': 'build_argument',
+      'ARGUMENT': 'build_narrative', 'NARRATIVE': 'build_master',
+      'MASTER': 'build_script', 'SCRIPT': 'run_review',
+      'APPROVED': 'localize',
+    } %}
+    {% set primary = primary_for_stage.get(state.stage.value) %}
+    {% if state.stage.value == 'REVIEW' %}
+      {% set primary = 'revise' if (state.open_blockers or state.open_warnings) else 'approve' %}
+    {% endif %}
+    {% if primary not in state.allowed_actions %}{% set primary = none %}{% endif %}
     <ul class="action-list">
       {% for action in state.allowed_actions %}
       <li>
         <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
-          <button type="submit" class="button">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
+          <button type="submit" class="button{% if action != primary %} secondary{% endif %}">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
         </form>
       </li>
       {% endfor %}
@@ -96,8 +188,8 @@
       {% if brief.status.value == 'DRAFT' %}Der Brief ist noch ein Entwurf — zuerst abschließen, dann kann die Recherche geplant werden.{% endif %}
     </p>
     {% endif %}
-    {% if state.open_blockers %}
-    <p class="muted">{{ state.open_blockers }} blockierende(s) Review-Ergebnis(se) muss/müssen vor der Freigabe gelöst werden.</p>
+    {% if state.open_blockers or state.open_warnings %}
+    <p class="muted">{{ state.open_blockers }} blockierende(s) + {{ state.open_warnings }} schwere Review-Ergebnis(se) müssen vor der Freigabe gelöst oder explizit akzeptiert werden.</p>
     {% endif %}
   </section>
 </div>
@@ -202,6 +294,32 @@
 </section>
 {% elif not plan %}
 {{ not_built('Research', 'Plan research to create the plan, then freeze the package.') }}
+{% endif %}
+{% if research_runs %}
+<section class="card">
+  <h2>Internet-Recherche ({{ research_runs | length }})</h2>
+  <table>
+    <thead><tr><th>Zeit</th><th>Runde</th><th>Art</th><th>Auslöser</th><th>Anbieter/Modell</th><th>Query</th><th>Status</th><th>Quellen</th><th>Dauer</th></tr></thead>
+    <tbody>
+      {% for run in research_runs %}
+      <tr>
+        <td>{{ run.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ run.result_json.get('round_number') or '—' }}</td>
+        <td>{{ run.result_json.get('query_kind') or '—' }}</td>
+        <td>{{ run.trigger }}</td>
+        <td>{{ run.provider }}{% if run.model %} / {{ run.model }}{% endif %}</td>
+        <td title="{{ run.query }}">{{ run.query[:80] }}{% if run.query|length > 80 %}…{% endif %}</td>
+        <td><span class="badge {% if run.status == 'OK' %}success{% else %}danger{% endif %}">{{ run.status }}</span>
+          {% if run.error %}<span class="muted" title="{{ run.error }}">{{ run.error[:80] }}</span>{% endif %}</td>
+        <td>{{ run.ingested_count }}/{{ run.findings_count }}{% if run.result_json.get('rejected_count') %}
+          <span class="muted" title="{% for r in run.result_json.get('rejected', []) %}{{ r.url }} — {{ r.reason }}
+{% endfor %}">({{ run.result_json.get('rejected_count') }} abgelehnt)</span>{% endif %}</td>
+        <td>{{ '%.1f' | format(run.latency_ms / 1000) }}s</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endif %}
 
 {# ----------------------------- EVIDENCE ---------------------------- #}
@@ -404,15 +522,30 @@
 <section class="card">
   <h2>Draft versions</h2>
   <table>
-    <thead><tr><th>Version</th><th>Language</th><th>Status</th><th>Words</th><th>Est. duration</th><th>Created</th></tr></thead>
+    <thead><tr><th>Version</th><th>Sprache</th><th>Status</th><th>Generierung</th><th>Wörter</th><th>Geschätzte Dauer</th><th>Erstellt</th></tr></thead>
     <tbody>
       {% for draft in drafts %}
+      {% set est_min = draft.estimated_duration_seconds / 60 %}
+      {% set band_min = draft.target_duration_minutes * 0.9 %}
+      {% set band_max = draft.target_duration_minutes * 1.1 %}
+      {% set genval = draft.provenance_json.get('generation_validation', {}) %}
       <tr>
         <td>v{{ draft.version_number }}</td>
         <td>{{ draft.language }}</td>
         <td><span class="badge {% if draft.status.value == 'APPROVED' %}success{% endif %}">{{ draft.status.value.replace('_', ' ') }}</span></td>
+        <td>
+          {% if genval.get('status') == 'PASSED' %}<span class="badge success">erfüllt</span>
+          {% elif genval.get('status') == 'FAILED' %}<span class="badge danger">nicht erfüllt</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
         <td>{{ draft.actual_word_count }}</td>
-        <td>{{ (draft.estimated_duration_seconds // 60) }} min</td>
+        <td>{{ '%.1f' | format(est_min) }} min
+          <span class="muted" title="Generierungsband: reviewreif; Freigabe-Band: {{ duration_min or '?' }}–{{ duration_max or '?' }} Min.">Gen:</span>
+          {% if est_min < band_min %}<span class="badge warning">zu kurz</span>
+          {% elif est_min > band_max %}<span class="badge warning">zu lang</span>
+          {% else %}<span class="badge success">reviewreif</span>{% endif %}
+          {% if est_min < duration_min %}<span class="badge warning">Freigabe: zu kurz</span>
+          {% elif est_min > duration_max %}<span class="badge warning">Freigabe: zu lang</span>{% endif %}</td>
         <td>{{ draft.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
       </tr>
       {% endfor %}
@@ -421,6 +554,18 @@
 </section>
 <section class="card">
   <h2>Latest draft — v{{ latest_draft.version_number }} ({{ latest_draft.language }})</h2>
+  {% set genval = latest_draft.provenance_json.get('generation_validation', {}) %}
+  {% if genval.get('status') == 'FAILED' %}
+  <p class="error">Generierungsanforderungen nicht erfüllt — der Entwurf ist
+  nicht reviewreif{% if genval.failed_checks %} ({{ genval.failed_checks | join(', ') }}){% endif %}.
+  „Skript erstellen" erneut ausführen — automatische Korrekturen wurden bereits
+  {{ genval.max_correction_attempts }}× versucht. Semantische Revisionen wurden
+  nicht verbraucht.</p>
+  {% elif genval.get('status') == 'PASSED' %}
+  <p class="muted">Generierungsprüfung bestanden
+    ({{ genval.attempts | length }} Versuch{% if genval.attempts | length > 1 %}e{% endif %})
+    — der Entwurf ist bereit für das Review.</p>
+  {% endif %}
   <dl class="metadata">
     <div><dt>Status</dt><dd>{{ latest_draft.status.value.replace('_', ' ') }}</dd></div>
     <div><dt>Words</dt><dd>{{ latest_draft.actual_word_count }}</dd></div>
@@ -429,6 +574,7 @@
     <div><dt>Narrative plan</dt><dd>v{{ latest_draft.provenance_json.get('narrative_plan_version', '—') }}</dd></div>
     <div><dt>Semantic master</dt><dd>v{{ latest_draft.provenance_json.get('lecture_master_version', '—') }}</dd></div>
   </dl>
+  {{ book_refs_table(book_ref_rows) }}
   <details open><summary>Script text</summary>
     <p class="unit-fulltext">{{ latest_draft.text }}</p>
   </details>
@@ -441,14 +587,69 @@
 {% elif active_stage.value == 'REVIEW' %}
 {% if latest_draft %}
 <section class="card">
-  <h2>Review — draft v{{ latest_draft.version_number }}</h2>
-  {% if state.open_blockers %}
-  <p class="error">Approval is blocked: {{ state.open_blockers }} blocking finding(s) are still open.</p>
+  <h2>Review — Entwurf v{{ latest_draft.version_number }}</h2>
+  <p class="muted">Review-Zyklus #{{ state.current_review_cycle }} ·
+    {{ state.cycle_revisions_used }} Revision(en) in diesem Zyklus verbraucht.
+    {% if state.final_duration_minutes is not none %}Freigabe-Dauer:
+    {{ state.final_duration_minutes }} Min.
+    {% if state.final_duration_in_band %}(im {{ duration_min or '?' }}–{{ duration_max or '?' }}-Min.-Endband)
+    {% else %}(<strong>außerhalb</strong> des {{ duration_min or '?' }}–{{ duration_max or '?' }}-Min.-Endbands — Freigabe blockiert){% endif %}{% endif %}
+  </p>
+  {% if state.revision_budget_exhausted %}
+  <p class="error">Automatisches Revisionsbudget für Zyklus #{{ state.current_review_cycle }}
+  erschöpft (OWNER_REVIEW_REQUIRED) — der Eigentümer kann Ergebnisse akzeptieren,
+  den Entwurf freigeben (sofern alle Gates erfüllt), neu generieren oder explizit
+  einen neuen Review-Zyklus starten. Historische Runden bleiben unverändert.</p>
+  {% endif %}
+  {% if review_runs and review_runs[0].status.value in ('PENDING', 'RUNNING') %}
+  <p class="muted">Review läuft (Runde {{ review_runs[0].round_number }})…</p>
+  {% elif review_runs and review_runs[0].status.value == 'FAILED' %}
+  <p class="error">Review fehlgeschlagen (Runde {{ review_runs[0].round_number }}): {{ review_runs[0].error or 'unbekannter Fehler' }}</p>
+  {% elif review_stale %}
+  <p class="error">Review erneut erforderlich — der Entwurf wurde seit der letzten Prüfung geändert.</p>
+  {% elif current_run %}
+  {% if state.open_blockers or state.open_warnings %}
+  <p class="error">Freigabe blockiert: {{ state.open_blockers }} blockierende(s) und {{ state.open_warnings }} schwere(s) Ergebnis(se) sind noch offen — beheben oder einzeln akzeptieren.</p>
   {% else %}
-  <p class="muted">No open blockers — this draft can be approved.</p>
+  <p class="muted">Review abgeschlossen (Runde {{ current_run.round_number }}, {{ current_run.finding_count }} Ergebnis(se)) — dieser Entwurf kann freigegeben werden.</p>
+  {% endif %}
+  {% elif latest_draft.status.value == 'APPROVED' %}
+  <p class="muted">Historischer Datensatz — Review nicht nachweisbar (vor dem ReviewRun-Modell freigegeben).</p>
+  {% elif state.generation_status == 'FAILED' %}
+  <p class="error">Generierung unvollständig ({{ state.generation_failed_checks | join(', ') }}) —
+  der Entwurf ist nicht reviewreif. „Skript erstellen" erneut ausführen;
+  Review-Runden wurden nicht verbraucht.</p>
+  {% else %}
+  <p class="muted">Noch kein Review — „Review starten" ausführen.</p>
+  {% endif %}
+  {{ book_refs_table(book_ref_rows) }}
+  {% if review_runs %}
+  <table>
+    <thead><tr>
+      <th>Runde</th><th>Zyklus</th><th>Status</th><th>Entwurf</th><th>Ergebnisse</th>
+      <th>Kritiker</th><th>Provider/Modell</th><th>Dauer</th>
+    </tr></thead>
+    <tbody>
+      {% for run in review_runs %}
+      <tr>
+        <td>{{ run.round_number }}</td>
+        <td>#{{ run.cycle_number or 1 }}</td>
+        <td>
+          <span class="badge {% if run.status.value == 'COMPLETED' %}success{% elif run.status.value == 'FAILED' %}danger{% else %}warning{% endif %}">{{ run.status.value }}</span>
+          {% if current_run and run.id == current_run.id %}<span class="chip">aktuell</span>{% endif %}
+        </td>
+        <td>v{{ run.draft_version }} <code>{{ run.draft_hash[:8] }}</code></td>
+        <td>{{ run.finding_count }} ({{ run.blocking_count }} block./{{ run.major_count }} schwer/{{ run.minor_count }} info)</td>
+        <td>{{ run.critics_completed }}/{{ run.critics_requested }}</td>
+        <td>{{ run.provider or '—' }}{% if run.model %} · {{ run.model }}{% endif %}</td>
+        <td>{{ (run.latency_ms / 1000) | round(1) }} s</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 </section>
-{% for role, role_findings in findings | groupby('critic_role') %}
+{% for role, role_findings in current_run_findings | groupby('critic_role') %}
 <section class="card">
   <h3>{{ role.replace('_', ' ') }} critic ({{ role_findings | length }})</h3>
   {% for finding in role_findings %}
@@ -457,16 +658,46 @@
       <span class="badge {% if finding.severity.value == 'BLOCKER' %}danger{% elif finding.severity.value == 'WARNING' %}warning{% endif %}">{{ finding.severity.value }}</span>
       <code>{{ finding.code }}</code>
       <span class="chip">{{ finding.status.value }}</span>
+      {% if finding.status.value == 'WAIVED' and finding.resolution_actor %}
+      <span class="chip">waived by {{ finding.resolution_actor }}</span>
+      {% endif %}
+      {% if finding.status.value == 'OPEN' %}
+      <form method="post" class="inline-form"
+            action="/studio/production/{{ brief.id }}/findings/{{ finding.id }}/waive">
+        <input type="text" name="reason" required
+               placeholder="Begründung (Eigentümer-Entscheidung)"
+               title="Waivers are owner decisions — a justification is required">
+        <button class="button secondary small" type="submit"
+                title="Als akzeptiert markieren — zählt nicht mehr als offenes Ergebnis">Akzeptieren</button>
+      </form>
+      {% endif %}
     </div>
     <p><strong>{{ finding.location }}</strong></p>
     <p>{{ finding.explanation }}</p>
-    {% if finding.correction_constraint %}<p class="muted"><strong>Correction.</strong> {{ finding.correction_constraint }}</p>{% endif %}
+    {% if finding.resolution_note %}<p class="muted"><strong>{% if finding.status.value == 'WAIVED' %}Begründung{% else %}Empfehlung{% endif %}.</strong> {{ finding.resolution_note }}</p>{% endif %}
+    {% if finding.correction_constraint %}<p class="muted"><strong>Korrektur.</strong> {{ finding.correction_constraint }}</p>{% endif %}
   </div>
   {% endfor %}
 </section>
-{% else %}
-<section class="card empty-state"><p class="muted">No critic findings yet — run review.</p></section>
 {% endfor %}
+{% if historical_findings %}
+<section class="card">
+  <h3>Historische Ergebnisse (ältere Review-Runde)</h3>
+  <p class="muted">Diese Ergebnisse gehören zu einer früheren Prüfung und blockieren die Freigabe nicht automatisch — besteht das Problem weiter, meldet der Critic es erneut.</p>
+  {% for finding in historical_findings %}
+  <div class="unit-row">
+    <div class="unit-head">
+      <span class="badge {% if finding.severity.value == 'BLOCKER' %}danger{% elif finding.severity.value == 'WARNING' %}warning{% endif %}">{{ finding.severity.value }}</span>
+      <code>{{ finding.code }}</code>
+      <span class="chip">{{ finding.status.value }}</span>
+      <span class="muted">{{ finding.critic_role.replace('_', ' ') }}</span>
+    </div>
+    <p><strong>{{ finding.location }}</strong></p>
+    <p>{{ finding.explanation }}</p>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
 {% else %}
 {{ not_built('Review', 'A script draft must exist before critics can run.') }}
 {% endif %}

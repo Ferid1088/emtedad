@@ -1,4 +1,169 @@
-# Pending Phase: Multichannel program — Phase 21 complete, awaiting owner review
+# Pending Phase: Phase 6.2 — approval semantics + cycles + quote provenance + real translation, awaiting owner review
+
+Status (2026-10-06, Phase 7 pre-commit integrity audit — uncommitted):
+
+- Owner authority: `waive_finding`/`approve_draft`/`start_review_cycle`
+  now require explicit actor identity (waivers also justification);
+  `recommend_waiver` is a separate non-resolving agent path.
+- Psychology v8 is REVISED at an owner checkpoint — the eight findings
+  are OPEN with recorded agent recommendations; earlier agent-executed
+  waivers were reverted rather than fabricated as owner consent.
+- Revision budget counts persisted revision drafts per cycle
+  (`ScriptDraft.revision_cycle`), never review runs. Psych: c1=1, c2=3
+  (exhausted). History: c1=2, c2=2 — one revision remains.
+- Localization: `adjust_duration` is anchored to the exported approved
+  Semantic Master and requires exact claim-set equality; the semantic
+  validator now blocks U+FFFD/Cf corruption (ZWNJ exempt). Live fixes:
+  AR corruption + superlative + invented quantifier, EN ungrounded
+  detail, DE de-attributed statistic.
+- Full regression: ruff/format/mypy strict clean; 342 unit + 118
+  integration passed; migration chain clean end-to-end.
+- Audit record: `docs/audits/FULL_PROCESS_OPTIMIZATION.md` →
+  FINAL_PRECOMMIT_AUDIT. Do not commit without explicit owner approval.
+
+Status (2026-10-05, uncommitted on top of the Phase 6.1 tree):
+
+- Final approval gate: `approve_draft` now hard-requires the configured
+  25–30 min band deterministically (language WPM, shared word counter) —
+  critic silence can no longer approve an under/over-length draft.
+- Review cycles: `ReviewCycle` + `ReviewRun.cycle_number` persist the
+  owner-authorized cycle; `start_review_cycle` grants a fresh bounded
+  budget only after exhaustion — history never renumbered.
+- Quote provenance: direct quotes verify against raw source excerpts,
+  not generated Evidence claims; marked translations exempt, unmarked
+  renderings still flag.
+- Revision encoding gate: corrupted revision output now fails honestly
+  (verified live on two real corrupted outputs).
+- Live certification: psych v8 APPROVED (27.2 min, cycle 2, 3/3 rounds,
+  8 justified waivers). History honestly BLOCKED at owner checkpoint —
+  v11 has 1 blocker + 23.8 min; cycle-3 authorization not granted.
+- Real localization from the approved master: DE 27.0 min (3 loops),
+  EN 25.3 min (1 loop), AR 25.0 min (2 loops), FA verified as master
+  language — independent statuses verified in DB and UI.
+- Tests: 341 unit + integration suites green; ruff/mypy strict clean.
+- Stop state: NOT committed; owner review checkpoint.
+
+Status (2026-10-04, uncommitted on top of the Phase 5 tree):
+
+- Root cause of the short-first-draft defect: the budget chain existed
+  end-to-end (brief → narrative `target_seconds` → master
+  `duration_seconds` → per-section writer `target_words`), but narrative
+  totals were trusted uncalibrated (live: 720–1650 s for 27.5-min
+  briefs) and nothing validated the draft before it consumed review
+  rounds. A second defect surfaced in Loop 2: two word counters
+  (ZWNJ-splitting regex vs whitespace) let a 21.8-min draft pass as
+  in-band — unified on the whitespace spoken-word count.
+- Narrative budget calibration: `_calibrate_target_seconds` rescales
+  model-proposed per-beat seconds to the brief target when the sum
+  drifts >10 %; raw and calibrated totals are hashed/persisted.
+- Generation contract: `writing/generation.py::validate_generation`
+  checks encoding, duration band (0.85–1.15 × target·wpm, owner-tunable
+  via `first_draft_{min,max}_duration_ratio`), paragraph floor vs planned
+  beats, and Persian quality blockers (incl. new `REPEATED_SENTENCES`
+  filler check). Bounded correction
+  (`generation_max_correction_attempts`, default 2) uses
+  `script_generation_correction` — never creates a ReviewRun, never
+  consumes `max_revision_rounds`.
+- Truthful failure: persistent generation failure persists
+  `generation_validation.status=FAILED`; `ProductionService` gates
+  `run_review`/`revise`/`approve` and shows SCRIPT as REVIEW_REQUIRED;
+  the workspace explains attempts, failed checks, and that revision
+  rounds were not consumed.
+- Live results: psych-evol v5 2992 w ≈ 27.2 min PASSED attempt 1 (prior
+  first drafts ~70 % of target); history v6 bounded-correction exhausted
+  on un-repairable U+FFFD → honest FAILED; history v7 one correction →
+  2581 w ≈ 23.5 min PASSED.
+- Provider capacity live-verified: background capped at 2 remote
+  sessions while owner work acquired slots; `provider_capacity_wait`
+  instrumentation logs ≥1 s slot waits; per-process pool + foreign
+  account sessions remain documented limits.
+- Tests: 337 unit, targeted integration green; ruff/mypy strict clean.
+- Stop state: NOT committed; owner review checkpoint.
+
+# Earlier state: Phase 5 — book-reference correction + real quality loops, awaiting owner review
+
+Status (2026-10-04, uncommitted on top of the Phase 4 tree):
+
+- `BOOK_REFERENCE_PERSIAN` semantics corrected: the rule judges the
+  book's SOURCE language from metadata (`original_language`), never the
+  rendered title — a Persian-translated title of an English book is
+  presentation and is allowed; a Persian book under an English title is
+  still rejected; missing language is omitted, never assumed.
+- Quote policy corrected: no more blanket ban. `verified_quote` is
+  populated by the selector only from verbatim evidence wording and
+  re-verified deterministically by the gate; the writer may use
+  PARAPHRASE / DIRECT_QUOTE (exact reproduction; translations marked as
+  translation, never in quotes) / CRITICAL_ATTRIBUTION.
+- Deterministic `BOOK_POLICY` layer (`book_reference_findings`): quoted
+  spans near attribution anchors or «کتاب» mentions must be verified
+  wording — reproduces the live «آدم‌های خالص» catch; quoted titles
+  («کتاب «عنوان»») are citations, exempt.
+- Encoding-corruption root cause fixed at the provider boundary: remote
+  session output carries U+FFFD; the live session now gets one bounded
+  in-session repair turn (stale-output suppression) before the
+  fresh-session fallback; `ENCODING_CORRUPTION` blocker remains the
+  certification backstop.
+- Reproducibility: allow-list still frozen in
+  `draft.provenance_json["book_references"]` before the writer call;
+  `reference_usage()` + `book_refs_table` show available vs used
+  references in SCRIPT and REVIEW stages without re-running selection.
+- Real loops: same-draft re-review (PERSIAN false positive gone, real
+  findings retained), regenerated psych-evol v4 (verified-quote
+  translations, natural varied attribution), history-channel v4 (Haidt,
+  one purposeful citation, zero book findings).
+- Tests: 315 unit (17 book-reference), targeted integration green;
+  ruff/mypy strict clean.
+- Stop state: NOT committed; owner review checkpoint.
+
+# Earlier state: Phase 4 — provider capacity + real semantic certification, awaiting owner review
+
+Status (2026-10-04, uncommitted on top of the Phase 21 / Parts A–B tree):
+
+- Provider starvation fixed at root: leaked remote Devin sessions orphaned
+  by killed processes held the 5-slot quota. `app/knowledge/llm/capacity.py`
+  enforces a total cap plus a background cap by work class
+  (`INTERACTIVE_OWNER` > `OWNER_REQUESTED` > `BACKGROUND_NEW` >
+  `BACKGROUND_RETRY`); the provider sweeps stale tagged `blocked`/`expired`
+  sessions and backs off on quota. New finding: foreign untagged sessions
+  on the same account also consume the cap — they cannot be swept;
+  `provider_max_concurrency` should reflect effective quota.
+- Scheduler: persisted owner pause (`background_processing_paused`) gates
+  background classes only; quota/rate-limit failures never burn
+  `attempt_count`; owner "retry all failed" action bypasses the cap.
+- Real semantic evidence where provider capacity permitted: 81 real topic
+  candidates (all five channels ≥ 10), two real scripts in different
+  channels, a live V1→V3 review/revision chain (36→30→32 findings, blocker
+  resolved, no stale-finding leak), master immutability test, and a real
+  book-PDF run that correctly stopped at STRUCTURE_REVIEW_REQUIRED (merge
+  prompt defect found and fixed, `source_structure_merge_v2`).
+- Real defects found and fixed: transcript NameError, LogRecord `extra`
+  collisions masking failures, duplicate re-mining via
+  `_published_signatures` scope, vague script duration instruction
+  (explicit per-section word targets now), revision prompt without word
+  budget, provider U+FFFD corruption caught deterministically
+  (`ENCODING_CORRUPTION`), merge dropping parent nodes.
+- Localization: `adjust_duration` actively corrects spoken length as a new
+  immutable version (claim-set preserved, quality gate re-run, owner button
+  on the translations page); shared `speech_wpm()` helper.
+- Book/author references (final-prompt §18–26): `build_script` runs a
+  `book_reference_selection` step over the frozen EvidenceMatrix claims;
+  `app/content_engine/writing/books.py` applies the deterministic gate
+  (non-Persian only, dedupe, cap 4), the surviving allow-list is frozen in
+  `draft.provenance_json["book_references"]`, injected into the writer
+  payload, shown in the draft UI, and checked by the channel-specific
+  critic (`BOOK_REFERENCE_UNVERIFIED|PERSIAN|INVENTED_QUOTE|OVERCLAIM`).
+  Selection failure degrades to no references — scripts never *need* one.
+  Prompts bumped: `script_writer_v3`, `critic_v2`.
+- Honest limits: OpenRouter web research `BLOCKED: NO_API_KEY`; token/cost
+  `BLOCKED: PROVIDER_CONTRACT`; first-write scripts still land ~50–60 % of
+  the 25–30 min target (revision recovers: +64 %/+72 %, one in-band).
+- Tests: 304 unit, 108+ integration (3 pre-existing environmental failures
+  unchanged, verified identical on HEAD). Evidence:
+  `docs/audits/FULL_PROCESS_OPTIMIZATION.md` + `PROCESS_OPTIMIZATION_LOOP.md`
+  Phase 4 appendices.
+- Stop state: NOT committed; owner review checkpoint.
+
+# Earlier state: Multichannel program — Phase 21 complete
 
 (For the multichannel program defined in
 `docs/EMTEDAD_CODING_AGENT_MASTER_IMPLEMENTATION_PROMPT.md`. Phases 0–21 are

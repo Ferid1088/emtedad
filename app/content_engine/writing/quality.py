@@ -66,6 +66,13 @@ class PersianDraftQualityValidator:
                     "Unicode format controls remain in prose.",
                 )
             )
+        if "\ufffd" in text:
+            findings.append(
+                PersianDraftFinding(
+                    "ENCODING_CORRUPTION",
+                    "Replacement characters (U+FFFD) remain in prose.",
+                )
+            )
         paragraphs = [
             item.strip() for item in re.split(r"\n\s*\n", text) if item.strip()
         ]
@@ -77,6 +84,25 @@ class PersianDraftQualityValidator:
                 PersianDraftFinding(
                     "DUPLICATE_PARAGRAPHS",
                     "Repeated paragraphs exceed the permitted ratio.",
+                )
+            )
+        # Filler can hide below paragraph level: the same sentence restated
+        # across paragraphs pads duration without adding content.
+        sentences = [
+            _normalize(part)
+            for part in re.split(r"[.!?؟\n]+", text)
+            if len(_normalize(part)) >= 40
+        ]
+        repeated = len(sentences) - len(set(sentences))
+        if sentences and (
+            repeated / len(sentences) > 0.12
+            or any(sentences.count(s) >= 3 for s in set(sentences))
+        ):
+            findings.append(
+                PersianDraftFinding(
+                    "REPEATED_SENTENCES",
+                    "The same sentences are restated across the draft — "
+                    "duration filled by repetition, not content.",
                 )
             )
         if evidence_texts:
@@ -109,32 +135,49 @@ class PersianDraftQualityValidator:
 
 
 def word_count(text: str) -> int:
-    """Count Latin/CJK and Persian-script words in one shared way."""
+    """Count spoken words — whitespace-separated tokens.
 
-    return len(re.findall(r"[\w\u0600-\u06ff]+", text))
+    A character-class regex would split Persian ZWNJ compounds
+    («می‌شود») into two tokens and inflate the count ~15 % over the
+    spoken truth, which silently under-reads the duration band. One
+    counter drives generation validation, persisted
+    ``actual_word_count``, and review-level duration findings.
+    """
+
+    return len(re.findall(r"\S+", text))
 
 
 def duration_findings(
-    text: str, target_minutes: int
+    text: str, target_minutes: float, wpm: int = 110
 ) -> tuple[list[PipelineFinding], int]:
-    """Check the word count against the spoken-duration band."""
+    """Check the word count against the spoken-duration band (±10%).
+
+    ``wpm`` is the language-specific speech rate; the Persian default of 110
+    reproduces the historical 99–121-words-per-minute band exactly.
+    """
 
     count = word_count(text)
-    target_min = round(target_minutes * 99)
-    target_max = round(target_minutes * 121)
+    target_min = round(target_minutes * wpm * 0.9)
+    target_max = round(target_minutes * wpm * 1.1)
     if target_min <= count <= target_max:
         return [], count
+    too_short = count < target_min
     return (
         [
             PipelineFinding(
-                "DURATION_OUT_OF_RANGE",
+                "DURATION_TOO_SHORT" if too_short else "DURATION_TOO_LONG",
                 "EDITORIAL_DURATION",
                 "WARNING",
-                "Der Entwurf liegt außerhalb der gewünschten Sprechdauer.",
+                (
+                    "Der Entwurf ist zu kurz für die gewünschte Sprechdauer."
+                    if too_short
+                    else "Der Entwurf ist zu lang für die gewünschte Sprechdauer."
+                ),
                 metadata={
                     "word_count": count,
                     "target_min": target_min,
                     "target_max": target_max,
+                    "wpm": wpm,
                 },
             )
         ],

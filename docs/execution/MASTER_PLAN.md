@@ -335,6 +335,7 @@ prompt. Status here refers to those phases.
 | 20 | Publication targets | complete | `PublicationTarget` model; no auto-publish |
 | 20a | Generic Semantic Master | complete | `CONTENT_BRIEF`-origin `LectureMasterVersion` via `GenericMasterService`; script gated on READY master; no lesson/canon dependency |
 | 21 | Retire 100-lesson path | pending | Prerequisite met; needs owner deletion decision |
+| P4 | Provider capacity + semantic certification | owner review | Class-aware provider capacity + orphan sweep + quota backoff; 81 real candidates; live review→revision chains in 2 channels; merge/voice/duration defects found and fixed; `NO_API_KEY` web research documented |
 
 Evidence: `docs/audits/MULTICHANNEL_PHASE_0_BASELINE.md`,
 `docs/audits/MULTICHANNEL_PHASE_1_EDITORIAL_CHANNELS.md`,

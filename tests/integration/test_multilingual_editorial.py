@@ -73,7 +73,15 @@ def test_approved_persian_is_exact_source_for_tracks_and_voice() -> None:
             track = await session.get(EditorialLanguageTrack, track_ids[0])
             assert track is not None
             assert track.display_text == text
-            assert track.voice_ready_text == text
+            # Voice text may carry pronunciation marks (e.g. Ezafe on
+            # آیین امتداد); stripping marks from both sides must show
+            # identical underlying text — voice never alters wording.
+            import unicodedata
+
+            def unmarked(value: str) -> str:
+                return "".join(c for c in value if unicodedata.category(c) != "Mn")
+
+            assert unmarked(track.voice_ready_text) == unmarked(text)
             assert track.source_persian_draft_id == draft_id
             await session.execute(
                 delete(EditorialLanguageTrack).where(

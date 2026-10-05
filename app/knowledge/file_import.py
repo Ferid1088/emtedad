@@ -221,3 +221,131 @@ async def import_file_resource(
     if schedule:
         schedule_structure_analysis(database, source.id)
     return source.id
+
+
+WEB_PLATFORM = "web"
+
+
+async def import_web_resource(
+    database: Database,
+    *,
+    url: str,
+    title: str,
+    text: str,
+    provider: str,
+    query: str | None = None,
+    answer_text: str = "",
+    channel_ids: tuple[UUID, ...] = (),
+    language: str = "en",
+    schedule: bool = True,
+    publication_type: str = "web_research",
+    retrieval_weight: float = 1.0,
+    quality_notes: str | None = None,
+) -> tuple[UUID, bool]:
+    """Persist a fetched web page as a WEBPAGE source.
+
+    Returns ``(source_id, created)`` — dedupe is on the canonical URL, so a
+    re-discovered page reuses the existing source. The provider's synthesized
+    answer is kept only in ``raw_metadata``; source segments contain the real
+    fetched page text, never the synthesis.
+    """
+
+    if not url.startswith(("http://", "https://")):
+        raise FileImportError("Web resources require an http(s) URL.")
+    segments = [PageSegment(page=0, text=chunk) for chunk in _chunk(text)]
+    if not segments:
+        raise FileImportError("No readable text could be extracted from the page.")
+    external_id = hashlib.sha256(url.encode()).hexdigest()[:48]
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    async with database.transaction() as session:
+        existing = await session.scalar(
+            select(Source.id).where(
+                Source.platform == WEB_PLATFORM, Source.external_id == external_id
+            )
+        )
+        if existing is not None:
+            source_id = existing
+            created = False
+        else:
+            source = Source(
+                source_type=SourceType.WEBPAGE,
+                platform=WEB_PLATFORM,
+                external_id=external_id,
+                canonical_url=url[:1024],
+                title=(title or url)[:1024],
+                language=language or "en",
+                raw_metadata={
+                    "research_provider": provider,
+                    "research_query": query or "",
+                    "research_answer": answer_text[:4000],
+                },
+                ingestion_status=IngestionStatus.DISCOVERED,
+            )
+            session.add(source)
+            await session.flush()
+            session.add(
+                SourceQuality(
+                    source_id=source.id,
+                    publication_type=publication_type,
+                    peer_reviewed=None,
+                    primary_or_secondary="secondary",
+                    retraction_status=None,
+                    review_notes=(
+                        quality_notes
+                        or (
+                            "Fetched via owner-configured web research; "
+                            "epistemic status is assigned per knowledge unit, "
+                            "not per page."
+                        )
+                    ),
+                    retrieval_weight=retrieval_weight,
+                )
+            )
+            version = SourceVersion(
+                source_id=source.id,
+                content_hash=digest,
+                transcript_hash=digest,
+                corpus_zone=CorpusZone.EXTERNAL_PRIMARY,
+                provider_metadata={
+                    "fetched_url": url,
+                    "research_provider": provider,
+                    "segment_pages": {},
+                },
+                acquisition_tool=provider,
+                acquisition_version="web-research-v1",
+                normalization_version=NORMALIZATION_VERSION,
+                acquired_at=datetime.now(UTC),
+            )
+            session.add(version)
+            await session.flush()
+            position = Decimal(0)
+            for sequence, segment in enumerate(segments, start=1):
+                end = position + Decimal(max(len(segment.text), 1))
+                session.add(
+                    SourceSegment(
+                        source_version_id=version.id,
+                        sequence=sequence,
+                        start_seconds=position,
+                        end_seconds=end,
+                        raw_text=segment.text,
+                        normalized_text=normalize_external_text(segment.text),
+                        language=source.language,
+                        content_hash=hashlib.sha256(segment.text.encode()).hexdigest(),
+                    )
+                )
+                position = end
+            source.ingestion_status = IngestionStatus.INGESTED
+            await session.flush()
+            source_id = source.id
+            created = True
+    if created:
+        await SourceStructureService(database).mark_ingested(source_id)
+        if schedule:
+            schedule_structure_analysis(database, source_id)
+    if channel_ids:
+        from app.editorial_channels.service import EditorialChannelService
+
+        channel_service = EditorialChannelService(database)
+        for channel_id in channel_ids:
+            await channel_service.assign_resource(channel_id, source_id)
+    return source_id, created

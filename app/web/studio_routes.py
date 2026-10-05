@@ -2,8 +2,10 @@
 
 import contextlib
 import json
+import re
 from pathlib import Path
 from typing import Any, TypedDict, cast
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Request
@@ -25,11 +27,13 @@ from app.channel_monitoring.service import ChannelDiscoveryService
 from app.content_engine.domain import (
     DraftStatus,
     ProductionStage,
+    ReviewRunStatus,
 )
 from app.content_engine.models import (
     ArgumentPlan,
     NarrativePlan,
     ReviewFinding,
+    ReviewRun,
     ScriptDraft,
 )
 from app.content_engine.review import ScriptService
@@ -37,6 +41,7 @@ from app.content_engine.service import (
     ContentEngineService,
     GateBlockedError,
 )
+from app.content_engine.writing.books import BookReference, reference_usage
 from app.content_strategy.models import (
     EditorialLanguageTrack,
     EditorialProject,
@@ -62,6 +67,7 @@ from app.editorial_channels.service import (
 )
 from app.knowledge.domain import SourceType
 from app.knowledge.file_import import FileImportError, import_file_resource
+from app.knowledge.llm.capacity import get_capacity
 from app.knowledge.models import (
     EntityLabel,
     ExternalConcept,
@@ -71,8 +77,13 @@ from app.knowledge.models import (
     SourceVersion,
     Work,
 )
-from app.knowledge.structure.domain import SourceProcessingStatus
+from app.knowledge.structure.domain import (
+    FailureClass,
+    SourceProcessingStatus,
+    classify_failure,
+)
 from app.knowledge.structure.models import SourceProcessingState, SourceStructureNode
+from app.knowledge.structure.scheduler import get_scheduler
 from app.knowledge.structure.service import SourceStructureService
 from app.knowledge.units.domain import ClaimType, KnowledgeUnitType
 from app.knowledge.units.mapping_service import ConceptMappingService
@@ -91,10 +102,16 @@ from app.lecture.models import (
     LectureSection,
 )
 from app.localization.domain import LocalizationStatus
-from app.localization.models import LocalizationProject
+from app.localization.models import (
+    LocalizationProject,
+    LocalizationStatement,
+    LocalizationVersion,
+)
 from app.localization.service import LocalizationService
+from app.ops.settings.service import StudioSettingsService
 from app.production.models import PublicationTarget
 from app.production.service import ProductionService, ProductionState
+from app.research.domain import ResearchPlanStatus
 from app.research.epistemic import classify_epistemic
 from app.research.generic import GenericResearchService
 from app.research.models import (
@@ -117,6 +134,8 @@ from app.topics.models import (
 )
 from app.topics.service import TopicService
 from app.web.service import import_youtube_resource
+from app.web_research.gap_fill import GapFillService
+from app.web_research.models import WebResearchRun
 
 router = APIRouter(tags=["studio"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -797,6 +816,63 @@ async def studio_translations(request: Request) -> HTMLResponse:
     groups: dict[UUID, list[LocalizationProject]] = {}
     for project in projects:
         groups.setdefault(project.lecture_master_version_id, []).append(project)
+
+    # Per-language duration estimates: word count of the latest version's
+    # statements ÷ the owner-configured WPM for that language. Each
+    # language is measured independently — a German version can be
+    # TOO_LONG while the English one sits in target.
+    latest_versions: dict[UUID, LocalizationVersion] = {}
+    if projects:
+        for version in await session.scalars(
+            select(LocalizationVersion)
+            .where(
+                LocalizationVersion.localization_project_id.in_(
+                    [p.id for p in projects]
+                )
+            )
+            .order_by(LocalizationVersion.version_number.desc())
+        ):
+            latest_versions.setdefault(version.localization_project_id, version)
+    word_counts: dict[UUID, int] = {}
+    if latest_versions:
+        rows = await session.execute(
+            select(
+                LocalizationStatement.localization_version_id,
+                LocalizationStatement.display_text,
+            ).where(
+                LocalizationStatement.localization_version_id.in_(
+                    [v.id for v in latest_versions.values()]
+                )
+            )
+        )
+        for version_id, display_text in rows:
+            word_counts[version_id] = word_counts.get(version_id, 0) + len(
+                re.findall(r"\S+", display_text or "")
+            )
+    effective = await StudioSettingsService(database).effective()
+    target_min = float(str(effective.get("target_duration_min_minutes", 25)))
+    target_max = float(str(effective.get("target_duration_max_minutes", 30)))
+    durations: dict[UUID, dict[str, object]] = {}
+    for project in projects:
+        loc_version: LocalizationVersion | None = latest_versions.get(project.id)
+        if loc_version is None:
+            continue
+        version = loc_version
+        words = word_counts.get(version.id, 0)
+        wpm = float(str(effective.get(f"speech_wpm_{project.language.value}", 130)))
+        minutes = words / wpm if wpm else 0.0
+        durations[project.id] = {
+            "version_id": version.id,
+            "words": words,
+            "minutes": round(minutes, 1),
+            "status": (
+                "TOO_SHORT"
+                if minutes < target_min
+                else "TOO_LONG"
+                if minutes > target_max
+                else "IN_TARGET"
+            ),
+        }
     return await _render(
         request,
         "studio/translations.html",
@@ -804,9 +880,13 @@ async def studio_translations(request: Request) -> HTMLResponse:
         groups=groups,
         masters=masters,
         ready_masters=ready_masters,
+        ready_master_ids={m.id for m in ready_masters},
         briefs=briefs,
         channels=channels,
         targets=targets,
+        durations=durations,
+        target_min=target_min,
+        target_max=target_max,
         languages=list(PublicationLanguage),
         notice=str(request.query_params.get("msg") or ""),
         error=str(request.query_params.get("error") or ""),
@@ -839,6 +919,31 @@ async def studio_translations_create(request: Request) -> Response:
         )
     return RedirectResponse(
         "/studio/translations?msg=%C3%9Cbersetzung+gestartet.", status_code=303
+    )
+
+
+@router.post("/studio/translations/{version_id}/adjust-duration")
+async def studio_translations_adjust_duration(
+    request: Request, version_id: UUID
+) -> Response:
+    try:
+        await LocalizationService(_database(request)).adjust_duration(
+            version_id, created_by="owner"
+        )
+    except LookupError:
+        return RedirectResponse(
+            "/studio/translations?error=Fassung+nicht+gefunden.",
+            status_code=303,
+        )
+    except Exception:  # noqa: BLE001
+        return RedirectResponse(
+            "/studio/translations?error="
+            "Die+L%C3%A4ngenkorrektur+konnte+nicht+ausgef%C3%BChrt+werden."
+            "+Bitte+sp%C3%A4ter+erneut+versuchen.",
+            status_code=303,
+        )
+    return RedirectResponse(
+        "/studio/translations?msg=L%C3%A4nge+angepasst.", status_code=303
     )
 
 
@@ -991,7 +1096,15 @@ async def _source_stats(
         stats[source_id]["units"] = unit_counts.get(version_id, 0)
         stats[source_id]["concepts"] = concept_counts.get(version_id, 0)
     for state in state_rows:
-        stats[state.source_id]["status"] = state.status.value
+        # A persisted FAILED on a quota/rate-limit error is not a dead
+        # source: the scheduler retries it after backoff. Show the owner
+        # the truth — "retrying" — not a permanent failure badge.
+        if state.status is SourceProcessingStatus.FAILED and classify_failure(
+            state.last_error
+        ) in {FailureClass.QUOTA, FailureClass.RATE_LIMIT}:
+            stats[state.source_id]["status"] = "RETRYING"
+        else:
+            stats[state.source_id]["status"] = state.status.value
         stats[state.source_id]["error"] = state.last_error
     return stats
 
@@ -1689,6 +1802,48 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
             if latest_draft is not None
             else []
         )
+        review_runs = (
+            list(
+                await session.scalars(
+                    select(ReviewRun)
+                    .where(ReviewRun.script_draft_id == latest_draft.id)
+                    .order_by(ReviewRun.round_number.desc())
+                )
+            )
+            if latest_draft is not None
+            else []
+        )
+        # The run that certifies the current text: COMPLETED for this exact
+        # draft version + hash. Anything else is history.
+        current_run = (
+            next(
+                (
+                    run
+                    for run in review_runs
+                    if run.status is ReviewRunStatus.COMPLETED
+                    and run.draft_version == latest_draft.version_number
+                    and run.draft_hash == latest_draft.content_hash
+                ),
+                None,
+            )
+            if latest_draft is not None
+            else None
+        )
+        review_stale = (
+            latest_draft is not None
+            and current_run is None
+            and any(run.status is ReviewRunStatus.COMPLETED for run in review_runs)
+        )
+        current_run_findings = [
+            f
+            for f in findings
+            if current_run is not None and f.review_run_id == current_run.id
+        ]
+        historical_findings = [
+            f
+            for f in findings
+            if current_run is None or f.review_run_id != current_run.id
+        ]
         signature = None
         if approved_draft is not None:
             signature = await session.scalar(
@@ -1702,6 +1857,27 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
                     ScriptSignature.script_draft_id == latest_draft.id
                 )
             )
+        # Allow-listed book references frozen with the draft, plus whether
+        # each one visibly surfaced in the script text — read-only, the
+        # selection is never re-run for display.
+        book_ref_rows: list[dict[str, object]] = []
+        if latest_draft is not None:
+            raw_refs = latest_draft.provenance_json.get("book_references", [])
+            parsed_refs = (
+                [
+                    BookReference.model_validate(item)
+                    for item in raw_refs
+                    if isinstance(item, dict)
+                ]
+                if isinstance(raw_refs, list)
+                else []
+            )
+            for ref, used in zip(
+                parsed_refs,
+                reference_usage(latest_draft.text, parsed_refs),
+                strict=True,
+            ):
+                book_ref_rows.append({"ref": ref, "used": used})
         localizations = (
             list(
                 await session.scalars(
@@ -1712,6 +1888,14 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
             )
             if master is not None
             else []
+        )
+        research_runs = list(
+            await session.scalars(
+                select(WebResearchRun)
+                .where(WebResearchRun.content_brief_id == brief_id)
+                .order_by(WebResearchRun.created_at.desc())
+                .limit(20)
+            )
         )
         # Resolve every referenced unit/item/section in batched lookups.
         unit_ids: set[UUID] = set()
@@ -1842,9 +2026,16 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
         "drafts": drafts,
         "latest_draft": latest_draft,
         "approved_draft": approved_draft,
+        "book_ref_rows": book_ref_rows,
         "findings": findings,
+        "review_runs": review_runs,
+        "current_run": current_run,
+        "review_stale": review_stale,
+        "current_run_findings": current_run_findings,
+        "historical_findings": historical_findings,
         "signature": signature,
         "localizations": localizations,
+        "research_runs": research_runs,
         "unit_map": unit_map,
         "item_map": item_map,
         "argument_section_map": argument_section_map,
@@ -1886,6 +2077,9 @@ async def brief_workspace(
     if stage:
         with contextlib.suppress(ValueError):
             active_stage = ProductionStage(stage)
+    database = _database(request)
+    gap = await GapFillService(database).assess(brief_id)
+    effective = await StudioSettingsService(database).effective()
     return await _render(
         request,
         "studio/brief_workspace.html",
@@ -1894,13 +2088,50 @@ async def brief_workspace(
         active_stage=active_stage,
         current_index=_stage_index(state.stage),
         uncertain_epistemic=_UNCERTAIN_EPISTEMIC,
+        gap=gap,
+        web_research_enabled=bool(effective.get("web_research_enabled")),
+        duration_min=effective.get("target_duration_min_minutes"),
+        duration_max=effective.get("target_duration_max_minutes"),
+        research_notice=request.query_params.get("research"),
+        error=request.query_params.get("error"),
         **detail,
+    )
+
+
+@router.post("/studio/production/{brief_id}/web-research")
+async def production_web_research(request: Request, brief_id: UUID) -> Response:
+    """Owner-triggered internet research for a brief with a material gap."""
+
+    try:
+        outcome = await GapFillService(_database(request)).fill_gap(
+            brief_id, process_inline=True, trigger="manual"
+        )
+    except LookupError:
+        return HTMLResponse("Brief not found", status_code=404)
+    if outcome.ran:
+        succeeded = sum(1 for item in outcome.ingested if item.status != "failed")
+        notice = (
+            f"Recherche abgeschlossen: {succeeded} Quelle(n) gefunden, "
+            f"{outcome.linked_units} neue Knowledge Units verknüpft."
+            + (f" Hinweis: {human_error(outcome.error)}" if outcome.error else "")
+        )
+    elif outcome.skipped_reason == "material_sufficient":
+        notice = "Genug Material vorhanden — keine Recherche nötig."
+    elif outcome.skipped_reason == "web_research_disabled":
+        notice = (
+            "Internet-Recherche ist deaktiviert. Aktiviere sie unter Einstellungen."
+        )
+    else:
+        notice = "Recherche nicht gestartet."
+    return RedirectResponse(
+        f"/studio/production/{brief_id}?research={quote(notice)}", status_code=303
     )
 
 
 _ACTION_HANDLERS = {
     "plan_research": "research",
     "build_evidence": "evidence",
+    "freeze_research": "freeze",
     "build_argument": "argument",
     "build_narrative": "narrative",
     "build_master": "master",
@@ -1908,6 +2139,7 @@ _ACTION_HANDLERS = {
     "run_review": "review",
     "revise": "revise",
     "approve": "approve",
+    "start_review_cycle": "review",
     "localize": "localize",
 }
 
@@ -1932,9 +2164,27 @@ async def production_action(request: Request, brief_id: UUID, action: str) -> Re
     database = _database(request)
     try:
         if action == "plan_research":
+            # When web research is enabled and the topic lacks material for
+            # the target duration, fill the gap before planning.
+            await GapFillService(database).fill_gap(brief_id, process_inline=True)
             await GenericResearchService(database).create_plan_for_brief(brief_id)
         elif action == "build_evidence":
+            await GapFillService(database).fill_gap(brief_id, process_inline=True)
             await GenericResearchService(database).build_evidence_matrix(brief_id)
+        elif action == "freeze_research":
+            async with database.transaction() as session:
+                plan_id = await session.scalar(
+                    select(ResearchPlan.id)
+                    .where(
+                        ResearchPlan.content_brief_id == brief_id,
+                        ResearchPlan.status == ResearchPlanStatus.READY,
+                    )
+                    .order_by(ResearchPlan.version_number.desc())
+                    .limit(1)
+                )
+            if plan_id is None:
+                raise GateBlockedError("No ready research plan to freeze")
+            await GenericResearchService(database).freeze_package(plan_id)
         elif action == "build_argument":
             await ContentEngineService(database).build_argument(brief_id)
         elif action == "build_narrative":
@@ -1945,27 +2195,73 @@ async def production_action(request: Request, brief_id: UUID, action: str) -> Re
             await ScriptService(database).build_script(brief_id)
         elif action == "run_review":
             draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is not None:
-                await ScriptService(database).review_draft(draft_id)
+            if draft_id is None:
+                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+            await ScriptService(database).review_draft(draft_id)
         elif action == "revise":
             draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is not None:
-                await ScriptService(database).revise_draft(draft_id)
+            if draft_id is None:
+                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+            await ScriptService(database).revise_draft(draft_id)
         elif action == "approve":
             draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is not None:
-                await ScriptService(database).approve_draft(draft_id)
+            if draft_id is None:
+                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+            await ScriptService(database).approve_draft(draft_id, approved_by="owner")
+        elif action == "start_review_cycle":
+            await ScriptService(database).start_review_cycle(
+                brief_id, started_by="owner"
+            )
         elif action == "localize":
             form = await request.form()
             language = str(form.get("language") or "en")
             state = await ProductionService(database).state_for_brief(brief_id)
-            if state.latest_master_id is not None:
-                await LocalizationService(database).create(
-                    state.latest_master_id, PublicationLanguage(language)
-                )
-    except (LookupError, ValueError, GateBlockedError):
-        pass
+            if state.latest_master_id is None:
+                raise GateBlockedError("Kein Semantic Master vorhanden")
+            await LocalizationService(database).create(
+                state.latest_master_id, PublicationLanguage(language)
+            )
+    except (LookupError, ValueError, GateBlockedError) as exc:
+        # Never fail silently: the owner must see why the action did not run.
+        return RedirectResponse(
+            f"/studio/production/{brief_id}?error={quote(str(exc)[:300])}",
+            status_code=303,
+        )
     return RedirectResponse(f"/studio/production/{brief_id}", status_code=303)
+
+
+@router.post("/studio/production/{brief_id}/findings/{finding_id}/waive")
+async def production_waive_finding(
+    request: Request, brief_id: UUID, finding_id: UUID
+) -> Response:
+    """Owner override: waive one open review finding."""
+
+    database = _database(request)
+    try:
+        async with database.transaction() as session:
+            draft_brief = await session.scalar(
+                select(ScriptDraft.content_brief_id)
+                .join(
+                    ReviewFinding,
+                    ReviewFinding.script_draft_id == ScriptDraft.id,
+                )
+                .where(ReviewFinding.id == finding_id)
+            )
+        if draft_brief != brief_id:
+            return HTMLResponse("Finding not found", status_code=404)
+        form = await request.form()
+        reason = str(form.get("reason") or "").strip()
+        await ScriptService(database).waive_finding(
+            finding_id, waived_by="owner", reason=reason
+        )
+    except (LookupError, ValueError) as exc:
+        return RedirectResponse(
+            f"/studio/production/{brief_id}?stage=REVIEW&error={quote(str(exc)[:300])}",
+            status_code=303,
+        )
+    return RedirectResponse(
+        f"/studio/production/{brief_id}?stage=REVIEW", status_code=303
+    )
 
 
 @router.post("/studio/topics/{candidate_id}/brief")
@@ -1977,13 +2273,19 @@ async def topic_create_brief(request: Request, candidate_id: UUID) -> Response:
         candidate = await session.get(TopicCandidate, candidate_id)
     if candidate is None:
         return HTMLResponse("Candidate not found", status_code=404)
+    effective = await StudioSettingsService(database).effective()
+    target_minutes = _clamp_duration(
+        float(effective.get("target_duration_default_minutes") or 27.5),
+        float(effective.get("target_duration_min_minutes") or 25),
+        float(effective.get("target_duration_max_minutes") or 30),
+    )
     try:
         brief = await BriefService(database).create_for_candidate(
             candidate_id,
             BriefInput(
                 question=candidate.video_question,
                 thesis=candidate.tentative_thesis,
-                target_duration_minutes=12,
+                target_duration_minutes=target_minutes,
                 angle=candidate.angle,
             ),
         )
@@ -2069,11 +2371,20 @@ async def resource_library(
                     slug_by_id.get(channel_id, str(channel_id))
                 )
     source_stats = await _source_stats(request, [source.id for source in sources])
+    settings = get_settings()
+    exhausted_count = sum(
+        1
+        for state in state_by_source.values()
+        if state.status is SourceProcessingStatus.FAILED
+        and classify_failure(state.last_error) is FailureClass.FAILED
+        and state.attempt_count >= settings.speech_structure_max_attempts
+    )
     return await _render(
         request,
         "studio/resource_library.html",
         title="Resource Library",
         sources=sources,
+        exhausted_count=exhausted_count,
         segment_counts=segment_counts,
         assignments=assignments,
         source_stats=source_stats,
@@ -2092,27 +2403,49 @@ async def resource_library(
     )
 
 
+@router.post("/library/retry-failed")
+async def library_retry_failed(request: Request) -> Response:
+    """Owner action: re-enqueue every FAILED source, ignoring the retry cap."""
+    enqueued = await get_scheduler(_database(request)).retry_failed()
+    return RedirectResponse(f"/library?retried={enqueued}", status_code=303)
+
+
 def _status_matches(state: SourceProcessingState | None, status: str) -> bool:
     """Bucket the persisted processing status into owner-facing filters."""
 
     if status == "READY":
         return state is not None and state.status is SourceProcessingStatus.READY
     if status == "PROCESSING":
-        return state is not None and state.status in {
+        if state is None:
+            return False
+        if state.status in {
             SourceProcessingStatus.INGESTED,
             SourceProcessingStatus.STRUCTURE_PENDING,
             SourceProcessingStatus.STRUCTURING,
             SourceProcessingStatus.STRUCTURED,
             SourceProcessingStatus.UNIT_EXTRACTION_PENDING,
             SourceProcessingStatus.UNIT_EXTRACTING,
-        }
+        }:
+            return True
+        # Quota/rate-limit failures are retried automatically — still in
+        # flight from the owner's perspective.
+        return state.status is SourceProcessingStatus.FAILED and (
+            classify_failure(state.last_error)
+            in {FailureClass.QUOTA, FailureClass.RATE_LIMIT}
+        )
     if status == "REVIEW_REQUIRED":
         return state is not None and state.status in {
             SourceProcessingStatus.STRUCTURE_REVIEW_REQUIRED,
             SourceProcessingStatus.UNIT_REVIEW_REQUIRED,
         }
     if status == "FAILED":
-        return state is not None and state.status is SourceProcessingStatus.FAILED
+        # Only genuine failures: quota/rate-limit failures are retried
+        # automatically and belong to the PROCESSING bucket.
+        return (
+            state is not None
+            and state.status is SourceProcessingStatus.FAILED
+            and classify_failure(state.last_error) is FailureClass.FAILED
+        )
     return True
 
 
@@ -2784,6 +3117,14 @@ async def analytics(request: Request) -> HTMLResponse:
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request) -> HTMLResponse:
     settings = get_settings()
+    service = StudioSettingsService(_database(request), settings)
+    web_research = await service.effective()
+    overrides = await service.overrides()
+    if web_research.get("web_research_api_key"):
+        web_research["web_research_api_key"] = _mask_key(
+            str(web_research["web_research_api_key"])
+        )
+    scheduler = get_scheduler(_database(request))
     return await _render(
         request,
         "studio/settings.html",
@@ -2793,7 +3134,90 @@ async def settings_page(request: Request) -> HTMLResponse:
         llm_provider=settings.llm_provider,
         youtube_mcp_enabled=settings.youtube_mcp_enabled,
         youtube_mcp_url=settings.youtube_mcp_url,
+        web_research=web_research,
+        web_research_overrides=overrides,
+        provider_capacity=get_capacity().snapshot(),
+        background_jobs_running=scheduler.active_count(),
+        background_jobs_waiting=scheduler.queued_count(),
+        background_jobs_by_class=scheduler.active_work_classes(),
+        saved=request.query_params.get("saved") == "1",
     )
+
+
+def _mask_key(value: str) -> str:
+    return ("•" * max(len(value) - 4, 0)) + value[-4:] if len(value) > 4 else "••••"
+
+
+def _clamp_duration(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(value, maximum))
+
+
+@router.post("/settings")
+async def settings_save(request: Request) -> Response:
+    form = await request.form()
+    values: dict[str, Any] = {
+        "web_research_enabled": form.get("web_research_enabled") == "on",
+        "web_research_provider": str(form.get("web_research_provider") or "openrouter"),
+        "web_research_base_url": str(form.get("web_research_base_url") or "").strip()
+        or None,
+        "web_research_model": str(form.get("web_research_model") or "").strip() or None,
+        "web_research_max_results": str(
+            form.get("web_research_max_results") or ""
+        ).strip()
+        or None,
+        "web_research_timeout_seconds": str(
+            form.get("web_research_timeout_seconds") or ""
+        ).strip()
+        or None,
+        "target_duration_default_minutes": str(
+            form.get("target_duration_default_minutes") or ""
+        ).strip()
+        or None,
+        "target_duration_min_minutes": str(
+            form.get("target_duration_min_minutes") or ""
+        ).strip()
+        or None,
+        "target_duration_max_minutes": str(
+            form.get("target_duration_max_minutes") or ""
+        ).strip()
+        or None,
+        "max_revision_rounds": str(form.get("max_revision_rounds") or "").strip()
+        or None,
+        "first_draft_min_duration_ratio": str(
+            form.get("first_draft_min_duration_ratio") or ""
+        ).strip()
+        or None,
+        "first_draft_max_duration_ratio": str(
+            form.get("first_draft_max_duration_ratio") or ""
+        ).strip()
+        or None,
+        "generation_max_correction_attempts": str(
+            form.get("generation_max_correction_attempts") or ""
+        ).strip()
+        or None,
+        "units_per_video_minute": str(form.get("units_per_video_minute") or "").strip()
+        or None,
+        "speech_wpm_fa": str(form.get("speech_wpm_fa") or "").strip() or None,
+        "speech_wpm_en": str(form.get("speech_wpm_en") or "").strip() or None,
+        "speech_wpm_de": str(form.get("speech_wpm_de") or "").strip() or None,
+        "speech_wpm_ar": str(form.get("speech_wpm_ar") or "").strip() or None,
+        "background_processing_paused": (
+            form.get("background_processing_paused") == "on"
+        ),
+    }
+    api_key = str(form.get("web_research_api_key") or "").strip()
+    if api_key and not api_key.startswith("•"):
+        values["web_research_api_key"] = api_key
+    try:
+        await StudioSettingsService(_database(request)).set_many(values)
+    except ValueError as exc:
+        return HTMLResponse(f"Ungültige Einstellung: {exc}", status_code=422)
+    # Reflect the toggle on the live scheduler immediately — the next
+    # scan re-reads it too, but the owner expects instant effect.
+    get_scheduler(_database(request)).set_paused(
+        bool(values["background_processing_paused"])
+    )
+    return RedirectResponse("/settings?saved=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------

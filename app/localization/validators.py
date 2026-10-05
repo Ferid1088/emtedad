@@ -36,6 +36,25 @@ class SemanticFidelityValidator:
             claim = by_id.get(str(statement.get("master_claim_id")))
             if claim is None:
                 continue
+            # Localization output is generated text too: replacement
+            # characters or stray format controls mean corrupted provider
+            # output — flag blocking, never pass silently (ZWNJ excepted).
+            for field in ("display_text", "voice_text"):
+                value = statement.get(field)
+                if isinstance(value, str) and (
+                    "\ufffd" in value
+                    or any(
+                        unicodedata.category(char) == "Cf" and char != "‌"
+                        for char in value
+                    )
+                ):
+                    findings.append(
+                        LocalizationFinding(
+                            "ENCODING_CORRUPTION",
+                            f"{field} for claim {claim['id']} contains "
+                            "replacement characters or format controls.",
+                        )
+                    )
             for field in ("epistemic_status", "certainty"):
                 if field in statement and statement[field] != claim.get(field):
                     findings.append(
@@ -123,9 +142,7 @@ class PronunciationValidator:
         present = [term for term in risky_terms if term in display_text]
         if not present:
             return []
-        if display_text == voice_text and not any(
-            mark in voice_text for mark in "ًٌٍَُِّْ"
-        ):
+        if display_text == voice_text and not any(mark in voice_text for mark in "ًٌٍَُِّْ"):
             return [
                 LocalizationFinding(
                     "PRONUNCIATION_PREPARATION_MISSING",

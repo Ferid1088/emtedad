@@ -43,3 +43,40 @@ Ayin terminology. Validate the native rewriting afterward against the approved
 source, Semantic Master, claim identities, uncertainty, open questions, and
 terminology. Return only the target-language realization.
 """.strip()
+
+
+def duration_adjustment_instruction(
+    language: PublicationLanguage, direction: str, target_words: int
+) -> str:
+    language_name = {
+        PublicationLanguage.FA: "Persian",
+        PublicationLanguage.DE: "German",
+        PublicationLanguage.EN: "English",
+        PublicationLanguage.AR: "Modern Standard Arabic",
+    }[language]
+    verb = "condense" if direction == "condense" else "elaborate faithfully"
+    return f"""
+Adjust the spoken length of this {language_name} localization by rewriting
+every statement so the total approaches about {target_words} words.
+
+Direction: {verb}.
+
+The payload contains `source_claims` — the approved Semantic Master
+claims. They are the ONLY authority for meaning: expansion may restore
+omitted source meaning or express implicit source connections, but must
+never assert anything the source does not contain.
+
+Hard rules:
+- Return exactly one statement per incoming claim ID — never drop, merge,
+  split, or reorder claims.
+- Do not remove evidence, qualifications, counterarguments, limitations,
+  epistemic status, or protected Ayin terms.
+- Do not add facts, examples, citations, or claims not already present;
+  expansion must re-express existing meaning in fuller natural speech,
+  not invent content.
+- Preserve each claim's epistemic status exactly: a hedged source claim
+  stays hedged; an ANECDOTAL source stays anecdotal.
+- Keep the native voice and idiom of {language_name}; filler, padding,
+  and repeated formulas are forbidden.
+- When condensing, cut redundancy before cutting substance.
+""".strip()

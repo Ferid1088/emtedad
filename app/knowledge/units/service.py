@@ -23,7 +23,11 @@ from app.knowledge.models import (
     Source,
     SourceSegment,
 )
-from app.knowledge.structure.domain import SourceProcessingStatus
+from app.knowledge.structure.domain import (
+    FailureClass,
+    SourceProcessingStatus,
+    classify_failure,
+)
 from app.knowledge.structure.models import (
     SourceProcessingState,
     SourceStructureNode,
@@ -223,7 +227,10 @@ class KnowledgeUnitService:
                 run.completed_at = datetime.now(UTC)
                 state.status = SourceProcessingStatus.FAILED
                 state.last_error = str(exc)[:2000]
-                state.attempt_count += 1
+                # Quota/rate-limit failures stay retryable and must not
+                # burn a real attempt — only analysis failures count.
+                if classify_failure(state.last_error) is FailureClass.FAILED:
+                    state.attempt_count += 1
                 logger.exception(
                     "knowledge_units.failed",
                     extra={"source_id": str(source_id)},

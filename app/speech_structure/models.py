@@ -56,11 +56,14 @@ class SpeechStructure(Base):
 
 class SpeechStructureRun(Base):
     __tablename__ = "speech_structure_runs"
-    __table_args__ = ({"schema": KNOWLEDGE},)
+    __table_args__ = (
+        Index("ix_speech_structure_runs_structure_id", "speech_structure_id"),
+        {"schema": KNOWLEDGE},
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     speech_structure_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{KNOWLEDGE}.speech_structures.id", ondelete="CASCADE"), index=True
+        ForeignKey(f"{KNOWLEDGE}.speech_structures.id", ondelete="CASCADE")
     )
     provider: Mapped[str] = mapped_column(String(128))
     model: Mapped[str] = mapped_column(String(256))
@@ -83,13 +86,14 @@ class SpeechStructureRun(Base):
 class SpeechSection(Base):
     __tablename__ = "speech_sections"
     __table_args__ = (
+        Index("ix_speech_sections_structure_id", "speech_structure_id"),
         Index("ix_speech_sections_parent_id", "parent_id"),
         {"schema": KNOWLEDGE},
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     speech_structure_id: Mapped[UUID] = mapped_column(
-        ForeignKey(f"{KNOWLEDGE}.speech_structures.id", ondelete="CASCADE"), index=True
+        ForeignKey(f"{KNOWLEDGE}.speech_structures.id", ondelete="CASCADE")
     )
     parent_id: Mapped[UUID | None] = mapped_column(
         ForeignKey(f"{KNOWLEDGE}.speech_sections.id", ondelete="CASCADE"), nullable=True

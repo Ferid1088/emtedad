@@ -23,12 +23,14 @@ from app.knowledge.units import models as knowledge_unit_models  # noqa: F401
 from app.lecture import models as lecture_models  # noqa: F401
 from app.localization import models as localization_models  # noqa: F401
 from app.ops.assets import models as asset_models  # noqa: F401
+from app.ops.settings import models as settings_models  # noqa: F401
 from app.production import models as production_models  # noqa: F401
 from app.research import models as research_models  # noqa: F401
 from app.retrieval import models as retrieval_models  # noqa: F401
 from app.ritual import models as ritual_models  # noqa: F401
 from app.speech_structure import models as speech_structure_models  # noqa: F401
 from app.topics import models as topic_models  # noqa: F401
+from app.web_research import models as web_research_models  # noqa: F401
 
 config = context.config
 

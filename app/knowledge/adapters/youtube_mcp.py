@@ -130,16 +130,12 @@ class YouTubeMcpClient:
             httpx.AsyncClient(timeout=self._timeout) as client,
         ):
             try:
-                return await self._request(
-                    client, payload, notification=notification
-                )
+                return await self._request(client, payload, notification=notification)
             except YouTubeMcpUnavailableError:
                 if self._session_id is not None:
                     raise
                 await self._initialize(client)
-                return await self._request(
-                    client, payload, notification=notification
-                )
+                return await self._request(client, payload, notification=notification)
 
     async def _initialize(self, client: httpx.AsyncClient) -> None:
         result = await self._request(
@@ -189,9 +185,7 @@ class YouTubeMcpClient:
         return response
 
     async def _tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        response = await self._rpc(
-            "tools/call", {"name": name, "arguments": arguments}
-        )
+        response = await self._rpc("tools/call", {"name": name, "arguments": arguments})
         result = response.get("result")
         if not isinstance(result, dict):
             raise YouTubeMcpError(f"mcp tool {name} returned malformed result")
@@ -227,9 +221,7 @@ class YouTubeMcpClient:
             return False
 
     async def get_video_info(self, video_url: str) -> dict[str, Any]:
-        payload = await self._tool(
-            "get_video_info", {"video_url": video_url}
-        )
+        payload = await self._tool("get_video_info", {"video_url": video_url})
         if not isinstance(payload, dict):
             raise YouTubeMcpError("get_video_info returned no object")
         return payload
@@ -299,8 +291,7 @@ class YouTubeMcpClient:
             raise YouTubeTranscriptUnavailableError("video transcript is empty")
         segments: list[YouTubeTranscriptSegment] = []
         starts = [
-            float(item.get("start_seconds") or item.get("start") or 0.0)
-            for item in raw
+            float(item.get("start_seconds") or item.get("start") or 0.0) for item in raw
         ]
         for index, item in enumerate(raw):
             start = starts[index]
@@ -384,10 +375,19 @@ class YouTubeMcpAdapter:
             transcript_kind="unknown",
             metadata={
                 key: metadata[key]
-                for key in ("id", "url", "title", "duration_seconds",
-                            "upload_date", "views", "likes", "tags")
+                for key in (
+                    "id",
+                    "url",
+                    "title",
+                    "duration_seconds",
+                    "upload_date",
+                    "views",
+                    "likes",
+                    "tags",
+                )
                 if metadata.get(key) is not None
-            } | {"transport": "youtube-mcp"},
+            }
+            | {"transport": "youtube-mcp"},
             transcript=entries,
             thumbnail_url=None,
         )

@@ -176,13 +176,7 @@ async def test_ip_block_maps_to_rate_limit() -> None:
 
 @pytest.mark.asyncio
 async def test_no_transcript_maps_to_unavailable() -> None:
-    _script(
-        _sse(
-            _tool_result(
-                {"error": "No transcript available for this video."}
-            )
-        )
-    )
+    _script(_sse(_tool_result({"error": "No transcript available for this video."})))
     client = YouTubeMcpClient("http://x")
     with pytest.raises(YouTubeTranscriptUnavailableError):
         await client.get_transcript("https://youtube.com/watch?v=dQw4w9WgXcQ")
@@ -212,9 +206,7 @@ async def test_timeout_raises_unavailable() -> None:
 
 @pytest.mark.asyncio
 async def test_tool_error_flag_raises() -> None:
-    _script(
-        _sse(_tool_result("boom", is_error=True))
-    )
+    _script(_sse(_tool_result("boom", is_error=True)))
     client = YouTubeMcpClient("http://x")
     with pytest.raises(YouTubeMcpError, match="boom"):
         await client.get_video_info("https://youtube.com/watch?v=dQw4w9WgXcQ")
@@ -270,9 +262,7 @@ async def test_adapter_list_channel_videos() -> None:
     ]
     _script(_sse(_tool_result(videos)))
     adapter = YouTubeMcpAdapter(YouTubeMcpClient("http://x"))
-    result = await adapter.list_channel_videos(
-        "https://www.youtube.com/@chan"
-    )
+    result = await adapter.list_channel_videos("https://www.youtube.com/@chan")
     assert result[0].youtube_video_id == "dQw4w9WgXcQ"
     assert result[0].duration_seconds == 60
 

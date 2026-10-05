@@ -25,6 +25,21 @@ class ProductionStage(StrEnum):
     PUBLISHED = "PUBLISHED"
 
 
+class StageHealth(StrEnum):
+    """Truthful per-stage health derived only from persisted artifacts.
+
+    A stage is READY/APPROVED only when its own artifact exists in a valid
+    completion state — never inferred from a later stage's existence.
+    """
+
+    NOT_STARTED = "NOT_STARTED"
+    IN_PROGRESS = "IN_PROGRESS"  # artifact exists but not yet complete
+    READY = "READY"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"  # artifact exists, open findings
+    FAILED = "FAILED"  # artifact run failed; needs owner attention
+    APPROVED = "APPROVED"
+
+
 ARGUMENT_PROMPT_VERSION = "argument_architect_v1"
 NARRATIVE_PROMPT_VERSION = "narrative_architect_v1"
 
@@ -49,6 +64,15 @@ class FindingStatus(StrEnum):
     WAIVED = "WAIVED"
 
 
+class ReviewRunStatus(StrEnum):
+    """Lifecycle of one persisted critic pass over an exact draft hash."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class CriticRole(StrEnum):
     FACT = "FACT"
     LOGIC = "LOGIC"
@@ -58,6 +82,6 @@ class CriticRole(StrEnum):
     PERSIAN_QUALITY = "PERSIAN_QUALITY"  # deterministic fa checks (writing/*)
 
 
-SCRIPT_PROMPT_VERSION = "script_writer_v1"
-CRITIC_PROMPT_VERSION = "critic_v1"
+SCRIPT_PROMPT_VERSION = "script_writer_v4"
+CRITIC_PROMPT_VERSION = "critic_v2"
 REVISION_PROMPT_VERSION = "revision_v1"

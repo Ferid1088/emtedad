@@ -587,7 +587,7 @@ class GenericMasterService:
             research_package_id=package.id,
             lecture_type=LectureType.HUMAN_QUESTION,
             working_title=brief.question[:512],
-            target_duration_seconds=brief.target_duration_minutes * 60,
+            target_duration_seconds=int(brief.target_duration_minutes * 60),
             target_audience=brief.target_audience or None,
             created_by=created_by,
         )

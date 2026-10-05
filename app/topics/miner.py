@@ -13,7 +13,7 @@ channel from its assigned knowledge base.
 
 You receive: the channel strategy (core question, preferred/forbidden \
 angles), a labeled list of Knowledge Units (u1, u2, ...) with their concepts, \
-and published topic signatures for novelty awareness.
+and existing topic signatures for novelty awareness.
 
 Return topic candidates with:
 - video_question: the driving question the video answers
@@ -29,6 +29,8 @@ Rules:
 - Do not invent evidence. Every candidate must cite real unit refs.
 - High curiosity with weak unit grounding is fine — mark the gap honestly.
 - Respect forbidden angles.
+- Do not re-propose an existing signature — same question in other words \
+is still a duplicate.
 """.strip()
 
 _LANGUAGE_NAMES = {

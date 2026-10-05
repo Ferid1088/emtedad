@@ -611,6 +611,10 @@ class EvidenceMatrix(Base):
         default=EvidenceMatrixStatus.DRAFT,
     )
     content_hash: Mapped[str] = mapped_column(String(64))
+    # Persisted result of the pre-READY validation pass — READY without a
+    # passing report is not a truthful state. Unresolved content gaps are
+    # recorded here rather than silently swallowed.
+    validation_report: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

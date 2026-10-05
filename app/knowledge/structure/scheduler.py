@@ -24,9 +24,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Database
 from app.knowledge.domain import RunStatus
+from app.knowledge.llm.capacity import (
+    WorkClass,
+    reset_work_class,
+    set_work_class,
+)
 from app.knowledge.models import ExtractionRun, Source, SourceSegment, SourceVersion
 from app.knowledge.processing import SourceProcessingService
-from app.knowledge.structure.domain import SourceProcessingStatus
+from app.knowledge.structure.domain import (
+    FailureClass,
+    SourceProcessingStatus,
+    classify_failure,
+)
 from app.knowledge.structure.models import SourceProcessingState
 
 if TYPE_CHECKING:
@@ -46,28 +55,6 @@ class DisplayStatus(StrEnum):
     FAILED = "FAILED"  # failed and automatic retries exhausted
     UNAVAILABLE = "UNAVAILABLE"  # no usable transcript
     REVIEW = "REVIEW"  # validation flagged the output; owner review needed
-
-
-class FailureClass(StrEnum):
-    QUOTA = "quota"  # provider quota/billing — retry later, unbounded
-    RATE_LIMIT = "rate_limit"  # provider concurrency/throttling — retry later
-    FAILED = "failed"  # real analysis failure — counted against max attempts
-
-
-def classify_failure(error: str | None) -> FailureClass:
-    """Bucket a persisted processing error into a retry class."""
-
-    text = (error or "").lower()
-    if (
-        "out_of_quota" in text
-        or "provider_quota_exhausted" in text
-        or "kontingent" in text
-        or "billing" in text
-    ):
-        return FailureClass.QUOTA
-    if "429" in text or "rate limit" in text or "parallele sessions" in text:
-        return FailureClass.RATE_LIMIT
-    return FailureClass.FAILED
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,27 +247,75 @@ class SourceProcessingScheduler:
         self._queued: set[UUID] = set()
         self._active: set[UUID] = set()
         self._phases: dict[UUID, str] = {}
+        self._work_classes: dict[UUID, WorkClass] = {}
         self._tasks: set[asyncio.Task[None]] = set()
         self._stop = asyncio.Event()
+        self._paused = False
 
-    def enqueue(self, source_id: UUID, *, force: bool = False) -> bool:
-        """Queue a source; returns False when already queued or running."""
+    @staticmethod
+    def _default_work_class(*, force: bool) -> WorkClass:
+        return WorkClass.OWNER_REQUESTED if force else WorkClass.BACKGROUND_NEW
 
+    def set_paused(self, paused: bool) -> None:
+        self._paused = paused
+        logger.info("source_processing.paused", extra={"paused": paused})
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    def enqueue(
+        self,
+        source_id: UUID,
+        *,
+        force: bool = False,
+        work_class: WorkClass | None = None,
+    ) -> bool:
+        """Queue a source; returns False when already queued or running.
+
+        A paused scheduler refuses BACKGROUND_* work only — owner-requested
+        processing still runs (the owner just asked for it).
+        """
+
+        resolved = work_class or self._default_work_class(force=force)
+        if self._paused and resolved in {
+            WorkClass.BACKGROUND_NEW,
+            WorkClass.BACKGROUND_RETRY,
+        }:
+            return False
         if source_id in self._queued or source_id in self._active:
             return False
         self._queued.add(source_id)
-        task = asyncio.create_task(self._run(source_id, force=force))
+        task = asyncio.create_task(
+            self._run(source_id, force=force, work_class=resolved)
+        )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         task.add_done_callback(lambda done: self._log_task_failure(source_id, done))
         logger.info(
             "source_processing.queued",
-            extra={"source_id": str(source_id), "force": force},
+            extra={
+                "source_id": str(source_id),
+                "force": force,
+                "work_class": resolved.value,
+            },
         )
         return True
 
     def is_queued(self, source_id: UUID) -> bool:
         return source_id in self._queued
+
+    def queued_count(self) -> int:
+        return len(self._queued)
+
+    def active_count(self) -> int:
+        return len(self._active)
+
+    def active_work_classes(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for work_class in self._work_classes.values():
+            counts[work_class.value] = counts.get(work_class.value, 0) + 1
+        return counts
 
     def is_running(self, source_id: UUID) -> bool:
         return source_id in self._active
@@ -288,11 +323,15 @@ class SourceProcessingScheduler:
     def phase_of(self, source_id: UUID) -> str | None:
         return self._phases.get(source_id)
 
-    async def _run(self, source_id: UUID, *, force: bool) -> None:
+    async def _run(
+        self, source_id: UUID, *, force: bool, work_class: WorkClass
+    ) -> None:
         async with self._semaphore:
             self._queued.discard(source_id)
             self._active.add(source_id)
             self._phases[source_id] = "structure"
+            self._work_classes[source_id] = work_class
+            token = set_work_class(work_class)
             started = asyncio.get_running_loop().time()
             try:
                 service = self._service_factory(self._database)
@@ -304,6 +343,8 @@ class SourceProcessingScheduler:
                     ),
                 )
             finally:
+                reset_work_class(token)
+                self._work_classes.pop(source_id, None)
                 self._active.discard(source_id)
                 self._phases.pop(source_id, None)
                 logger.info(
@@ -327,11 +368,24 @@ class SourceProcessingScheduler:
                 exc_info=(type(exc), exc, exc.__traceback__),
             )
 
+    @staticmethod
+    def _work_class_for_reason(reason: str) -> WorkClass:
+        # A re-run of previously failed work is lower priority than
+        # never-processed imports.
+        if reason in {
+            FailureClass.QUOTA.value,
+            FailureClass.RATE_LIMIT.value,
+            "retry",
+        }:
+            return WorkClass.BACKGROUND_RETRY
+        return WorkClass.BACKGROUND_NEW
+
     async def scan_once(self) -> dict[str, int]:
         """Evaluate every source once and enqueue the eligible ones."""
 
         async with self._database.transaction() as session:
             infos = await collect_source_infos(session)
+        self._paused = await self._read_pause_setting()
         now = datetime.now(UTC)
         counts: dict[str, int] = {status.value: 0 for status in DisplayStatus}
         scheduled = 0
@@ -346,11 +400,23 @@ class SourceProcessingScheduler:
                 quota_backoff_seconds=self.quota_backoff_seconds,
             )
             counts[evaluation.status.value] += 1
-            if evaluation.eligible and self.enqueue(info.source_id):
+            if evaluation.eligible and self.enqueue(
+                info.source_id,
+                work_class=self._work_class_for_reason(evaluation.reason),
+            ):
                 scheduled += 1
         counts["scheduled"] = scheduled
+        counts["paused"] = int(self._paused)
         logger.info("source_processing.scan", extra=counts)
         return counts
+
+    async def _read_pause_setting(self) -> bool:
+        """Owner toggle overrides the env default, same as the UI shows."""
+
+        from app.ops.settings.service import StudioSettingsService
+
+        effective = await StudioSettingsService(self._database).effective()
+        return bool(effective.get("background_processing_paused"))
 
     async def retry_failed(self) -> int:
         """Manually re-enqueue every FAILED source, ignoring the retry cap."""
@@ -361,7 +427,7 @@ class SourceProcessingScheduler:
         for info in infos:
             if (
                 info.processing_status == SourceProcessingStatus.FAILED.value
-                and self.enqueue(info.source_id)
+                and self.enqueue(info.source_id, work_class=WorkClass.OWNER_REQUESTED)
             ):
                 enqueued += 1
         return enqueued
@@ -416,11 +482,24 @@ def get_scheduler(database: Database) -> SourceProcessingScheduler:
 
 
 def schedule_structure_analysis(
-    database: Database, source_id: UUID, *, force: bool = False
+    database: Database,
+    source_id: UUID,
+    *,
+    force: bool = False,
+    work_class: WorkClass | None = None,
 ) -> bool:
-    """Queue post-ingestion processing in the background after an import."""
+    """Queue post-ingestion processing in the background after an import.
 
-    return get_scheduler(database).enqueue(source_id, force=force)
+    Every call site is an owner-initiated import, so the default class is
+    OWNER_REQUESTED; periodic catch-up in ``scan_once`` passes BACKGROUND_*
+    classes explicitly.
+    """
+
+    return get_scheduler(database).enqueue(
+        source_id,
+        force=force,
+        work_class=work_class or WorkClass.OWNER_REQUESTED,
+    )
 
 
 def summarize_states(

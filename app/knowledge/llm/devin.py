@@ -8,15 +8,18 @@ this provider is an opt-in fallback, not the default. Select it with
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
+from datetime import UTC, datetime
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import get_settings
 from app.knowledge.llm.base import StructuredExtractionRequest
+from app.knowledge.llm.capacity import current_work_class, get_capacity
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,27 @@ _NUDGE_MESSAGE = (
     "output. Produce exactly one JSON object matching the JSON schema given "
     "earlier and set the session's structured output to it. No commentary."
 )
+_CORRUPTION_REPAIR_MESSAGE = (
+    "Your JSON output contains Unicode replacement characters (U+FFFD, �) "
+    "— corrupted text inside the string values. Produce the same JSON "
+    "object again with the corrupted words rewritten as intact text; "
+    "keep every other value unchanged. No commentary."
+)
+# In-session repair gives the agent one bounded turn to fix corrupted
+# output before the provider falls back to a fresh session.
+_CORRUPTION_REPAIR_TIMEOUT_SECONDS = 600.0
+# Orphaned remote sessions (process killed before _terminate_session ran)
+# hold concurrency slots forever. ``blocked``/``expired`` sessions older
+# than this have no live caller — every extract path fails or finishes
+# long before — so they are safe to reap.
+_ORPHAN_SESSION_AGE_SECONDS = 30 * 60
+_ORPHAN_STATES = frozenset({"blocked", "expired"})
+# Only sessions we created carry this tag — the sweep must never reap a
+# session the account owns for other tools (Devin app, CLI, other services
+# share the same concurrency quota).
+_APP_TAG = "emtedad-app"
+_SWEEP_INTERVAL_SECONDS = 600.0
+_last_orphan_sweep = 0.0
 
 
 class DevinCloudError(RuntimeError):
@@ -76,28 +100,88 @@ class DevinCloudProvider:
             f"Instructions: {request.instructions}\n\n"
             f"Source material:\n{request.input_text}"
         )
-        timeout = max(request.timeout_seconds, _MINIMUM_TIMEOUT_SECONDS)
+        timeout_seconds = max(request.timeout_seconds, _MINIMUM_TIMEOUT_SECONDS)
+        # The capacity slot is held only while a cloud session exists —
+        # prompt assembly and validation never occupy provider quota.
+        async with get_capacity().acquire(current_work_class()):  # noqa: ASYNC100
+            result = await self._run_session(
+                request,
+                prompt,
+                timeout_seconds,
+                settings.devin_api_key.get_secret_value(),
+            )
+            if _has_replacement_chars(result):
+                # Remote sessions sometimes corrupt multi-byte output
+                # (observed: U+FFFD inside Persian words). One fresh
+                # session usually produces clean text; a still-corrupted
+                # retry is returned as-is — downstream deterministic
+                # gates (e.g. ENCODING_CORRUPTION) remain the backstop.
+                logger.warning(
+                    "devin.encoding_corruption_retry",
+                    extra={"task": request.task},
+                )
+                result = await self._run_session(
+                    request,
+                    prompt,
+                    timeout_seconds,
+                    settings.devin_api_key.get_secret_value(),
+                )
+            return result
+
+    async def _run_session(
+        self,
+        request: StructuredExtractionRequest,
+        prompt: str,
+        timeout_seconds: float,
+        api_key: str,
+    ) -> BaseModel:
+        settings = get_settings()
         async with httpx.AsyncClient(
             base_url=_BASE_URL,
-            headers={
-                "Authorization": (f"Bearer {settings.devin_api_key.get_secret_value()}")
-            },
+            headers={"Authorization": (f"Bearer {api_key}")},
             timeout=60,
             transport=self._transport,
         ) as client:
+            await self._sweep_orphaned_sessions(client)
             session_id = await self._create_session_with_backoff(
                 client, prompt, settings
             )
             try:
                 payload = await self._await_session(
-                    client, session_id, deadline_seconds=timeout
+                    client, session_id, deadline_seconds=timeout_seconds
                 )
+                result = self._validate(request, payload)
+                if _has_replacement_chars(result):
+                    # Cheapest fix first: the live session can see and
+                    # repair its own corrupted output — a fresh session
+                    # only makes sense when the session is unreachable
+                    # (handled by the caller's one-shot retry).
+                    try:
+                        await self._send_message(
+                            client, session_id, _CORRUPTION_REPAIR_MESSAGE
+                        )
+                    except DevinCloudError:
+                        pass  # finished/expired sessions take no messages
+                    else:
+                        try:
+                            repaired = await self._await_session(
+                                client,
+                                session_id,
+                                deadline_seconds=(_CORRUPTION_REPAIR_TIMEOUT_SECONDS),
+                                ignore_structured=payload,
+                            )
+                            candidate = self._validate(request, repaired)
+                        except DevinCloudError:
+                            pass  # keep the original corrupted result
+                        else:
+                            if not _has_replacement_chars(candidate):
+                                result = candidate
             finally:
                 # Every code path out of the call — success, timeout, HTTP
                 # error, cancellation — must release the cloud session; an
                 # abandoned session keeps a slot in the concurrency cap.
                 await self._terminate_session(client, session_id)
-        return self._validate(request, payload)
+        return result
 
     async def _create_session_with_backoff(
         self, client: httpx.AsyncClient, prompt: str, settings: object
@@ -111,10 +195,29 @@ class DevinCloudProvider:
         max_delay = float(
             getattr(settings, "devin_rate_limit_max_backoff_seconds", 120.0)
         )
-        last: DevinRateLimitError | None = None
+        last: DevinCloudError | None = None
+        quota_retried = False
         for attempt in range(1, max_attempts + 1):
             try:
                 return await self._create_session(client, prompt)
+            except DevinQuotaError as exc:
+                # Orphaned remote sessions can hold the concurrency cap even
+                # though no live caller owns them — sweep once, then retry.
+                # A still-full cap means live (possibly foreign) sessions hold
+                # the slots; they clear in minutes, so back off like any other
+                # rate limit instead of retrying instantly.
+                last = exc
+                if not quota_retried:
+                    quota_retried = True
+                    await self._sweep_orphaned_sessions(client, force=True)
+                if attempt == max_attempts:
+                    break
+                logger.warning(
+                    "devin.quota_exhausted",
+                    extra={"attempt": attempt, "backoff_seconds": delay},
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, max_delay)
             except DevinRateLimitError as exc:
                 last = exc
                 if attempt == max_attempts:
@@ -127,6 +230,54 @@ class DevinCloudProvider:
                 delay = min(delay * 2, max_delay)
         raise last if last is not None else DevinCloudError("unreachable")
 
+    async def _sweep_orphaned_sessions(
+        self, client: httpx.AsyncClient, *, force: bool = False
+    ) -> int:
+        """Delete abandoned remote sessions that still hold a quota slot.
+
+        A session in ``blocked``/``expired`` state older than
+        ``_ORPHAN_SESSION_AGE_SECONDS`` cannot have a live caller — every
+        extract path resolves or fails well inside that window — so reaping
+        is safe. Best-effort: sweep errors are logged, never fatal.
+        """
+
+        global _last_orphan_sweep
+        now = time.monotonic()
+        if not force and now - _last_orphan_sweep < _SWEEP_INTERVAL_SECONDS:
+            return 0
+        _last_orphan_sweep = now
+        try:
+            response = await client.get("/v1/sessions", params={"limit": 50})
+            if response.status_code != 200:
+                return 0
+            sessions = response.json().get("sessions", [])
+        except (httpx.HTTPError, json.JSONDecodeError, AttributeError) as exc:
+            logger.warning("devin.orphan_sweep_failed", extra={"error": str(exc)[:200]})
+            return 0
+        reaped = 0
+        for session in sessions if isinstance(sessions, list) else []:
+            if not isinstance(session, dict):
+                continue
+            if str(session.get("status_enum", "")) not in _ORPHAN_STATES:
+                continue
+            tags = session.get("tags") or []
+            if _APP_TAG not in tags:
+                continue  # not ours — other tools share this account
+            if not _older_than_orphan_age(session):
+                continue
+            session_id = str(session.get("session_id") or "")
+            if not session_id:
+                continue
+            with contextlib.suppress(httpx.HTTPError):
+                delete = await client.delete(f"/v1/sessions/{session_id}")
+                if delete.status_code < 400:
+                    reaped += 1
+                    logger.info(
+                        "devin.orphan_session_reaped",
+                        extra={"session_id": session_id},
+                    )
+        return reaped
+
     async def _create_session(self, client: httpx.AsyncClient, prompt: str) -> str:
         chunks = _chunk_prompt(prompt)
         first = chunks[0]
@@ -138,7 +289,9 @@ class DevinCloudProvider:
         # Not idempotent: retries must create a fresh session — an idempotent
         # create resurrects the previous session, which may be a terminal
         # dead-end that can never produce output.
-        payload = await self._post(client, "/v1/sessions", {"prompt": first})
+        payload = await self._post(
+            client, "/v1/sessions", {"prompt": first, "tags": [_APP_TAG]}
+        )
         session_id = str(payload.get("session_id") or "")
         if not session_id:
             raise DevinCloudError("session creation returned no session_id")
@@ -236,10 +389,12 @@ class DevinCloudProvider:
         client: httpx.AsyncClient,
         session_id: str,
         deadline_seconds: float,
+        *,
+        ignore_structured: object | None = None,
     ) -> object:
         deadline = time.monotonic() + deadline_seconds
         empty_since: float | None = None
-        nudged = False
+        nudged = ignore_structured is not None  # already nudged/repaired
         while time.monotonic() < deadline:
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
             try:
@@ -252,10 +407,13 @@ class DevinCloudProvider:
             status = str(detail.get("status_enum", ""))
             structured = detail.get("structured_output")
             if status in _TERMINAL_DONE_STATES:
-                if structured:
+                # ``ignore_structured`` suppresses the stale output a
+                # blocked session still reports before it produces the
+                # repaired JSON we asked for.
+                if structured and structured != ignore_structured:
                     return structured
                 recovered = _recover_from_messages(detail.get("messages", []))
-                if recovered is not None:
+                if recovered is not None and recovered != ignore_structured:
                     return recovered
                 # A "blocked" session is awaiting input — nudge it once so it
                 # resumes and produces the output; "finished" cannot be
@@ -286,6 +444,25 @@ class DevinCloudProvider:
             raise DevinCloudError(
                 f"invalid structured output: {type(exc).__name__}"
             ) from exc
+
+
+def _has_replacement_chars(result: BaseModel) -> bool:
+    """U+FFFD is never intentional output — it marks corrupted decoding."""
+
+    return "�" in result.model_dump_json()
+
+
+def _older_than_orphan_age(session: dict[object, object]) -> bool:
+    """True when the session's last update predates the orphan window."""
+
+    raw = session.get("updated_at") or session.get("created_at")
+    if not isinstance(raw, str) or not raw:
+        return False
+    try:
+        updated = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return (datetime.now(UTC) - updated).total_seconds() > (_ORPHAN_SESSION_AGE_SECONDS)
 
 
 def _chunk_prompt(prompt: str) -> list[str]:

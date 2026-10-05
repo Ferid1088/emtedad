@@ -21,7 +21,11 @@ from sqlalchemy import select
 from app.db.session import Database
 from app.knowledge.llm.base import LLMProvider
 from app.knowledge.models import SourceVersion
-from app.knowledge.structure.domain import SourceProcessingStatus
+from app.knowledge.structure.domain import (
+    FailureClass,
+    SourceProcessingStatus,
+    classify_failure,
+)
 from app.knowledge.structure.models import SourceProcessingState
 from app.knowledge.structure.service import SourceStructureService
 from app.knowledge.units.mapping_service import ConceptMappingService
@@ -133,7 +137,10 @@ class SourceProcessingService:
                 if failed is not None:
                     failed.status = SourceProcessingStatus.FAILED
                     failed.last_error = str(exc)[:2000]
-                    failed.attempt_count += 1
+                    # Quota/rate-limit failures stay retryable and must not
+                    # burn a real attempt — only analysis failures count.
+                    if classify_failure(failed.last_error) is FailureClass.FAILED:
+                        failed.attempt_count += 1
                     return failed
             raise
 

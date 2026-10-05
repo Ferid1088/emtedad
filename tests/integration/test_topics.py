@@ -12,7 +12,7 @@ import psycopg
 import pytest
 from alembic.config import Config
 from psycopg import sql
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import selectinload
 
@@ -23,8 +23,16 @@ from app.briefs.service import BriefInput, BriefService, validate_ready
 from app.content_engine.domain import (
     DraftStatus,
     FindingSeverity,
+    FindingStatus,
     PlanStatus,
     ProductionStage,
+)
+from app.content_engine.models import (
+    ArgumentPlan,
+    NarrativePlan,
+    ReviewFinding,
+    ReviewRun,
+    ScriptDraft,
 )
 from app.content_engine.review import ScriptService
 from app.content_engine.schemas import (
@@ -73,16 +81,22 @@ from app.lecture.models import (
     LectureCitation,
     LectureClaim,
     LectureClaimEvidence,
+    LectureMasterVersion,
     LectureSection,
 )
 from app.production.service import ProductionService
 from app.research.domain import (
+    EvidenceMatrixStatus,
     EvidenceSelectionRole,
     PackageStatus,
     ResearchPlanStatus,
 )
 from app.research.generic import GenericResearchService
-from app.research.models import EvidenceMatrixItem
+from app.research.models import (
+    EvidenceMatrix,
+    EvidenceMatrixItem,
+    ResearchPlan,
+)
 from app.topics.domain import TopicStatus
 from app.topics.models import TopicCandidate
 from app.topics.schemas import TopicCandidateProposal, TopicMiningBatch
@@ -211,12 +225,57 @@ class _Provider:
                     )
                 ]
             )
+        if request.task == "book_reference_selection":
+            from app.content_engine.writing.books import (
+                BookReference,
+                BookReferenceSelection,
+            )
+
+            return BookReferenceSelection(
+                references=[
+                    BookReference(
+                        author="Daniel Kahneman",
+                        title="Thinking, Fast and Slow",
+                        original_language="English",
+                        supported_idea="Loss aversion shapes decisions.",
+                    ),
+                    BookReference(
+                        author="فارسی نویسنده",
+                        title="کتاب تست",
+                        original_language="fa",
+                        supported_idea="Must be filtered out.",
+                    ),
+                ]
+            )
         if request.task == "script_draft":
             from app.content_engine.review import ScriptDraftOutput
 
+            # The generation contract validates duration before review —
+            # size the stub draft to the payload's word band.
+            band = json.loads(request.input_text)["brief"]["generation_band_words"]
+            target = int(band[0] + (band[1] - band[0]) // 2)
+            sentences = [
+                f"Sentence number {i} carries a distinct piece of the "
+                f"argument and its own wording."
+                for i in range(max(1, target // 12))
+            ]
+            text = "\n\n".join(sentences[:2]) + "\n\n" + " ".join(sentences[2:])
             return ScriptDraftOutput(
-                text="Once upon a sunk cost. " * 30,
+                text=text,
                 estimated_duration_seconds=120,
+            )
+        if request.task == "script_generation_correction":
+            from app.content_engine.review import RevisionOutput
+
+            band = json.loads(request.input_text)["generation_band_words"]
+            target = int(band[0] + (band[1] - band[0]) // 2)
+            sentences = [
+                f"Corrected sentence {i} expands the argument with new "
+                f"detail and phrasing."
+                for i in range(max(1, target // 12))
+            ]
+            return RevisionOutput(
+                text="\n\n".join(sentences[:2]) + "\n\n" + " ".join(sentences[2:])
             )
         if request.task == "script_review":
             from app.content_engine.review import (
@@ -238,9 +297,16 @@ class _Provider:
         if request.task == "script_revision":
             from app.content_engine.review import RevisionOutput
 
-            return RevisionOutput(
-                text="Perhaps we keep losing choices because of sunk cost. " * 30
-            )
+            # Honour the requested target word count: the approval gate
+            # checks the real spoken duration of the revised text.
+            payload = json.loads(request.input_text)
+            target = int(payload.get("target_word_count") or 240)
+            sentences = [
+                f"Revised sentence {i} addresses the findings with new "
+                f"grounded wording."
+                for i in range(max(1, target // 10))
+            ]
+            return RevisionOutput(text=" ".join(sentences))
         if request.task == "narrative_plan":
             return NarrativePlanOutput(
                 sections=[
@@ -472,7 +538,10 @@ async def test_engine_gates(migrated_database_url: str) -> None:
         briefs = BriefService(database)
         brief = await briefs.create_for_candidate(
             candidate.id,
-            BriefInput(question="Q?", thesis="T.", target_duration_minutes=10),
+            # 27.5: the final approval gate requires the configured
+            # 25–30 min band — a short-target draft can be reviewed but
+            # never approved.
+            BriefInput(question="Q?", thesis="T.", target_duration_minutes=27.5),
         )
         await briefs.mark_ready(brief.id)
 
@@ -480,12 +549,19 @@ async def test_engine_gates(migrated_database_url: str) -> None:
         # No evidence matrix yet.
         with pytest.raises(GateBlockedError):
             await engine.build_argument(brief.id)
-        await GenericResearchService(database).build_evidence_matrix(brief.id)
-        # Matrix is DRAFT, not READY — still gated.
+        matrix = await GenericResearchService(database).build_evidence_matrix(brief.id)
+        # A matrix in a non-final status must still gate — force it back to
+        # DRAFT to prove the status check, not mere existence, drives the gate.
+        async with database.transaction() as session:
+            row = await session.get(EvidenceMatrix, matrix.id)
+            assert row is not None
+            row.status = EvidenceMatrixStatus.DRAFT
         with pytest.raises(GateBlockedError):
             await engine.build_argument(brief.id)
-        # Freeze the matrix via package freeze, which sets it FROZEN.
+        # Re-validate to READY, then freeze via package freeze (FROZEN).
         research = GenericResearchService(database)
+        matrix = await research.revalidate_matrix(matrix.id)
+        assert matrix.status is EvidenceMatrixStatus.READY
         plan = await research.create_plan_for_brief(brief.id)
         await research.freeze_package(plan.id)
         argument = await engine.build_argument(brief.id)
@@ -518,15 +594,41 @@ async def test_engine_gates(migrated_database_url: str) -> None:
         assert findings  # every critic ran; fixture returns one finding each
         assert all(f.critic_role for f in findings)
         with pytest.raises(GateBlockedError):
-            await scripts.approve_draft(draft.id)  # open BLOCKER
+            await scripts.approve_draft(draft.id, approved_by="owner")  # open BLOCKER
 
         revised = await scripts.revise_draft(draft.id)
         assert revised.version_number == draft.version_number + 1
         assert revised.status == DraftStatus.REVISED
-        approved = await scripts.approve_draft(revised.id)
+        # A revised draft is new text — the V1 review does not certify it.
+        approved = await _review_waive_approve(database, scripts, revised.id)
         assert approved.status == DraftStatus.APPROVED
     finally:
         await database.dispose()
+
+
+async def _review_waive_approve(database: Database, scripts: ScriptService, draft_id):
+    """Real review run → waive open majors → approve (the honest path)."""
+
+    await scripts.review_draft(draft_id)
+    async with database.transaction() as session:
+        open_major = list(
+            (
+                await session.scalars(
+                    select(ReviewFinding).where(
+                        ReviewFinding.script_draft_id == draft_id,
+                        ReviewFinding.status == FindingStatus.OPEN,
+                        ReviewFinding.severity.in_(
+                            [FindingSeverity.BLOCKER, FindingSeverity.WARNING]
+                        ),
+                    )
+                )
+            ).all()
+        )
+    for finding in open_major:
+        await scripts.waive_finding(
+            finding.id, waived_by="owner", reason="owner waiver"
+        )
+    return await scripts.approve_draft(draft_id, approved_by="owner")
 
 
 @pytest.mark.asyncio
@@ -654,6 +756,10 @@ async def test_generic_master_path(migrated_database_url: str) -> None:
         draft = await scripts.build_script(brief.id, language="en")
         assert draft.lecture_master_version_id == master.id
         assert draft.narrative_plan_id == narrative.id
+        # Book-reference gate: the Persian-language candidate is filtered
+        # out; only the real non-Persian attribution is frozen.
+        refs = draft.provenance_json["book_references"]
+        assert [ref["title"] for ref in refs] == ["Thinking, Fast and Slow"]
 
         # §11: writer export is bounded — no corpus or archive dumps.
         export = await masters.writer_export(master.id)
@@ -696,6 +802,51 @@ async def test_mining_requires_assigned_units(migrated_database_url: str) -> Non
         await channel_service.seed_channels()
         topics = TopicService(database, provider=_Provider())
         assert await topics.mine("emtedad") == []
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_mining_creates_no_production_artifacts(
+    migrated_database_url: str,
+) -> None:
+    """§20: topic generation is separate from production.
+
+    Mining must persist TopicCandidates only — never ContentBriefs,
+    ResearchPlans, EvidenceMatrices, plans, masters, or drafts.
+    """
+
+    database = Database(migrated_database_url)
+    try:
+        channel_service = EditorialChannelService(database)
+        await channel_service.seed_channels()
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        provider = _Provider()
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        assert len(candidates) == 2
+        async with database.transaction() as session:
+            for model in (
+                ContentBrief,
+                ResearchPlan,
+                EvidenceMatrix,
+                ArgumentPlan,
+                NarrativePlan,
+                LectureMasterVersion,
+                ScriptDraft,
+                ReviewRun,
+            ):
+                count = await session.scalar(select(func.count(model.id)))
+                assert count == 0, f"{model.__name__} created by mining"
     finally:
         await database.dispose()
 

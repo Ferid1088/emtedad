@@ -147,6 +147,40 @@ def test_semantic_localization_requires_claim_alignment() -> None:
     assert findings[0].code == "CLAIM_OMISSION"
 
 
+def test_localization_rejects_corrupted_generated_text() -> None:
+    """Provider corruption (U+FFFD/Cf) must not pass as clean content."""
+
+    master = [{"id": "claim-1", "epistemic_status": "EXTERNAL", "certainty": "LOW"}]
+    corrupted = [
+        {
+            "master_claim_id": "claim-1",
+            "epistemic_status": "EXTERNAL",
+            "certainty": "LOW",
+            "display_text": (
+                "الكلفة الحقيقية للحياة، ثمن ا\ufffd\ufffdتذ\ufffd\ufffdرة"
+            ),
+            "voice_text": "clean",
+        }
+    ]
+    findings = SemanticFidelityValidator().validate(master, corrupted)
+    assert any(f.code == "ENCODING_CORRUPTION" for f in findings)
+    # ZWNJ (U+200C) is legitimate Persian orthography — not corruption.
+    clean = [
+        {
+            "master_claim_id": "claim-1",
+            "epistemic_status": "EXTERNAL",
+            "certainty": "LOW",
+            "display_text": "می‌خواهم با توجه به این موضوع حرف بزنم",
+            "voice_text": "می‌خواهم",
+        }
+    ]
+    assert not [
+        f
+        for f in SemanticFidelityValidator().validate(master, clean)
+        if f.code == "ENCODING_CORRUPTION"
+    ]
+
+
 def test_critical_pronunciation_requires_approved_lexicon_entry() -> None:
     findings = PronunciationValidator().validate(
         PublicationLanguage.DE,

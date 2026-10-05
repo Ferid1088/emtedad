@@ -27,6 +27,9 @@ Rules:
 - Use the transcript order: earlier proposals belong earlier in the tree.
 - Every final node needs: temp_id, parent_temp_id, ordinal among siblings, \
 node_type, title, summary, start_segment_sequence, end_segment_sequence.
+- Every parent_temp_id must reference a node you also emit. If you keep a \
+child, emit its parent too — never drop a grouping node while keeping its \
+children.
 - Children are strictly contained within their parent's span; siblings do \
 not overlap.
 - A STORY or CASE_STUDY spans the complete narrative across region \

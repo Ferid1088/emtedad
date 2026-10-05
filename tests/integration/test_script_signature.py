@@ -27,7 +27,11 @@ from app.topics.distinctiveness import (
 from app.topics.domain import TopicStatus
 from app.topics.models import ScriptSignature, TopicCandidate
 from app.topics.service import TopicService
-from tests.integration.test_topics import _build_source_with_units, _Provider
+from tests.integration.test_topics import (
+    _build_source_with_units,
+    _Provider,
+    _review_waive_approve,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -110,7 +114,8 @@ async def test_approval_writes_signature_once_and_feeds_distinctiveness(
             BriefInput(
                 question="Why do we stick with losing choices?",
                 thesis="Loss aversion keeps us locked in.",
-                target_duration_minutes=10,
+                # 27.5: approval requires the configured 25–30 min band.
+                target_duration_minutes=27.5,
             ),
         )
         await briefs.mark_ready(brief.id)
@@ -133,7 +138,8 @@ async def test_approval_writes_signature_once_and_feeds_distinctiveness(
         # Draft state: no canonical signature yet.
         assert await _signature_count(database, draft.id) == 0
 
-        approved = await scripts.approve_draft(draft.id)
+        # Approval requires a completed review of the exact draft text.
+        approved = await _review_waive_approve(database, scripts, draft.id)
 
         signature: ScriptSignature | None = None
         async with database.transaction() as session:
@@ -155,7 +161,7 @@ async def test_approval_writes_signature_once_and_feeds_distinctiveness(
         assert signature.created_at is not None
 
         # Idempotent: re-approving the same draft does not duplicate.
-        await scripts.approve_draft(approved.id)
+        await scripts.approve_draft(approved.id, approved_by="owner")
         assert await _signature_count(database, approved.id) == 1
 
         # Distinctiveness: a near-identical candidate sees the signature.

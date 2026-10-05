@@ -272,6 +272,20 @@ body.studio {
   color: #2f6b3a;
 }
 
+.step.attention {
+  border-color: #b45309;
+  color: #b45309;
+}
+
+.step-icon {
+  margin-right: 0.25rem;
+  font-weight: 700;
+}
+
+.step.active .step-icon {
+  color: #fff;
+}
+
 .action-list {
   list-style: none;
   margin: 0;

@@ -28,4 +28,4 @@ SCORE_KEYS = (
 DEFAULT_COVERAGE_THRESHOLD = 0.4
 
 TOPIC_MINING_TASK = "topic_mining"
-TOPIC_PROMPT_VERSION = "topic_mining_v1"
+TOPIC_PROMPT_VERSION = "topic_mining_v2"

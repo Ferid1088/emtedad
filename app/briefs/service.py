@@ -18,7 +18,7 @@ class BriefInput:
 
     question: str
     thesis: str
-    target_duration_minutes: int
+    target_duration_minutes: float
     target_audience: str = ""
     angle: str = ""
     primary_concepts: tuple[str, ...] = ()

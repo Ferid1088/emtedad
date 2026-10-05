@@ -1,13 +1,18 @@
 import asyncio
 import os
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
+import psycopg
 import pytest
+from alembic.config import Config
 from fastapi.testclient import TestClient
+from psycopg import sql
 from pydantic import SecretStr
 from sqlalchemy import delete, select
+from sqlalchemy.engine import make_url
 
+from alembic import command
 from app.content_strategy.models import (
     ContentTopic,
     EditorialProject,
@@ -18,6 +23,14 @@ from app.db.session import Database
 from app.main import create_app
 from app.research.models import ResearchProject
 from app.web.service import TopicAnalysisService
+
+
+def _sync_url(url: str) -> str:
+    return url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
+def _url_for_database(url: str, database: str) -> str:
+    return make_url(url).set(database=database).render_as_string(hide_password=False)
 
 
 @pytest.mark.integration
@@ -227,79 +240,88 @@ def test_dynamic_topics_enter_the_canonical_editorial_workflow() -> None:
 
 
 @pytest.mark.integration
-def test_topic_discovery_batches_and_workspace_actions() -> None:
-    database_url = os.environ.get("EMTEDAD_DATABASE_URL")
-    if not database_url:
+def test_topic_discovery_batches_and_workspace_actions(tmp_path: Path) -> None:
+    # Disposable migrated database: the deterministic suggestion catalog
+    # deduplicates against existing topics, so a populated development
+    # corpus legitimately yields zero new topics — this flow must be
+    # tested on an empty corpus, not by mutating dev data.
+    base_url = os.environ.get("EMTEDAD_DATABASE_URL")
+    if not base_url:
         pytest.skip("EMTEDAD_DATABASE_URL is required")
+    name = f"emtedad_test_{uuid4().hex}"
+    admin_url = _sync_url(_url_for_database(base_url, "postgres"))
+    with psycopg.connect(admin_url, autocommit=True) as connection:
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    database_url = _url_for_database(base_url, name)
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    command.upgrade(config, "head")
     database = Database(database_url)
     settings = Settings(
         _env_file=None,
         environment=Environment.TEST,
         database_url=SecretStr(database_url),
-        storage_root=Path("/tmp/emtedad-owner-web-test"),
+        storage_root=tmp_path / "storage",
     )
     batch_id: UUID | None = None
     topic_ids: list[UUID] = []
-    with TestClient(create_app(settings)) as client:
-        response = client.post(
-            "/topics/suggestions",
-            data={"requested_count": "3", "owner_instruction": "Beziehungen"},
-        )
-        assert response.status_code == 200
-        assert "Neue Themen generieren" in response.text
-        assert "AI_SUGGESTED" not in response.text
-
-    async def inspect_batch() -> None:
-        nonlocal batch_id, topic_ids
-        async with database.transaction() as session:
-            batch = await session.scalar(
-                select(TopicSuggestionBatch).order_by(
-                    TopicSuggestionBatch.created_at.desc()
-                )
+    try:
+        with TestClient(create_app(settings)) as client:
+            response = client.post(
+                "/topics/suggestions",
+                data={"requested_count": "3", "owner_instruction": "Beziehungen"},
             )
-            assert batch is not None
-            batch_id = batch.id
-            topics = list(
-                await session.scalars(
-                    select(ContentTopic).where(
-                        ContentTopic.suggestion_batch_id == batch.id
+            assert response.status_code == 200
+            assert "Neue Themen generieren" in response.text
+            assert "AI_SUGGESTED" not in response.text
+
+        async def inspect_batch() -> None:
+            nonlocal batch_id, topic_ids
+            async with database.transaction() as session:
+                batch = await session.scalar(
+                    select(TopicSuggestionBatch).order_by(
+                        TopicSuggestionBatch.created_at.desc()
                     )
                 )
+                assert batch is not None
+                batch_id = batch.id
+                topics = list(
+                    await session.scalars(
+                        select(ContentTopic).where(
+                            ContentTopic.suggestion_batch_id == batch.id
+                        )
+                    )
+                )
+                assert len(topics) == 3
+                topic_ids = [topic.id for topic in topics]
+
+        asyncio.run(inspect_batch())
+        assert topic_ids
+        with TestClient(create_app(settings)) as client:
+            assert (
+                client.post(
+                    f"/topics/{topic_ids[0]}/later", follow_redirects=False
+                ).status_code
+                == 303
             )
-            assert len(topics) == 3
-            topic_ids = [topic.id for topic in topics]
-
-    asyncio.run(inspect_batch())
-    assert topic_ids
-    with TestClient(create_app(settings)) as client:
-        assert (
-            client.post(
-                f"/topics/{topic_ids[0]}/later", follow_redirects=False
-            ).status_code
-            == 303
-        )
-        assert (
-            client.post(
-                f"/topics/{topic_ids[0]}/archive", follow_redirects=False
-            ).status_code
-            == 303
-        )
-        assert (
-            client.post(
-                f"/topics/{topic_ids[0]}/restore", follow_redirects=False
-            ).status_code
-            == 303
-        )
-
-    async def cleanup() -> None:
-        async with database.transaction() as session:
-            await session.execute(
-                delete(ContentTopic).where(ContentTopic.id.in_(topic_ids))
+            assert (
+                client.post(
+                    f"/topics/{topic_ids[0]}/archive", follow_redirects=False
+                ).status_code
+                == 303
             )
-            if batch_id is not None:
-                batch = await session.get(TopicSuggestionBatch, batch_id)
-                if batch is not None:
-                    await session.delete(batch)
-
-    asyncio.run(cleanup())
-    asyncio.run(database.dispose())
+            assert (
+                client.post(
+                    f"/topics/{topic_ids[0]}/restore", follow_redirects=False
+                ).status_code
+                == 303
+            )
+    finally:
+        asyncio.run(database.dispose())
+        with psycopg.connect(admin_url, autocommit=True) as connection:
+            connection.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid()",
+                (name,),
+            )
+            connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))

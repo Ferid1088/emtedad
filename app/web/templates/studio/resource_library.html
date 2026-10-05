@@ -10,6 +10,17 @@
 {% if request.query_params.get('import') == 'failed' %}
 <p class="error">Import fehlgeschlagen. URL und Transkript-Verfügbarkeit prüfen, dann erneut versuchen.</p>
 {% endif %}
+{% if request.query_params.get('retried') %}
+<p class="notice">{{ request.query_params.get('retried') }} fehlgeschlagene Ressourcen erneut eingereiht.</p>
+{% endif %}
+{% if exhausted_count %}
+<section class="card">
+  <form method="post" action="/library/retry-failed" class="inline-form">
+    <span class="muted">{{ exhausted_count }} Ressource(n) dauerhaft fehlgeschlagen (Wiederholungsversuche erschöpft).</span>
+    <button class="button secondary" type="submit">Alle erneut versuchen</button>
+  </form>
+</section>
+{% endif %}
 <section class="card">
   <h2>Ressource importieren</h2>
   <div class="button-row">

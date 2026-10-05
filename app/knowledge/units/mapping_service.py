@@ -129,7 +129,10 @@ class ConceptMappingService:
                     stats["rejected"] += 1
                     logger.info(
                         "concept_mapping.proposal_rejected",
-                        extra={"reason": reason, "name": proposal.canonical_name[:80]},
+                        extra={
+                            "reason": reason,
+                            "concept_name": proposal.canonical_name[:80],
+                        },
                     )
                     continue
                 before = await session.scalar(

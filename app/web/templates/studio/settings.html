@@ -15,4 +15,116 @@
     <div><dt>YouTube MCP</dt><dd>{{ 'aktiviert' if youtube_mcp_enabled else 'deaktiviert' }}{% if youtube_mcp_enabled %} · <code>{{ youtube_mcp_url }}</code>{% endif %}</dd></div>
   </dl>
 </section>
+
+{% if saved %}<p class="notice">Einstellungen gespeichert.</p>{% endif %}
+
+<form method="post" action="/settings">
+<section class="card">
+  <h2>Internet-Recherche</h2>
+  <p class="lede">Wenn aktiviert, kann Emtedad bei Material-Lücken selbst im
+  Web recherchieren. Gefundene Seiten werden als echte Quellen ingestiert —
+  nicht als generierter Text.</p>
+  <label class="check">
+    <input type="checkbox" name="web_research_enabled" value="on"
+      {% if web_research.web_research_enabled %}checked{% endif %}>
+    Internet-Recherche aktivieren
+  </label>
+  <div class="form-grid">
+    <label>Anbieter
+      <select name="web_research_provider">
+        {% for option in [('openrouter', 'OpenRouter / Chat-API mit Websuche'), ('tavily', 'Tavily / Such-API'), ('custom', 'Eigener Endpunkt (JSON)')] %}
+        <option value="{{ option[0] }}" {% if web_research.web_research_provider == option[0] %}selected{% endif %}>{{ option[1] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Base-URL
+      <input type="url" name="web_research_base_url" value="{{ web_research.web_research_base_url }}"
+        placeholder="https://openrouter.ai/api/v1">
+    </label>
+    <label>Modell (nur Chat-API)
+      <input type="text" name="web_research_model" value="{{ web_research.web_research_model }}"
+        placeholder="openai/gpt-4o-mini:online">
+    </label>
+    <label>API-Key
+      <input type="password" name="web_research_api_key" value="{{ web_research.web_research_api_key }}"
+        placeholder="Key einfügen (leer = Umgebungsvariable)">
+    </label>
+    <label>Max. Ergebnisse pro Recherche
+      <input type="number" name="web_research_max_results" min="1" max="15" value="{{ web_research.web_research_max_results }}">
+    </label>
+    <label>Timeout (Sekunden)
+      <input type="number" name="web_research_timeout_seconds" min="10" max="600" value="{{ web_research.web_research_timeout_seconds }}">
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Hintergrund-Verarbeitung</h2>
+  <p class="lede">Importierte Quellen werden automatisch strukturiert und in
+  Wissenseinheiten zerlegt. Bei Provider-Engpässen kannst du die automatische
+  Verarbeitung pausieren — eigene Aktionen (Themen, Produktion, Review,
+  Übersetzung) laufen immer weiter.</p>
+  <label class="check">
+    <input type="checkbox" name="background_processing_paused" value="on"
+      {% if web_research.background_processing_paused %}checked{% endif %}>
+    Hintergrund-Verarbeitung pausieren
+  </label>
+  <p class="muted">
+    Provider-Kapazität: {{ provider_capacity.total }} Slots gesamt,
+    davon max. {{ provider_capacity.background_max }} für Hintergrund —
+    {{ provider_capacity.reserved_interactive }} für eigene Aktionen reserviert.
+    Aktiv: {{ provider_capacity.in_flight_total }} · Wartend:
+    {{ provider_capacity.waiting_total }} · Jobs: {{ background_jobs_running }}
+    laufend / {{ background_jobs_waiting }} in Warteschlange.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Video-Länge</h2>
+  <p class="lede">Jedes Thema soll ein Video in diesem Bereich ergeben. Reicht
+  das vorhandene Material nicht, markiert die Produktion die Lücke — mit
+  aktivierter Internet-Recherche wird sie automatisch gefüllt.</p>
+  <div class="form-grid">
+    <label>Standard-Ziel (Minuten)
+      <input type="number" name="target_duration_default_minutes" min="1" max="120" step="0.5" value="{{ web_research.target_duration_default_minutes }}">
+    </label>
+    <label>Minimum (Minuten)
+      <input type="number" name="target_duration_min_minutes" min="1" max="120" step="0.5" value="{{ web_research.target_duration_min_minutes }}">
+    </label>
+    <label>Maximum (Minuten)
+      <input type="number" name="target_duration_max_minutes" min="1" max="120" step="0.5" value="{{ web_research.target_duration_max_minutes }}">
+    </label>
+    <label>Max. automatische Revisionen
+      <input type="number" name="max_revision_rounds" min="1" max="10" value="{{ web_research.max_revision_rounds }}">
+    </label>
+    <label>Erstentwurf: Mindestanteil der Dauer (Faktor)
+      <input type="number" name="first_draft_min_duration_ratio" min="0.5" max="1" step="0.05" value="{{ web_research.first_draft_min_duration_ratio }}">
+    </label>
+    <label>Erstentwurf: Höchstanteil der Dauer (Faktor)
+      <input type="number" name="first_draft_max_duration_ratio" min="1" max="1.6" step="0.05" value="{{ web_research.first_draft_max_duration_ratio }}">
+    </label>
+    <label>Max. Generierungs-Korrekturen
+      <input type="number" name="generation_max_correction_attempts" min="0" max="5" value="{{ web_research.generation_max_correction_attempts }}">
+    </label>
+    <label>Units pro Videominute (Material-Schätzung)
+      <input type="number" name="units_per_video_minute" min="0.5" max="10" step="0.5" value="{{ web_research.units_per_video_minute }}">
+    </label>
+    <label>Wörter/Min Persisch (Sprechtempo)
+      <input type="number" name="speech_wpm_fa" min="60" max="300" value="{{ web_research.speech_wpm_fa }}">
+    </label>
+    <label>Wörter/Min Englisch
+      <input type="number" name="speech_wpm_en" min="60" max="300" value="{{ web_research.speech_wpm_en }}">
+    </label>
+    <label>Wörter/Min Deutsch
+      <input type="number" name="speech_wpm_de" min="60" max="300" value="{{ web_research.speech_wpm_de }}">
+    </label>
+    <label>Wörter/Min Arabisch
+      <input type="number" name="speech_wpm_ar" min="60" max="300" value="{{ web_research.speech_wpm_ar }}">
+    </label>
+  </div>
+  <button class="button" type="submit">Speichern</button>
+  <p class="muted">Leere Felder fallen auf die Umgebungs-Defaults zurück.
+  Gespeicherte API-Keys werden hier nur maskiert angezeigt.</p>
+</section>
+</form>
 {% endblock %}

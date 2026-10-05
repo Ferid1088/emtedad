@@ -39,6 +39,31 @@ ATOMIC_NODE_TYPES: frozenset[StructureNodeType] = frozenset(
     {StructureNodeType.STORY, StructureNodeType.CASE_STUDY}
 )
 
+
+class FailureClass(StrEnum):
+    """Retry classification for a persisted processing error."""
+
+    QUOTA = "quota"  # provider quota/billing — retry later, unbounded
+    RATE_LIMIT = "rate_limit"  # provider concurrency/throttling — retry later
+    FAILED = "failed"  # real analysis failure — counted against max attempts
+
+
+def classify_failure(error: str | None) -> FailureClass:
+    """Bucket a persisted processing error into a retry class."""
+
+    text = (error or "").lower()
+    if (
+        "out_of_quota" in text
+        or "provider_quota_exhausted" in text
+        or "kontingent" in text
+        or "billing" in text
+    ):
+        return FailureClass.QUOTA
+    if "429" in text or "rate limit" in text or "parallele sessions" in text:
+        return FailureClass.RATE_LIMIT
+    return FailureClass.FAILED
+
+
 STRUCTURE_TASK = "source_structure"
 LOCAL_PASS_PROMPT_VERSION = "source_structure_local_v1"
-MERGE_PASS_PROMPT_VERSION = "source_structure_merge_v1"
+MERGE_PASS_PROMPT_VERSION = "source_structure_merge_v2"

@@ -26,6 +26,7 @@ from app.content_engine.narrative import NarrativeArchitectAgent
 from app.content_engine.schemas import (
     ArgumentPlanOutput,
     NarrativePlanOutput,
+    NarrativeSectionProposal,
 )
 from app.db.session import Database
 from app.editorial_channels.models import ChannelStrategyVersion
@@ -43,6 +44,31 @@ from app.topics.models import TopicCandidateUnit
 
 class GateBlockedError(ValueError):
     """Raised when an upstream artifact is missing or not ready."""
+
+
+def _calibrate_target_seconds(
+    sections: list[NarrativeSectionProposal], target_minutes: float
+) -> list[int]:
+    """Scale the architect's per-beat budgets to the brief's duration.
+
+    The model decides the distribution across beats; the total is a
+    contract — when the sum drifts more than 10% from the planning
+    target, rescale proportionally so the narrative plan hands the
+    master (and writer) a truthful budget.
+    """
+
+    target_seconds = int(target_minutes * 60)
+    raw = [max(int(section.target_seconds), 1) for section in sections]
+    total = sum(raw)
+    if total <= 0 or abs(total - target_seconds) <= target_seconds * 0.1:
+        return raw
+    scaled = [max(15, round(seconds * target_seconds / total)) for seconds in raw]
+    # Fold the rounding remainder into the largest beat so the sum is exact.
+    diff = target_seconds - sum(scaled)
+    if diff and scaled:
+        largest = max(range(len(scaled)), key=lambda i: scaled[i])
+        scaled[largest] = max(15, scaled[largest] + diff)
+    return scaled
 
 
 def _hash(payload: object) -> str:
@@ -271,6 +297,9 @@ class ContentEngineService:
             )
             or 0
         ) + 1
+        calibrated = _calibrate_target_seconds(
+            output.sections, brief.target_duration_minutes
+        )
         plan = NarrativePlan(
             content_brief_id=brief.id,
             argument_plan_id=argument.id,
@@ -281,11 +310,16 @@ class ContentEngineService:
                     "brief": str(brief.id),
                     "argument": str(argument.id),
                     "output": output.model_dump(mode="json"),
+                    "calibrated_seconds": calibrated,
                 }
             ),
             provenance_json={
                 "model": self.model,
                 "argument_plan_version": argument.version_number,
+                "target_seconds_raw": [
+                    section.target_seconds for section in output.sections
+                ],
+                "target_seconds_total": sum(calibrated),
             },
         )
         plan.sections = [
@@ -293,7 +327,7 @@ class ContentEngineService:
                 ordinal=section.ordinal,
                 narrative_role=section.narrative_role,
                 purpose=section.purpose,
-                target_seconds=section.target_seconds,
+                target_seconds=calibrated[index],
                 argument_section_ids=[
                     labels[ref]
                     for ref in section.argument_section_refs
@@ -308,7 +342,7 @@ class ContentEngineService:
                 opening_method=section.opening_method,
                 ending_method=section.ending_method,
             )
-            for section in output.sections
+            for index, section in enumerate(output.sections)
         ]
         session.add(plan)
         await session.flush()

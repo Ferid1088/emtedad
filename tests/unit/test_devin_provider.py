@@ -425,14 +425,15 @@ async def test_devin_provider_rate_limit_retry_is_bounded(
 
 
 @pytest.mark.asyncio
-async def test_devin_provider_parallel_session_cap_is_quota_not_retry(
+async def test_devin_provider_parallel_session_cap_is_bounded_backoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     creates = 0
 
     def handle(request: httpx.Request) -> httpx.Response:
         nonlocal creates
-        creates += 1
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            creates += 1
         return httpx.Response(
             429,
             json={
@@ -446,7 +447,10 @@ async def test_devin_provider_parallel_session_cap_is_quota_not_retry(
     provider = _provider(monkeypatch, httpx.MockTransport(handle))
     with pytest.raises(devin_module.DevinQuotaError, match="PROVIDER_QUOTA"):
         await provider.extract(_request())
-    assert creates == 1  # hard quota: no in-call retry
+    # Hard quota: orphaned sessions are reaped once, then bounded backoff
+    # retries — quota clears in minutes, so waiting beats an instant fail,
+    # but the loop is still capped by devin_rate_limit_max_attempts.
+    assert creates == 3
 
 
 @pytest.mark.asyncio
@@ -497,3 +501,227 @@ def test_json_recovery_helper() -> None:
     assert with_attachment == {"topics": []}
     assert devin_module._recover_from_messages([]) is None
     assert json.loads("{}") == {}
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_repairs_corrupted_output_in_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """U+FFFD output gets one in-session repair turn — the agent sees and
+    fixes its own corrupted text; the stale payload is never re-read."""
+
+    monkeypatch.setattr(devin_module, "_CORRUPTION_REPAIR_TIMEOUT_SECONDS", 5)
+    corrupted = {"status": "broken�text"}
+    clean = {"status": "ok"}
+    gets = 0
+    messages: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal gets
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            return httpx.Response(200, json={"session_id": "s-1"})
+        if request.method == "POST":
+            messages.append(str(json.loads(request.content)["message"]))
+            return httpx.Response(200, json={})
+        if request.method == "DELETE":
+            return httpx.Response(200, json={})
+        gets += 1
+        if gets == 1:
+            return httpx.Response(
+                200,
+                json=_session_response(
+                    status_enum="blocked", structured_output=corrupted
+                ),
+            )
+        return httpx.Response(
+            200,
+            json=_session_response(status_enum="blocked", structured_output=clean),
+        )
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    result = await provider.extract(_request())
+
+    assert result == _Output(status="ok")
+    assert gets == 2
+    assert any("U+FFFD" in message for message in messages)
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_fresh_retry_when_repair_still_corrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed repair keeps the corrupted result; extract() then makes
+    exactly one fresh-session attempt."""
+
+    monkeypatch.setattr(devin_module, "_EMPTY_OUTPUT_GRACE_SECONDS", 0)
+    creates = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal creates
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            creates += 1
+            return httpx.Response(200, json={"session_id": f"s-{creates}"})
+        if request.method == "POST":
+            return httpx.Response(200, json={})
+        if request.method == "DELETE":
+            return httpx.Response(200, json={})
+        if creates == 1:
+            # Session 1: corrupted output; repair re-polls see the same
+            # stale payload (ignore_structured) until the grace expiry.
+            return httpx.Response(
+                200,
+                json=_session_response(
+                    status_enum="blocked",
+                    structured_output={"status": "bad�"},
+                ),
+            )
+        return httpx.Response(
+            200,
+            json=_session_response(
+                status_enum="blocked", structured_output={"status": "ok"}
+            ),
+        )
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    result = await provider.extract(_request())
+
+    assert result == _Output(status="ok")
+    assert creates == 2
+
+
+@pytest.mark.asyncio
+async def test_devin_provider_retries_fresh_when_session_not_messageable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 'finished' session cannot be repaired — straight to the fresh
+    retry, bounded at one."""
+
+    creates = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal creates
+        if request.method == "POST" and request.url.path == "/v1/sessions":
+            creates += 1
+            return httpx.Response(200, json={"session_id": f"s-{creates}"})
+        if request.method == "POST":
+            return httpx.Response(400, json={"detail": "session finished"})
+        if request.method == "DELETE":
+            return httpx.Response(200, json={})
+        if creates == 1:
+            return httpx.Response(
+                200,
+                json=_session_response(
+                    status_enum="finished",
+                    structured_output={"status": "bad�"},
+                ),
+            )
+        return httpx.Response(
+            200,
+            json=_session_response(
+                status_enum="blocked", structured_output={"status": "ok"}
+            ),
+        )
+
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    result = await provider.extract(_request())
+
+    assert result == _Output(status="ok")
+    assert creates == 2
+
+
+@pytest.mark.asyncio
+async def test_orphan_sweep_reaps_old_blocked_sessions_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Phase 4 §5: dead sessions holding quota slots get reaped; fresh or
+    running ones are untouched."""
+
+    deleted: list[str] = []
+    old = "2000-01-01T00:00:00Z"
+    fresh = "2999-01-01T00:00:00Z"
+    sessions = {
+        "sessions": [
+            {
+                "session_id": "old-blocked",
+                "status_enum": "blocked",
+                "updated_at": old,
+                "tags": ["emtedad-app"],
+            },
+            {
+                "session_id": "foreign-blocked",
+                "status_enum": "blocked",
+                "updated_at": old,
+                "tags": ["devin-app"],  # another tool's session — never reaped
+            },
+            {
+                "session_id": "fresh-blocked",
+                "status_enum": "blocked",
+                "updated_at": fresh,
+                "tags": ["emtedad-app"],
+            },
+            {
+                "session_id": "live-running",
+                "status_enum": "running",
+                "updated_at": old,
+                "tags": ["emtedad-app"],
+            },
+            {
+                "session_id": "done",
+                "status_enum": "finished",
+                "updated_at": old,
+                "tags": ["emtedad-app"],
+            },
+        ]
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            deleted.append(request.url.path.rsplit("/", 1)[-1])
+            return httpx.Response(200, json={})
+        if request.method == "GET" and request.url.path == "/v1/sessions":
+            return httpx.Response(200, json=sessions)
+        if request.method == "POST":
+            return httpx.Response(200, json={"session_id": "s-1"})
+        return httpx.Response(200, json=_session_response())
+
+    monkeypatch.setattr(devin_module, "_last_orphan_sweep", 0.0)
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    result = await provider.extract(_request())
+    assert result == _Output(status="ok")
+    # 's-1' is the normal post-extract termination; the sweep must reap
+    # only the stale tagged session — never fresh, running, or foreign.
+    assert "old-blocked" in deleted
+    assert "foreign-blocked" not in deleted
+    assert "fresh-blocked" not in deleted
+    assert "live-running" not in deleted
+    assert "done" not in deleted
+
+
+@pytest.mark.asyncio
+async def test_quota_error_triggers_sweep_then_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A quota 429 sweeps orphans once and retries session creation."""
+
+    posts = 0
+    swept = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal posts, swept
+        if request.method == "POST":
+            posts += 1
+            if posts == 1:
+                return httpx.Response(429, text="You have 5 SWE-2 sessions running")
+            return httpx.Response(200, json={"session_id": "s-1"})
+        if request.method == "GET" and request.url.path == "/v1/sessions":
+            swept += 1
+            return httpx.Response(200, json={"sessions": []})
+        if request.method == "DELETE":
+            return httpx.Response(200, json={})
+        return httpx.Response(200, json=_session_response())
+
+    monkeypatch.setattr(devin_module, "_last_orphan_sweep", 0.0)
+    provider = _provider(monkeypatch, httpx.MockTransport(handle))
+    assert await provider.extract(_request()) == _Output(status="ok")
+    assert posts == 2
+    assert swept >= 1

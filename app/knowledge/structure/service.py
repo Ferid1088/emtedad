@@ -25,7 +25,9 @@ from app.knowledge.structure.domain import (
     LOCAL_PASS_PROMPT_VERSION,
     MERGE_PASS_PROMPT_VERSION,
     STRUCTURE_TASK,
+    FailureClass,
     SourceProcessingStatus,
+    classify_failure,
 )
 from app.knowledge.structure.models import (
     SourceProcessingState,
@@ -210,7 +212,10 @@ class SourceStructureService:
                 run.completed_at = datetime.now(UTC)
                 state.status = SourceProcessingStatus.FAILED
                 state.last_error = str(exc)[:2000]
-                state.attempt_count += 1
+                # Quota/rate-limit failures stay retryable and must not
+                # burn a real attempt — only analysis failures count.
+                if classify_failure(state.last_error) is FailureClass.FAILED:
+                    state.attempt_count += 1
                 logger.exception(
                     "source_structure.failed",
                     extra={"source_id": str(source_id)},

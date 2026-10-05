@@ -40,6 +40,7 @@ from app.knowledge.structure.models import SourceProcessingState
 from app.knowledge.structure.service import SourceStructureService
 from app.knowledge.units.service import KnowledgeUnitService
 from app.main import create_app
+from app.ops.settings.service import StudioSettingsService
 from app.research.generic import GenericResearchService
 from app.topics.service import TopicService
 from tests.integration.test_topics import _build_source_with_units, _Provider
@@ -616,5 +617,398 @@ async def test_processing_error_is_humanized_not_raw(studio_client) -> None:
                 assert "tech-details" in body
             # Never rendered as a bare error banner with the raw code.
             assert '<p class="error">PROVIDER_QUOTA_EXHAUSTED' not in body
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_settings_web_research_roundtrip(studio_client) -> None:
+    """Owner toggles web research; the API key is masked on re-render."""
+
+    client, database_url = studio_client
+    page = client.get("/settings")
+    assert page.status_code == 200
+    assert "Internet-Recherche" in page.text
+    assert "Video-Länge" in page.text
+
+    response = client.post(
+        "/settings",
+        data={
+            "web_research_enabled": "on",
+            "web_research_provider": "tavily",
+            "web_research_base_url": "https://api.tavily.test",
+            "web_research_model": "",
+            "web_research_api_key": "sk-owner-key-9999",
+            "web_research_max_results": "7",
+            "web_research_timeout_seconds": "45",
+            "target_duration_default_minutes": "22",
+            "target_duration_min_minutes": "20",
+            "target_duration_max_minutes": "25",
+            "units_per_video_minute": "2",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    database = Database(database_url)
+    try:
+        service = StudioSettingsService(database)
+        effective = await service.effective()
+        assert effective["web_research_enabled"] is True
+        assert effective["web_research_provider"] == "tavily"
+        assert effective["web_research_base_url"] == "https://api.tavily.test"
+        assert effective["web_research_api_key"] == "sk-owner-key-9999"
+        assert effective["web_research_max_results"] == 7
+        assert effective["units_per_video_minute"] == 2.0
+    finally:
+        await database.dispose()
+
+    page = client.get("/settings")
+    assert "sk-owner-key-9999" not in page.text
+    assert "••" in page.text
+
+    # Submitting again with the masked placeholder must not clobber the key.
+    response = client.post(
+        "/settings",
+        data={
+            "web_research_enabled": "on",
+            "web_research_provider": "tavily",
+            "web_research_base_url": "https://api.tavily.test",
+            "web_research_api_key": "••••••9999",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    database = Database(database_url)
+    try:
+        effective = await StudioSettingsService(database).effective()
+        assert effective["web_research_api_key"] == "sk-owner-key-9999"
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_brief_defaults_to_27_5_minutes_and_shows_gap(studio_client) -> None:
+    """Brief creation clamps to the configured 25–30 range, default 27.5."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        service = EditorialChannelService(database)
+        channel = await service.get_channel("emtedad")
+        strategies = await service.list_strategies(channel.id)
+        active = next(s for s in strategies if s.status.value == "ACTIVE")
+        candidate = await TopicService(database).create_manual(
+            channel.id,
+            active.id,
+            question="Why do we forget names?",
+            thesis="Names fail because they lack semantic hooks.",
+        )
+        response = client.post(
+            f"/studio/topics/{candidate.id}/brief", follow_redirects=False
+        )
+        assert response.status_code == 303
+        briefs = await BriefService(database).list_for_candidate(candidate.id)
+        assert len(briefs) == 1
+        assert briefs[0].target_duration_minutes == 27.5
+
+        # No units yet → the workspace flags the material gap in German.
+        page = client.get(f"/studio/production/{briefs[0].id}")
+        assert page.status_code == 200
+        assert "Lücke:" in page.text
+        assert "Im Internet recherchieren" not in page.text  # feature off
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_web_research_button_and_disabled_notice(studio_client) -> None:
+    """With the toggle on, the workspace offers manual research; the POST
+    reports 'disabled' only when the owner turned it off."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        service = EditorialChannelService(database)
+        channel = await service.get_channel("emtedad")
+        strategies = await service.list_strategies(channel.id)
+        active = next(s for s in strategies if s.status.value == "ACTIVE")
+        candidate = await TopicService(database).create_manual(
+            channel.id, active.id, question="Gap question?"
+        )
+        brief = await BriefService(database).create_for_candidate(
+            candidate.id,
+            BriefInput(
+                question="Gap question?",
+                thesis="T.",
+                target_duration_minutes=22,
+            ),
+        )
+
+        # Disabled: POST reports the feature is off.
+        response = client.post(
+            f"/studio/production/{brief.id}/web-research",
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert "deaktiviert" in response.headers["location"]
+
+        # Enable via owner settings → the button appears.
+        await StudioSettingsService(database).set_many({"web_research_enabled": True})
+        page = client.get(f"/studio/production/{brief.id}")
+        assert "Im Internet recherchieren" in page.text
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_workspace_stepper_truthful_not_positional(studio_client) -> None:
+    """Audit §3: the stepper marks stages done only for real artifacts.
+
+    A READY evidence matrix without a research plan must show Evidence as
+    done and Recherche as NOT done — positional inference would mark every
+    step before Evidence complete.
+    """
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        provider = _Provider()
+        channel_service = EditorialChannelService(database)
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        brief = await BriefService(database).create_for_candidate(
+            candidates[0].id,
+            BriefInput(question="Q?", thesis="T.", target_duration_minutes=10),
+        )
+        await BriefService(database).mark_ready(brief.id)
+        # Evidence matrix built without ever creating a research plan.
+        await GenericResearchService(database).build_evidence_matrix(brief.id)
+
+        page = client.get(f"/studio/production/{brief.id}")
+        assert page.status_code == 200
+        # Evidence must show done; Recherche must NOT — it has no artifact.
+        import re as _re
+
+        done_steps = _re.findall(
+            r'class="step[^"]*done[^"]*"[^>]*>\s*'
+            r'(?:<span class="step-icon">[^<]*</span>)?([^<]+)<',
+            page.text,
+        )
+        done_steps = [s.strip() for s in done_steps]
+        assert "Evidence" in done_steps
+        assert "Recherche" not in done_steps
+        assert "Argument" not in done_steps
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_failed_action_surfaces_error_to_owner(studio_client) -> None:
+    """Audit §45: action failures must not redirect as if nothing happened."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        service = EditorialChannelService(database)
+        channel = await service.get_channel("emtedad")
+        strategies = await service.list_strategies(channel.id)
+        active = next(s for s in strategies if s.status.value == "ACTIVE")
+        candidate = await TopicService(database).create_manual(
+            channel.id, active.id, question="Error surfacing?"
+        )
+        brief = await BriefService(database).create_for_candidate(
+            candidate.id,
+            BriefInput(
+                question="Error surfacing?", thesis="T.", target_duration_minutes=22
+            ),
+        )
+        # Approve with no draft at all — must surface an error, not no-op.
+        response = client.post(
+            f"/studio/production/{brief.id}/actions/approve",
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert "error=" in response.headers["location"]
+        # The error notice renders on the workspace page.
+        page = client.get(response.headers["location"])
+        assert page.status_code == 200
+        assert "Kein Skript-Entwurf" in page.text
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_freeze_research_action_freezes_package(studio_client) -> None:
+    """The UI freeze action produces the FROZEN package the master gate needs."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        provider = _Provider()
+        channel_service = EditorialChannelService(database)
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        brief = await BriefService(database).create_for_candidate(
+            candidates[0].id,
+            BriefInput(question="Q?", thesis="T.", target_duration_minutes=10),
+        )
+        await BriefService(database).mark_ready(brief.id)
+        research = GenericResearchService(database)
+        await research.create_plan_for_brief(brief.id)
+        await research.build_evidence_matrix(brief.id)
+
+        page = client.get(f"/studio/production/{brief.id}")
+        assert "Recherche einfrieren" in page.text
+
+        response = client.post(
+            f"/studio/production/{brief.id}/actions/freeze_research",
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert "error=" not in response.headers["location"]
+
+        from sqlalchemy import select
+
+        from app.research.domain import PackageStatus
+        from app.research.models import ResearchPackage
+
+        async with database.transaction() as session:
+            package = await session.scalar(
+                select(ResearchPackage).where(
+                    ResearchPackage.content_brief_id == brief.id
+                )
+            )
+        assert package is not None
+        assert package.status is PackageStatus.FROZEN
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_waive_finding_route(studio_client) -> None:
+    """Owner waiver via POST flips an open finding; wrong brief → 404."""
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        provider = _Provider()
+        channel_service = EditorialChannelService(database)
+        channel = await channel_service.get_channel("emtedad")
+        source = await _build_source_with_units(database)
+        await SourceStructureService(database, provider=provider).process_source(
+            source.id
+        )
+        await KnowledgeUnitService(database, provider=provider).extract_for_source(
+            source.id
+        )
+        await channel_service.assign_resource(
+            channel.id, source.id, role=ChannelResourceRole.PRIMARY
+        )
+        candidates = await TopicService(database, provider=provider).mine("emtedad")
+        briefs = BriefService(database)
+        brief = await briefs.create_for_candidate(
+            candidates[0].id,
+            BriefInput(
+                question="Waive finding?", thesis="T.", target_duration_minutes=22
+            ),
+        )
+        other = await briefs.create_for_candidate(
+            candidates[0].id,
+            BriefInput(question="Other?", thesis="T.", target_duration_minutes=22),
+        )
+        await briefs.mark_ready(brief.id)
+
+        research = GenericResearchService(database)
+        plan = await research.create_plan_for_brief(brief.id)
+        await research.build_evidence_matrix(brief.id)
+        await research.freeze_package(plan.id)
+        engine = ContentEngineService(database, provider=provider)
+        await engine.build_argument(brief.id)
+        await engine.build_narrative(brief.id)
+        from app.content_engine.review import ScriptService
+        from app.lecture.generic_service import GenericMasterService
+
+        await GenericMasterService(database).build_from_content_brief(brief.id)
+        draft = await ScriptService(database, provider=provider).build_script(
+            brief.id, language="en"
+        )
+
+        from app.content_engine.domain import FindingSeverity, FindingStatus
+        from app.content_engine.models import ReviewFinding
+
+        async with database.transaction() as session:
+            finding = ReviewFinding(
+                script_draft_id=draft.id,
+                critic_role="FACT",
+                severity=FindingSeverity.WARNING,
+                location="opening",
+                code="WEAK_EVIDENCE",
+                explanation="Claim lacks support.",
+            )
+            session.add(finding)
+            await session.flush()
+            finding_id = finding.id
+
+        # Wrong brief id → 404, no state change.
+        response = client.post(
+            f"/studio/production/{other.id}/findings/{finding_id}/waive",
+            follow_redirects=False,
+        )
+        assert response.status_code == 404
+
+        # A waiver without an owner justification must not resolve.
+        response = client.post(
+            f"/studio/production/{brief.id}/findings/{finding_id}/waive",
+            follow_redirects=False,
+        )
+        assert "error=" in response.headers["location"]
+
+        response = client.post(
+            f"/studio/production/{brief.id}/findings/{finding_id}/waive",
+            data={"reason": "acceptable minor style risk"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        async with database.transaction() as session:
+            from sqlalchemy import select as _select
+
+            stored = await session.scalar(
+                _select(ReviewFinding.status).where(ReviewFinding.id == finding_id)
+            )
+        assert stored is FindingStatus.WAIVED
+
+        # Second waive on the same finding surfaces an error, not silence.
+        response = client.post(
+            f"/studio/production/{brief.id}/findings/{finding_id}/waive",
+            follow_redirects=False,
+        )
+        assert "error=" in response.headers["location"]
     finally:
         await database.dispose()
