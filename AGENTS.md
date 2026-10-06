@@ -83,9 +83,9 @@ repository, service, and workflow boundaries without premature microservices.
 
 ## Agent production system
 
-Content production runs through the Devin Cloud API
-(`app/knowledge/llm/devin.py`); all structured extraction and editorial
-workflows resolve providers via `resolve_llm_provider()`. Production is
+All LLM calls go through APIMaster (https://apimaster.ai), the only LLM
+gateway, via `resolve_llm_provider(role=...)` in
+`app/knowledge/llm/factory.py`. Do not add other LLM providers or fallbacks. Production is
 resource-first: `python -m app.cli knowledge ingest-youtube` imports sources,
 post-ingestion processing (structure → KnowledgeUnits) runs through
 `app.knowledge.structure`, and new productions originate from ContentBriefs
