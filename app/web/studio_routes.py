@@ -2,7 +2,6 @@
 
 import contextlib
 import json
-import re
 from pathlib import Path
 from typing import Any, TypedDict, cast
 from urllib.parse import quote
@@ -42,12 +41,6 @@ from app.content_engine.service import (
     GateBlockedError,
 )
 from app.content_engine.writing.books import BookReference, reference_usage
-from app.content_strategy.models import (
-    EditorialLanguageTrack,
-    EditorialProject,
-    PersianDraft,
-)
-from app.content_strategy.text_library import load_library_items
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
 from app.db.session import Database
@@ -93,7 +86,6 @@ from app.knowledge.units.quality import unit_retrieval_role
 from app.knowledge.units.service import KnowledgeUnitService
 from app.lecture.domain import (
     MasterOriginType,
-    MasterStatus,
     PublicationLanguage,
 )
 from app.lecture.generic_service import GenericMasterService
@@ -102,15 +94,12 @@ from app.lecture.models import (
     LectureMasterVersion,
     LectureSection,
 )
-from app.localization.domain import LocalizationStatus
+from app.localization.domain import LocalizationPipelineStage
 from app.localization.models import (
     LocalizationPipelineRun,
-    LocalizationProject,
     LocalizationSemanticPackage,
-    LocalizationStatement,
-    LocalizationVersion,
 )
-from app.localization.service import LocalizationService
+from app.localization.runner import NativeLocalizationRunner
 from app.ops.settings.service import StudioSettingsService
 from app.production.models import PublicationTarget
 from app.production.service import ProductionService, ProductionState
@@ -136,6 +125,7 @@ from app.topics.models import (
     TopicCandidateConcept,
 )
 from app.topics.service import TopicService
+from app.web.jobs import jobs
 from app.web.service import import_youtube_resource
 from app.web_research.gap_fill import GapFillService
 from app.web_research.models import WebResearchRun
@@ -391,18 +381,13 @@ async def studio_home(request: Request) -> HTMLResponse:
             ).all()
         }
         localization_total = int(
-            await session.scalar(select(func.count(LocalizationProject.id))) or 0
+            await session.scalar(select(func.count(LocalizationPipelineRun.id))) or 0
         )
         localization_open = int(
             await session.scalar(
-                select(func.count(LocalizationProject.id)).where(
-                    LocalizationProject.status.in_(
-                        [
-                            LocalizationStatus.DRAFT,
-                            LocalizationStatus.NOT_READY_FOR_VOICE,
-                            LocalizationStatus.FAILED,
-                        ]
-                    )
+                select(func.count(LocalizationPipelineRun.id)).where(
+                    LocalizationPipelineRun.stage
+                    != LocalizationPipelineStage.READY_FOR_VOICE
                 )
             )
             or 0
@@ -747,249 +732,78 @@ async def studio_topics_manual(request: Request) -> Response:
 
 @router.get("/studio/translations", response_class=HTMLResponse)
 async def studio_translations(request: Request) -> HTMLResponse:
+    """Every production with an approved Persian script and the status of
+    its native translations. Translations are started in the workspace."""
+
     database = _database(request)
     async with database.transaction() as session:
-        projects = list(
+        approved = list(
             await session.scalars(
-                select(LocalizationProject)
-                .order_by(LocalizationProject.created_at.desc())
-                .limit(200)
-            )
-        )
-        master_ids = {p.lecture_master_version_id for p in projects}
-        masters = (
-            {
-                m.id: m
-                for m in (
-                    await session.scalars(
-                        select(LectureMasterVersion).where(
-                            LectureMasterVersion.id.in_(master_ids)
-                        )
-                    )
-                ).all()
-            }
-            if master_ids
-            else {}
-        )
-        # Localizable masters: CONTENT_BRIEF origin, READY, sorted newest first.
-        ready_masters = list(
-            await session.scalars(
-                select(LectureMasterVersion)
+                select(ScriptDraft)
                 .where(
-                    LectureMasterVersion.origin_type == MasterOriginType.CONTENT_BRIEF,
-                    LectureMasterVersion.status == MasterStatus.READY,
+                    ScriptDraft.lineage == "primary",
+                    ScriptDraft.status == DraftStatus.APPROVED,
                 )
-                .order_by(LectureMasterVersion.created_at.desc())
-                .limit(50)
+                .order_by(ScriptDraft.created_at.desc())
             )
         )
-        brief_ids = {
-            m.content_brief_id
-            for m in list(masters.values()) + ready_masters
-            if m.content_brief_id
-        }
+        brief_ids = list({draft.content_brief_id for draft in approved})
         briefs = (
             {
-                b.id: b
-                for b in (
-                    await session.scalars(
-                        select(ContentBrief).where(ContentBrief.id.in_(brief_ids))
-                    )
-                ).all()
+                brief.id: brief
+                for brief in await session.scalars(
+                    select(ContentBrief).where(ContentBrief.id.in_(brief_ids))
+                )
             }
             if brief_ids
             else {}
         )
-        channel_ids = {b.editorial_channel_id for b in briefs.values()}
-        channels = (
-            {
-                c.id: c
-                for c in (
-                    await session.scalars(
-                        select(EditorialChannel).where(
-                            EditorialChannel.id.in_(channel_ids)
-                        )
-                    )
-                ).all()
-            }
-            if channel_ids
-            else {}
-        )
-        targets = list(await session.scalars(select(PublicationTarget)))
-    groups: dict[UUID, list[LocalizationProject]] = {}
-    for project in projects:
-        groups.setdefault(project.lecture_master_version_id, []).append(project)
-
-    # Per-language duration estimates: word count of the latest version's
-    # statements ÷ the owner-configured WPM for that language. Each
-    # language is measured independently — a German version can be
-    # TOO_LONG while the English one sits in target.
-    latest_versions: dict[UUID, LocalizationVersion] = {}
-    if projects:
-        for version in await session.scalars(
-            select(LocalizationVersion)
-            .where(
-                LocalizationVersion.localization_project_id.in_(
-                    [p.id for p in projects]
-                )
-            )
-            .order_by(LocalizationVersion.version_number.desc())
-        ):
-            latest_versions.setdefault(version.localization_project_id, version)
-    word_counts: dict[UUID, int] = {}
-    if latest_versions:
-        rows = await session.execute(
-            select(
-                LocalizationStatement.localization_version_id,
-                LocalizationStatement.display_text,
-            ).where(
-                LocalizationStatement.localization_version_id.in_(
-                    [v.id for v in latest_versions.values()]
-                )
-            )
-        )
-        for version_id, display_text in rows:
-            word_counts[version_id] = word_counts.get(version_id, 0) + len(
-                re.findall(r"\S+", display_text or "")
-            )
-    effective = await StudioSettingsService(database).effective()
-    target_min = float(str(effective.get("target_duration_min_minutes", 25)))
-    target_max = float(str(effective.get("target_duration_max_minutes", 30)))
-    durations: dict[UUID, dict[str, object]] = {}
-    for project in projects:
-        loc_version: LocalizationVersion | None = latest_versions.get(project.id)
-        if loc_version is None:
+    rows = []
+    seen: set[UUID] = set()
+    for draft in approved:
+        if draft.content_brief_id in seen or draft.content_brief_id not in briefs:
             continue
-        version = loc_version
-        words = word_counts.get(version.id, 0)
-        wpm = float(str(effective.get(f"speech_wpm_{project.language.value}", 130)))
-        minutes = words / wpm if wpm else 0.0
-        durations[project.id] = {
-            "version_id": version.id,
-            "words": words,
-            "minutes": round(minutes, 1),
-            "status": (
-                "TOO_SHORT"
-                if minutes < target_min
-                else "TOO_LONG"
-                if minutes > target_max
-                else "IN_TARGET"
-            ),
-        }
+        seen.add(draft.content_brief_id)
+        rows.append(
+            {
+                "brief": briefs[draft.content_brief_id],
+                "draft": draft,
+                "runs": await _localization_runs(database, draft.content_brief_id),
+            }
+        )
     return await _render(
         request,
         "studio/translations.html",
         title="Übersetzungen",
-        groups=groups,
-        masters=masters,
-        ready_masters=ready_masters,
-        ready_master_ids={m.id for m in ready_masters},
-        briefs=briefs,
-        channels=channels,
-        targets=targets,
-        durations=durations,
-        target_min=target_min,
-        target_max=target_max,
-        languages=list(PublicationLanguage),
-        notice=str(request.query_params.get("msg") or ""),
-        error=str(request.query_params.get("error") or ""),
+        rows=rows,
     )
-
-
-@router.post("/studio/translations")
-async def studio_translations_create(request: Request) -> Response:
-    form = await request.form()
-    try:
-        master_id = UUID(str(form.get("master_id") or ""))
-        language = PublicationLanguage(str(form.get("language") or ""))
-    except ValueError:
-        return RedirectResponse(
-            "/studio/translations?error=Ung%C3%BCltige+Anfrage.", status_code=303
-        )
-    try:
-        await LocalizationService(_database(request)).create(master_id, language)
-    except ValueError as exc:
-        return RedirectResponse(
-            "/studio/translations?error=" + str(exc).replace(" ", "+"),
-            status_code=303,
-        )
-    except Exception:  # noqa: BLE001
-        return RedirectResponse(
-            "/studio/translations?error="
-            "Die+%C3%9Cbersetzung+konnte+nicht+erstellt+werden."
-            "+Bitte+sp%C3%A4ter+erneut+versuchen.",
-            status_code=303,
-        )
-    return RedirectResponse(
-        "/studio/translations?msg=%C3%9Cbersetzung+gestartet.", status_code=303
-    )
-
-
-@router.post("/studio/translations/{version_id}/adjust-duration")
-async def studio_translations_adjust_duration(
-    request: Request, version_id: UUID
-) -> Response:
-    try:
-        await LocalizationService(_database(request)).adjust_duration(
-            version_id, created_by="owner"
-        )
-    except LookupError:
-        return RedirectResponse(
-            "/studio/translations?error=Fassung+nicht+gefunden.",
-            status_code=303,
-        )
-    except Exception:  # noqa: BLE001
-        return RedirectResponse(
-            "/studio/translations?error="
-            "Die+L%C3%A4ngenkorrektur+konnte+nicht+ausgef%C3%BChrt+werden."
-            "+Bitte+sp%C3%A4ter+erneut+versuchen.",
-            status_code=303,
-        )
-    return RedirectResponse(
-        "/studio/translations?msg=L%C3%A4nge+angepasst.", status_code=303
-    )
-
-
-# ---------------------------------------------------------------------------
-# Publishing readiness (no external publishing integration yet)
-# ---------------------------------------------------------------------------
 
 
 @router.get("/studio/publishing", response_class=HTMLResponse)
 async def studio_publishing(request: Request) -> HTMLResponse:
     database = _database(request)
     async with database.transaction() as session:
-        ready_projects = list(
-            await session.scalars(
-                select(LocalizationProject)
-                .where(
-                    LocalizationProject.status.in_(
-                        [
-                            LocalizationStatus.READY_FOR_VOICE,
-                            LocalizationStatus.APPROVED,
-                        ]
-                    )
+        ready_rows = (
+            await session.execute(
+                select(LocalizationPipelineRun, LocalizationSemanticPackage)
+                .join(
+                    LocalizationSemanticPackage,
+                    LocalizationSemanticPackage.id
+                    == LocalizationPipelineRun.semantic_package_id,
                 )
-                .order_by(LocalizationProject.created_at.desc())
+                .where(
+                    LocalizationPipelineRun.stage
+                    == LocalizationPipelineStage.READY_FOR_VOICE
+                )
+                .order_by(LocalizationPipelineRun.updated_at.desc())
                 .limit(200)
             )
-        )
-        master_ids = {p.lecture_master_version_id for p in ready_projects}
-        masters = (
-            {
-                m.id: m
-                for m in (
-                    await session.scalars(
-                        select(LectureMasterVersion).where(
-                            LectureMasterVersion.id.in_(master_ids)
-                        )
-                    )
-                ).all()
-            }
-            if master_ids
-            else {}
-        )
-        brief_ids = {m.content_brief_id for m in masters.values() if m.content_brief_id}
+        ).all()
+        ready = [
+            {"run": run, "brief_id": package.content_brief_id}
+            for run, package in ready_rows
+        ]
+        brief_ids = {row["brief_id"] for row in ready}
         briefs = (
             {
                 b.id: b
@@ -1022,8 +836,7 @@ async def studio_publishing(request: Request) -> HTMLResponse:
         request,
         "studio/publishing.html",
         title="Veröffentlichung",
-        projects=ready_projects,
-        masters=masters,
+        ready=ready,
         briefs=briefs,
         channels=channels,
         targets=targets,
@@ -1782,10 +1595,16 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
             if master is not None
             else []
         )
+        # The workspace works on the Persian primary script. Localized
+        # drafts (lineage="localized") have their own version numbers and
+        # must never be shown or acted on as "the script".
         drafts = list(
             await session.scalars(
                 select(ScriptDraft)
-                .where(ScriptDraft.content_brief_id == brief_id)
+                .where(
+                    ScriptDraft.content_brief_id == brief_id,
+                    ScriptDraft.lineage == "primary",
+                )
                 .order_by(ScriptDraft.version_number.desc())
             )
         )
@@ -1881,17 +1700,6 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
                 strict=True,
             ):
                 book_ref_rows.append({"ref": ref, "used": used})
-        localizations = (
-            list(
-                await session.scalars(
-                    select(LocalizationProject).where(
-                        LocalizationProject.lecture_master_version_id == master.id
-                    )
-                )
-            )
-            if master is not None
-            else []
-        )
         # Native-pipeline truth: every per-language run derives from the
         # shared semantic package anchored to this brief's approved
         # Persian draft — no separate progress bookkeeping.
@@ -2078,7 +1886,6 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
         "current_run_findings": current_run_findings,
         "historical_findings": historical_findings,
         "signature": signature,
-        "localizations": localizations,
         "pipeline_runs": pipeline_runs,
         "llm_costs": llm_costs,
         "research_runs": research_runs,
@@ -2124,6 +1931,7 @@ async def brief_workspace(
         with contextlib.suppress(ValueError):
             active_stage = ProductionStage(stage)
     database = _database(request)
+    localization_runs = await _localization_runs(database, brief_id)
     gap = await GapFillService(database).assess(brief_id)
     effective = await StudioSettingsService(database).effective()
     return await _render(
@@ -2140,6 +1948,10 @@ async def brief_workspace(
         duration_max=effective.get("target_duration_max_minutes"),
         research_notice=request.query_params.get("research"),
         error=request.query_params.get("error"),
+        job=jobs.get(str(brief_id)),
+        action_labels=_ACTION_LABELS,
+        localization_runs=localization_runs,
+        localized_texts=await _localized_texts(database, localization_runs),
         **detail,
     )
 
@@ -2174,105 +1986,195 @@ async def production_web_research(request: Request, brief_id: UUID) -> Response:
     )
 
 
-_ACTION_HANDLERS = {
-    "plan_research": "research",
-    "build_evidence": "evidence",
-    "freeze_research": "freeze",
-    "build_argument": "argument",
-    "build_narrative": "narrative",
-    "build_master": "master",
-    "build_script": "script",
-    "run_review": "review",
-    "revise": "revise",
-    "approve": "approve",
-    "start_review_cycle": "review",
-    "localize": "localize",
-}
-
-
 async def _latest_draft_id(database: Database, brief_id: UUID) -> UUID | None:
     async with database.transaction() as session:
         result: UUID | None = await session.scalar(
             select(ScriptDraft.id)
-            .where(ScriptDraft.content_brief_id == brief_id)
+            .where(
+                ScriptDraft.content_brief_id == brief_id,
+                ScriptDraft.lineage == "primary",
+            )
             .order_by(ScriptDraft.version_number.desc())
             .limit(1)
         )
         return result
 
 
-@router.post("/studio/production/{brief_id}/actions/{action}")
-async def production_action(request: Request, brief_id: UUID, action: str) -> Response:
-    """Run one pipeline action; availability was already gated by state."""
+_ACTION_LABELS = {
+    "plan_research": "Recherche planen",
+    "build_evidence": "Evidence aufbauen",
+    "freeze_research": "Recherche einfrieren",
+    "build_argument": "Argument aufbauen",
+    "build_narrative": "Narrativ aufbauen",
+    "build_master": "Semantic Master erstellen",
+    "build_script": "Persisches Skript erstellen",
+    "run_review": "Review starten",
+    "revise": "Entwurf überarbeiten",
+    "approve": "Freigeben",
+    "start_review_cycle": "Neuen Review-Zyklus starten",
+    "localize": "Übersetzen",
+}
 
-    if action not in _ACTION_HANDLERS:
-        return HTMLResponse("Unknown action", status_code=404)
-    database = _database(request)
-    try:
-        if action == "plan_research":
-            # When web research is enabled and the topic lacks material for
-            # the target duration, fill the gap before planning.
-            await GapFillService(database).fill_gap(brief_id, process_inline=True)
-            await GenericResearchService(database).create_plan_for_brief(brief_id)
-        elif action == "build_evidence":
-            await GapFillService(database).fill_gap(brief_id, process_inline=True)
-            await GenericResearchService(database).build_evidence_matrix(brief_id)
-        elif action == "freeze_research":
-            async with database.transaction() as session:
-                plan_id = await session.scalar(
-                    select(ResearchPlan.id)
-                    .where(
-                        ResearchPlan.content_brief_id == brief_id,
-                        ResearchPlan.status == ResearchPlanStatus.READY,
-                    )
-                    .order_by(ResearchPlan.version_number.desc())
-                    .limit(1)
+_LOCALIZE_LANGUAGES = ("de", "en", "ar")
+
+
+async def _localization_runs(
+    database: Database, brief_id: UUID
+) -> dict[str, LocalizationPipelineRun]:
+    """Latest native localization run per language for this brief."""
+
+    async with database.transaction() as session:
+        rows = list(
+            await session.scalars(
+                select(LocalizationPipelineRun)
+                .join(
+                    LocalizationSemanticPackage,
+                    LocalizationSemanticPackage.id
+                    == LocalizationPipelineRun.semantic_package_id,
                 )
-            if plan_id is None:
-                raise GateBlockedError("No ready research plan to freeze")
-            await GenericResearchService(database).freeze_package(plan_id)
-        elif action == "build_argument":
-            await ContentEngineService(database).build_argument(brief_id)
-        elif action == "build_narrative":
-            await ContentEngineService(database).build_narrative(brief_id)
-        elif action == "build_master":
-            await GenericMasterService(database).build_from_content_brief(brief_id)
-        elif action == "build_script":
-            await ScriptService(database).build_script(brief_id)
-        elif action == "run_review":
-            draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is None:
-                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+                .where(LocalizationSemanticPackage.content_brief_id == brief_id)
+                .order_by(LocalizationPipelineRun.updated_at.desc())
+            )
+        )
+    latest: dict[str, LocalizationPipelineRun] = {}
+    for run in rows:
+        latest.setdefault(run.language.value, run)
+    return latest
+
+
+async def _localized_texts(
+    database: Database, runs: dict[str, LocalizationPipelineRun]
+) -> dict[str, str]:
+    draft_ids = {
+        language: run.script_draft_id
+        for language, run in runs.items()
+        if run.script_draft_id is not None
+    }
+    if not draft_ids:
+        return {}
+    async with database.transaction() as session:
+        drafts = {
+            draft.id: draft.text
+            for draft in await session.scalars(
+                select(ScriptDraft).where(ScriptDraft.id.in_(draft_ids.values()))
+            )
+        }
+    return {
+        language: drafts[draft_id]
+        for language, draft_id in draft_ids.items()
+        if draft_id in drafts
+    }
+
+
+async def _run_production_action(
+    database: Database, brief_id: UUID, action: str, language: str
+) -> None:
+    if action == "plan_research":
+        # When web research is enabled and the topic lacks material for
+        # the target duration, fill the gap before planning.
+        gap_fill = GapFillService(database)
+        await gap_fill.fill_gap(brief_id, process_inline=True)
+        if (await gap_fill.assess(brief_id)).units_available == 0:
+            raise GateBlockedError(
+                "Für dieses Thema gibt es kein Quellmaterial (keine Knowledge "
+                "Units). Weise dem Kanal passende Quellen zu oder aktiviere die "
+                "Internet-Recherche unter Settings."
+            )
+        await GenericResearchService(database).create_plan_for_brief(brief_id)
+    elif action == "build_evidence":
+        await GapFillService(database).fill_gap(brief_id, process_inline=True)
+        await GenericResearchService(database).build_evidence_matrix(brief_id)
+    elif action == "freeze_research":
+        async with database.transaction() as session:
+            plan_id = await session.scalar(
+                select(ResearchPlan.id)
+                .where(
+                    ResearchPlan.content_brief_id == brief_id,
+                    ResearchPlan.status == ResearchPlanStatus.READY,
+                )
+                .order_by(ResearchPlan.version_number.desc())
+                .limit(1)
+            )
+        if plan_id is None:
+            raise GateBlockedError("Kein fertiger Recherche-Plan zum Einfrieren")
+        await GenericResearchService(database).freeze_package(plan_id)
+    elif action == "build_argument":
+        await ContentEngineService(database).build_argument(brief_id)
+    elif action == "build_narrative":
+        await ContentEngineService(database).build_narrative(brief_id)
+    elif action == "build_master":
+        await GenericMasterService(database).build_from_content_brief(brief_id)
+    elif action == "build_script":
+        await ScriptService(database).build_script(brief_id)
+    elif action in {"run_review", "revise", "approve"}:
+        draft_id = await _latest_draft_id(database, brief_id)
+        if draft_id is None:
+            raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+        if action == "run_review":
             await ScriptService(database).review_draft(draft_id)
         elif action == "revise":
-            draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is None:
-                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
             await ScriptService(database).revise_draft(draft_id)
-        elif action == "approve":
-            draft_id = await _latest_draft_id(database, brief_id)
-            if draft_id is None:
-                raise GateBlockedError("Kein Skript-Entwurf vorhanden")
+        else:
             await ScriptService(database).approve_draft(draft_id, approved_by="owner")
-        elif action == "start_review_cycle":
-            await ScriptService(database).start_review_cycle(
-                brief_id, started_by="owner"
-            )
-        elif action == "localize":
-            form = await request.form()
-            language = str(form.get("language") or "en")
-            state = await ProductionService(database).state_for_brief(brief_id)
-            if state.latest_master_id is None:
-                raise GateBlockedError("Kein Semantic Master vorhanden")
-            await LocalizationService(database).create(
-                state.latest_master_id, PublicationLanguage(language)
-            )
-    except (LookupError, ValueError, GateBlockedError) as exc:
-        # Never fail silently: the owner must see why the action did not run.
-        return RedirectResponse(
-            f"/studio/production/{brief_id}?error={quote(str(exc)[:300])}",
-            status_code=303,
+    elif action == "start_review_cycle":
+        await ScriptService(database).start_review_cycle(brief_id, started_by="owner")
+    elif action == "localize":
+        # The certified native pipeline: translates the owner-approved
+        # Persian script, not the earlier Semantic Master.
+        await NativeLocalizationRunner(database).run_language(
+            brief_id, PublicationLanguage(language)
         )
+
+
+@router.post("/studio/production/{brief_id}/actions/{action}")
+async def production_action(request: Request, brief_id: UUID, action: str) -> Response:
+    """Start one pipeline step in the background.
+
+    The step must be allowed by the persisted state right now; the
+    workspace shows its progress and any error in plain language.
+    """
+
+    if action not in _ACTION_LABELS:
+        return HTMLResponse("Unknown action", status_code=404)
+    database = _database(request)
+    key = str(brief_id)
+    back = f"/studio/production/{brief_id}"
+    language = "de"
+    if action == "localize":
+        form = await request.form()
+        language = str(form.get("language") or "de")
+        if language not in _LOCALIZE_LANGUAGES:
+            return RedirectResponse(
+                f"{back}?error={quote('Unbekannte Zielsprache')}", status_code=303
+            )
+    try:
+        state = await ProductionService(database).state_for_brief(brief_id)
+    except LookupError:
+        return HTMLResponse("Brief not found", status_code=404)
+    if action not in state.allowed_actions:
+        message = f"„{_ACTION_LABELS[action]}“ ist im aktuellen Zustand nicht möglich."
+        return RedirectResponse(f"{back}?error={quote(message)}", status_code=303)
+    label = _ACTION_LABELS[action]
+    if action == "localize":
+        label = f"{label} ({language.upper()})"
+    started = jobs.start(
+        key,
+        action,
+        label,
+        lambda: _run_production_action(database, brief_id, action, language),
+    )
+    if not started:
+        running = jobs.get(key)
+        message = (
+            f"Es läuft bereits: {running.label}" if running else "Es läuft bereits"
+        )
+        return RedirectResponse(f"{back}?error={quote(message)}", status_code=303)
+    return RedirectResponse(back, status_code=303)
+
+
+@router.post("/studio/production/{brief_id}/job/dismiss")
+async def production_job_dismiss(brief_id: UUID) -> Response:
+    jobs.clear(str(brief_id))
     return RedirectResponse(f"/studio/production/{brief_id}", status_code=303)
 
 
@@ -3093,47 +2995,16 @@ async def production_list(request: Request) -> HTMLResponse:
             channel.id: channel.slug
             for channel in (await session.scalars(select(EditorialChannel))).all()
         }
-        items = await load_library_items(session, status="ACTIVE")
     return await _render(
         request,
         "studio/production_list.html",
         title="Production",
-        items=items,
         productions=productions,
+        action_labels=_ACTION_LABELS,
         brief_channels={
             state.brief.id: slug_by_id.get(state.brief.editorial_channel_id, "?")
             for state in productions
         },
-    )
-
-
-@router.get("/production/{project_id}", response_class=HTMLResponse)
-async def production_workspace(request: Request, project_id: UUID) -> Response:
-    async with _database(request).transaction() as session:
-        project = await session.get(EditorialProject, project_id)
-        if project is None:
-            return HTMLResponse("Production not found", status_code=404)
-        drafts = list(
-            await session.scalars(
-                select(PersianDraft)
-                .where(PersianDraft.editorial_project_id == project_id)
-                .order_by(PersianDraft.version_number.desc())
-            )
-        )
-        tracks = list(
-            await session.scalars(
-                select(EditorialLanguageTrack).where(
-                    EditorialLanguageTrack.editorial_project_id == project_id
-                )
-            )
-        )
-    return await _render(
-        request,
-        "studio/production_workspace.html",
-        title=project.title,
-        project=project,
-        drafts=drafts,
-        tracks=tracks,
     )
 
 
@@ -3145,14 +3016,34 @@ async def analytics(request: Request) -> HTMLResponse:
             "segments": int(
                 await session.scalar(select(func.count(SourceSegment.id))) or 0
             ),
-            "projects": int(
-                await session.scalar(select(func.count(EditorialProject.id))) or 0
+            "productions": int(
+                await session.scalar(select(func.count(ContentBrief.id))) or 0
             ),
             "drafts": int(
-                await session.scalar(select(func.count(PersianDraft.id))) or 0
+                await session.scalar(
+                    select(func.count(ScriptDraft.id)).where(
+                        ScriptDraft.lineage == "primary"
+                    )
+                )
+                or 0
             ),
-            "tracks": int(
-                await session.scalar(select(func.count(EditorialLanguageTrack.id))) or 0
+            "approved": int(
+                await session.scalar(
+                    select(func.count(ScriptDraft.id)).where(
+                        ScriptDraft.lineage == "primary",
+                        ScriptDraft.status == DraftStatus.APPROVED,
+                    )
+                )
+                or 0
+            ),
+            "translations_ready": int(
+                await session.scalar(
+                    select(func.count(LocalizationPipelineRun.id)).where(
+                        LocalizationPipelineRun.stage
+                        == LocalizationPipelineStage.READY_FOR_VOICE
+                    )
+                )
+                or 0
             ),
         }
     return await _render(

@@ -1,16 +1,4 @@
 {% extends "studio/layout.html" %}
-{% set action_names = {
-  'plan_research': 'Recherche planen',
-  'build_evidence': 'Evidence erstellen',
-  'build_argument': 'Argument aufbauen',
-  'build_narrative': 'Narrativ erstellen',
-  'build_master': 'Master erstellen',
-  'build_script': 'Skript erstellen',
-  'run_review': 'Review starten',
-  'revise': 'Überarbeiten',
-  'approve': 'Freigeben',
-  'localize': 'Übersetzen'
-} %}
 {% block content %}
 <div class="pagehead">
   <div>
@@ -32,7 +20,7 @@
         <td><span class="badge {% if state.stage.value == 'APPROVED' %}success{% endif %}">{{ state.stage.value.replace('_', ' ') }}</span></td>
         <td>{{ state.brief.status.value }}</td>
         <td>{% if state.open_blockers %}<span class="badge warning">{{ state.open_blockers }}</span>{% else %}—{% endif %}</td>
-        <td>{% if state.allowed_actions %}<span class="badge action">{{ action_names.get(state.allowed_actions[0], state.allowed_actions[0]) }}</span>{% if state.allowed_actions|length > 1 %}<span class="muted">+{{ state.allowed_actions|length - 1 }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if state.next_action %}<span class="badge action">{{ action_labels.get(state.next_action, state.next_action) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td><a class="linkbutton" href="/studio/production/{{ state.brief.id }}">Öffnen</a></td>
       </tr>
       {% else %}
@@ -43,24 +31,4 @@
   </div>
 </section>
 
-{% if items %}
-<section class="card">
-  <h2>Historische Produktionen</h2>
-  <p class="muted">Projekte aus der Lesson-Ära, zur Dokumentation aufbewahrt. Neue Produktionen laufen über die Brief-Pipeline oben.</p>
-  <section class="lesson-grid" aria-label="Historische Produktionen">
-    {% for item in items %}
-    <article class="card lesson-card">
-      <div class="topic-card-head">
-        <span class="badge">{{ item.origin_label }}</span>
-        <span class="badge {% if item.status_key == 'PUBLISHED' %}published{% endif %}">{{ item.status_label }}</span>
-      </div>
-      <h2><a href="/production/{{ item.project.id }}" dir="auto">{{ item.project.title }}</a></h2>
-      {% if item.lesson %}<p><strong>Historische Lesson {{ item.lesson.number }} / {{ item.lesson.total }}</strong></p>
-      {% elif item.topic %}<p class="muted">{{ item.topic.title }}</p>{% endif %}
-      <p dir="auto">{{ item.project.human_question }}</p>
-    </article>
-    {% endfor %}
-  </section>
-</section>
-{% endif %}
 {% endblock %}

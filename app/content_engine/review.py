@@ -652,6 +652,7 @@ class ScriptService:
                     ).where(
                         ScriptDraft.content_brief_id == brief_id,
                         ScriptDraft.language == language,
+                        ScriptDraft.lineage == "primary",
                     )
                 )
                 or 0

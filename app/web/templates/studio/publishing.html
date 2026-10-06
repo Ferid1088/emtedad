@@ -44,21 +44,20 @@
 
 <section class="card">
   <h2>Bereite Inhalte</h2>
-  {% if projects %}
+  {% if ready %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Inhalt</th><th>Kanal</th><th>Sprache</th><th>Übersetzungsstatus</th><th>Bereitschaft</th></tr></thead>
+      <thead><tr><th>Inhalt</th><th>Kanal</th><th>Sprache</th><th>Status</th><th></th></tr></thead>
       <tbody>
-        {% for p in projects %}
-        {% set master = masters.get(p.lecture_master_version_id) %}
-        {% set brief = briefs.get(master.content_brief_id) if master else none %}
+        {% for row in ready %}
+        {% set brief = briefs.get(row.brief_id) %}
         {% set channel = channels.get(brief.editorial_channel_id) if brief else none %}
         <tr>
-          <td dir="auto">{{ brief.question[:80] if brief else 'Master ' ~ p.lecture_master_version_id|string|truncate(8) }}</td>
+          <td dir="auto">{{ brief.question[:80] if brief else '—' }}</td>
           <td>{{ channel.name if channel else '—' }}</td>
-          <td>{{ lang_names.get(p.language.value, p.language.value) }}</td>
-          <td><span class="badge success">{{ status_names.get(p.status.value, p.status.value) }}</span></td>
-          <td class="muted">{% if p.status.value == 'APPROVED' %}Freigegeben{% else %}Bereit für Voice{% endif %}</td>
+          <td>{{ lang_names.get(row.run.language.value, row.run.language.value) }}</td>
+          <td><span class="badge success">Bereit für Voice</span></td>
+          <td>{% if brief %}<a class="linkbutton" href="/studio/production/{{ brief.id }}?stage=APPROVED#translations">Text öffnen</a>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

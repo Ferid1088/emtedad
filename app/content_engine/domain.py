@@ -38,6 +38,9 @@ class StageHealth(StrEnum):
     REVIEW_REQUIRED = "REVIEW_REQUIRED"  # artifact exists, open findings
     FAILED = "FAILED"  # artifact run failed; needs owner attention
     APPROVED = "APPROVED"
+    # Built from an older version of its upstream artifact (e.g. the
+    # argument was rebuilt after this narrative) — must be rebuilt.
+    STALE = "STALE"
 
 
 ARGUMENT_PROMPT_VERSION = "argument_architect_v1"

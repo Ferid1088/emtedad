@@ -84,11 +84,11 @@
 <nav class="stepper" aria-label="Produktions-Stufen">
   {% set health_icons = {
     'READY': '✓', 'APPROVED': '✓', 'IN_PROGRESS': '…',
-    'REVIEW_REQUIRED': '!', 'FAILED': '✕', 'NOT_STARTED': ''
+    'REVIEW_REQUIRED': '!', 'FAILED': '✕', 'STALE': '↻', 'NOT_STARTED': ''
   } %}
   {% for tab in tabs %}
   {% set health = state.stage_states.get(tab) %}
-  <a class="step {% if tab == active_stage %}active{% endif %} {% if health and health.value in ('READY', 'APPROVED') %}done{% elif health and health.value in ('REVIEW_REQUIRED', 'FAILED') %}attention{% endif %}"
+  <a class="step {% if tab == active_stage %}active{% endif %} {% if health and health.value in ('READY', 'APPROVED') %}done{% elif health and health.value in ('REVIEW_REQUIRED', 'FAILED', 'STALE') %}attention{% endif %}"
      href="/studio/production/{{ brief.id }}?stage={{ tab.value }}"
      title="{{ health.value if health else 'NOT_STARTED' }}">
      {% if health and health_icons.get(health.value) %}<span class="step-icon">{{ health_icons[health.value] }}</span>{% endif %}{{ stage_names.get(tab.value, tab.value.replace('_', ' ')) }}</a>
@@ -144,49 +144,54 @@
     {% endif %}
   </section>
   <section class="card">
-    <h2>Aktionen</h2>
-    {% set action_labels = {
-      'plan_research': 'Recherche planen',
-      'build_evidence': 'Evidence-Matrix erstellen',
-      'freeze_research': 'Recherche einfrieren',
-      'build_argument': 'Argument-Plan erstellen',
-      'build_narrative': 'Narrativ-Plan erstellen',
-      'build_master': 'Semantic Master erstellen',
-      'build_script': 'Skript erstellen',
-      'run_review': 'Review starten',
-      'revise': 'Entwurf überarbeiten',
-      'approve': 'Freigeben',
-      'start_review_cycle': 'Neuen Review-Zyklus starten',
-      'localize': 'Übersetzen',
-    } %}
-    {% if state.allowed_actions %}
-    {# The action that advances the *current* stage is the primary button;
-       rebuild/optional actions stay secondary. #}
-    {% set primary_for_stage = {
-      'BRIEF': 'plan_research', 'THESIS': 'plan_research',
-      'RESEARCH': 'build_evidence', 'EVIDENCE': 'build_argument',
-      'ARGUMENT': 'build_narrative', 'NARRATIVE': 'build_master',
-      'MASTER': 'build_script', 'SCRIPT': 'run_review',
-      'APPROVED': 'localize',
-    } %}
-    {% set primary = primary_for_stage.get(state.stage.value) %}
-    {% if state.stage.value == 'REVIEW' %}
-      {% set primary = 'revise' if (state.open_blockers or state.open_warnings) else 'approve' %}
-    {% endif %}
-    {% if primary not in state.allowed_actions %}{% set primary = none %}{% endif %}
-    <ul class="action-list">
-      {% for action in state.allowed_actions %}
-      <li>
-        <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
-          <button type="submit" class="button{% if action != primary %} secondary{% endif %}">{{ action_labels.get(action, action.replace('_', ' ')) }}</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
+    <h2>Nächster Schritt</h2>
+    {% if job and job.running %}
+    <p class="notice"><strong>Läuft gerade: {{ job.label }}</strong> — seit {{ job.elapsed_seconds // 60 }} Min. {{ job.elapsed_seconds % 60 }} Sek.<br>
+    Diese Seite aktualisiert sich automatisch. Du kannst sie auch schließen; der Schritt läuft weiter.</p>
+    <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
     {% else %}
-    <p class="muted">Keine Aktion in dieser Stufe verfügbar.
-      {% if brief.status.value == 'DRAFT' %}Der Brief ist noch ein Entwurf — zuerst abschließen, dann kann die Recherche geplant werden.{% endif %}
-    </p>
+    {% if job and job.error %}
+    <div class="error">
+      <p><strong>{{ job.label }} ist fehlgeschlagen.</strong> {{ job.error }}</p>
+      <form method="post" action="/studio/production/{{ brief.id }}/job/dismiss" class="inline-form">
+        <button type="submit" class="button secondary">Hinweis schließen</button>
+      </form>
+    </div>
+    {% elif job %}
+    <p class="notice">✓ {{ job.label }} abgeschlossen ({{ job.elapsed_seconds // 60 }} Min. {{ job.elapsed_seconds % 60 }} Sek.).</p>
+    {% endif %}
+    {% if state.next_action and state.next_action != 'localize' %}
+    <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ state.next_action }}">
+      <button type="submit" class="button">{{ action_labels.get(state.next_action) }}</button>
+    </form>
+    {% elif state.next_action == 'localize' %}
+    <p>Das persische Skript ist freigegeben. Starte die Übersetzungen unten im Bereich <a href="?stage=APPROVED#translations">Freigegeben → Übersetzungen</a>.</p>
+    {% elif brief.status.value == 'DRAFT' %}
+    <p class="muted">Der Brief ist noch ein Entwurf — zuerst abschließen, dann kann die Recherche geplant werden.</p>
+    {% elif state.final_duration_in_band is false %}
+    <p class="muted">Das Skript liegt außerhalb der Ziel-Dauer ({{ duration_min or '?' }}–{{ duration_max or '?' }} Min.) und kann so nicht freigegeben werden. Überarbeite es oder passe die Ziel-Dauer unter Settings an.</p>
+    {% else %}
+    <p class="muted">Kein automatischer nächster Schritt.</p>
+    {% endif %}
+    {% if state.stale_stages %}
+    <p class="muted">↻ Veraltet (wurde aus einer älteren Vorstufe gebaut und muss neu erzeugt werden):
+      {{ state.stale_stages | map(attribute='value') | map('lower') | join(', ') }}.</p>
+    {% endif %}
+    {% set others = state.allowed_actions | reject('equalto', state.next_action) | reject('equalto', 'localize') | list %}
+    {% if others %}
+    <details>
+      <summary>Weitere Aktionen (z. B. einen Schritt neu erzeugen)</summary>
+      <ul class="action-list">
+        {% for action in others %}
+        <li>
+          <form method="post" action="/studio/production/{{ brief.id }}/actions/{{ action }}">
+            <button type="submit" class="button secondary">{{ action_labels.get(action, action) }}</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
     {% endif %}
     {% if state.open_blockers or state.open_warnings %}
     <p class="muted">{{ state.open_blockers }} blockierende(s) + {{ state.open_warnings }} schwere Review-Ergebnis(se) müssen vor der Freigabe gelöst oder explizit akzeptiert werden.</p>
@@ -724,37 +729,49 @@
   {% endif %}
 </section>
 <section class="card">
-  <h2 id="translations">Übersetzungen <a class="linkbutton" href="/studio/translations" style="font-size:.8rem">Alle Übersetzungen →</a></h2>
-  {% if localizations %}
+  <h2 id="translations">Übersetzungen</h2>
+  <p class="muted">Übersetzt wird das freigegebene persische Skript (v{{ approved_draft.version_number }}) — jede Sprache wird nativ geschrieben, geprüft und auf die Ziel-Dauer gebracht.</p>
+  {% set language_names = {'de': 'Deutsch', 'en': 'Englisch', 'ar': 'Arabisch'} %}
+  {% set stage_texts = {
+    'READY_FOR_VOICE': 'fertig für Voice', 'BLOCKED': 'blockiert — Prüfung nötig',
+    'STALE_SOURCE': 'veraltet (persisches Skript geändert)', 'FAILED': 'fehlgeschlagen'
+  } %}
   <table>
-    <thead><tr><th>Sprache</th><th>Status</th><th>Erstellt</th></tr></thead>
+    <thead><tr><th>Sprache</th><th>Status</th><th>Review-Runden</th><th>Hinweis</th><th></th></tr></thead>
     <tbody>
-      {% for item in localizations %}
-      <tr><td>{{ item.language.value }}</td><td>{{ item.status.value }}</td><td>{{ item.created_at.strftime('%d.%m.%Y') }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="muted">Noch keine Sprachfassungen. „Übersetzen"-Aktion oben verwenden oder <a href="/studio/translations">Übersetzungen öffnen →</a></p>
-  {% endif %}
-  {% if pipeline_runs %}
-  <h3>Native Pipeline</h3>
-  <table>
-    <thead><tr><th>Sprache</th><th>Stufe</th><th>Review-Loop</th><th>Fidelity</th><th>Native</th><th>Fehler</th></tr></thead>
-    <tbody>
-      {% for run in pipeline_runs %}
+      {% for code in ['de', 'en', 'ar'] %}
+      {% set run = localization_runs.get(code) %}
       <tr>
-        <td>{{ run.language.value }}</td>
-        <td>{{ run.stage.value }}</td>
-        <td>{{ run.review_loop }}</td>
-        <td>{{ run.fidelity_status }}</td>
-        <td>{{ run.native_status }}</td>
-        <td class="muted">{{ (run.error or '')[:120] }}</td>
+        <td>{{ language_names[code] }}</td>
+        <td>
+          {% if not run %}<span class="muted">noch nicht gestartet</span>
+          {% elif run.stage.value == 'READY_FOR_VOICE' %}<span class="badge success">{{ stage_texts[run.stage.value] }}</span>
+          {% elif run.stage.value in stage_texts %}<span class="badge warning">{{ stage_texts[run.stage.value] }}</span>
+          {% else %}<span class="badge">unterbrochen bei {{ run.stage.value.replace('_', ' ').lower() }}</span>{% endif %}
+        </td>
+        <td>{{ run.review_loop if run else '—' }}</td>
+        <td class="muted">{{ (run.error or '')[:160] if run else '' }}</td>
+        <td>
+          {% if not (job and job.running) and 'localize' in state.allowed_actions %}
+          <form method="post" action="/studio/production/{{ brief.id }}/actions/localize" class="inline-form">
+            <input type="hidden" name="language" value="{{ code }}">
+            <button type="submit" class="button{% if run %} secondary{% endif %}">
+              {% if not run %}Übersetzen{% elif run.stage.value == 'READY_FOR_VOICE' %}Neu übersetzen{% elif run.stage.value in stage_texts %}Erneut versuchen{% else %}Fortsetzen{% endif %}
+            </button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
+      {% if run and localized_texts.get(code) %}
+      <tr><td colspan="5">
+        <details><summary>Text anzeigen ({{ language_names[code] }})</summary>
+          <div dir="auto" style="white-space: pre-wrap">{{ localized_texts[code] }}</div>
+        </details>
+      </td></tr>
+      {% endif %}
       {% endfor %}
     </tbody>
   </table>
-  {% endif %}
   {% if llm_costs %}
   <h3>Modellkosten (provider-gemeldet)</h3>
   <table>

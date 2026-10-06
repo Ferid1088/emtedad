@@ -99,6 +99,22 @@ def studio_client(tmp_path: Path) -> Iterator[tuple[TestClient, str]]:
             connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))
 
 
+def _wait_for_job(brief_id: object, timeout: float = 30.0) -> None:
+    """Production steps run in the background; wait and fail loudly."""
+
+    import time
+
+    from app.web.jobs import jobs
+
+    key = str(brief_id)
+    deadline = time.monotonic() + timeout
+    while jobs.is_running(key):
+        assert time.monotonic() < deadline, "background step did not finish"
+        time.sleep(0.05)
+    job = jobs.get(key)
+    assert job is None or job.error is None, job.error if job else None
+
+
 def _seed(client: TestClient) -> None:
     # The /studio home lazily runs the idempotent channel seed on first access.
     assert client.get("/studio").status_code == 200
@@ -260,6 +276,7 @@ async def test_production_workspace_generic_master_flow(studio_client) -> None:
             follow_redirects=False,
         )
         assert response.status_code == 303
+        _wait_for_job(brief.id)
 
         page = client.get(f"/studio/production/{brief.id}")
         assert page.status_code == 200
@@ -847,7 +864,7 @@ async def test_failed_action_surfaces_error_to_owner(studio_client) -> None:
         # The error notice renders on the workspace page.
         page = client.get(response.headers["location"])
         assert page.status_code == 200
-        assert "Kein Skript-Entwurf" in page.text
+        assert "im aktuellen Zustand nicht möglich" in page.text
     finally:
         await database.dispose()
 
@@ -892,6 +909,7 @@ async def test_freeze_research_action_freezes_package(studio_client) -> None:
         )
         assert response.status_code == 303
         assert "error=" not in response.headers["location"]
+        _wait_for_job(brief.id)
 
         from sqlalchemy import select
 

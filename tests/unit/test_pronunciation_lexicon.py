@@ -28,10 +28,15 @@ def test_lexicon_routes_are_registered() -> None:
 
 def test_primary_navigation_contains_lexicon() -> None:
     template = (
-        Path(__file__).parents[2] / "app" / "web" / "templates" / "base.html"
+        Path(__file__).parents[2]
+        / "app"
+        / "web"
+        / "templates"
+        / "studio"
+        / "layout.html"
     ).read_text(encoding="utf-8")
 
-    assert "('/lexicon', 'Lexikon')" in template
+    assert 'href="/lexicon"' in template
 
 
 def test_lexicon_template_exposes_review_lifecycle() -> None:

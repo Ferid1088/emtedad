@@ -548,7 +548,10 @@ class EditorialChannelService:
                         ScriptDraft,
                         ScriptDraft.content_brief_id == ContentBrief.id,
                     )
-                    .where(ScriptDraft.status == DraftStatus.APPROVED)
+                    .where(
+                        ScriptDraft.status == DraftStatus.APPROVED,
+                        ScriptDraft.lineage == "primary",
+                    )
                     .group_by(ContentBrief.editorial_channel_id)
                 )
             ).all()

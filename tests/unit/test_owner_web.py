@@ -30,32 +30,20 @@ def test_owner_routes_are_registered(test_settings: Settings) -> None:
     paths |= {getattr(route, "path", "") for route in studio_router.routes}
     assert {
         "/",
-        "/sources",
-        "/sources/new",
+        "/studio",
+        "/library",
         "/knowledge",
-        "/topics",
-        "/lessons",
-        "/lessons/{rest:path}",
-        "/stories",
-        "/stories/{story_id}",
-        "/archive",
+        "/production",
+        "/studio/voice",
+        "/lexicon",
     } <= paths
+    # The old parallel interface is gone — the Studio is the only UI.
+    for retired in ("/sources", "/topics", "/texts", "/archive", "/stories"):
+        assert retired not in paths
     # Retired lesson production routes must not come back.
     assert "/workspace/{project_id}/research" not in paths
     assert "/workspace/{project_id}/persian/drafts" not in paths
     assert "/lessons/{lesson_id}" not in paths
-
-
-def test_primary_navigation_has_no_lesson_catalog() -> None:
-    template = (
-        Path(__file__).parents[2] / "app" / "web" / "templates" / "base.html"
-    ).read_text(encoding="utf-8")
-
-    assert "('/studio', 'Studio')" in template
-    assert "Lektionen" not in template
-    assert "('/lessons'," not in template
-    assert "speech-structures" not in template
-    assert "('/strategy', 'Themenbaum')" not in template
 
 
 def test_story_library_is_curated_and_lesson_filterable() -> None:
@@ -85,25 +73,6 @@ def test_legacy_strategy_templates_are_removed() -> None:
 
     assert not (templates / "strategy_tree.html").exists()
     assert not (templates / "strategy_topic_detail.html").exists()
-
-
-def test_workspace_has_no_lesson_production_actions() -> None:
-    template = (
-        Path(__file__).parents[2]
-        / "app"
-        / "web"
-        / "templates"
-        / "editorial_workspace.html"
-    ).read_text(encoding="utf-8")
-
-    # Retired: lesson-bound research trigger and lesson-canon draft generation.
-    assert 'action="/workspace/{{ project.id }}/research"' not in template
-    assert 'action="/workspace/{{ project.id }}/persian/drafts"' not in template
-    assert 'name="lesson_id"' not in template
-    assert 'name="semantic_master_id"' not in template
-    # Historical drafts keep their maintain actions.
-    assert "/edit" in template
-    assert "/approve" in template
 
 
 def test_overlap_is_deterministic() -> None:

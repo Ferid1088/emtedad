@@ -32,8 +32,11 @@ from app.content_engine.models import (
 from app.db.session import Database
 from app.lecture.domain import MasterOriginType, MasterStatus
 from app.lecture.models import LectureMasterVersion
-from app.localization.domain import LocalizationStatus
-from app.localization.models import LocalizationProject
+from app.localization.domain import LocalizationPipelineStage
+from app.localization.models import (
+    LocalizationPipelineRun,
+    LocalizationSemanticPackage,
+)
 from app.ops.settings.service import StudioSettingsService, speech_wpm
 from app.production.models import PublicationTarget
 from app.research.domain import (
@@ -82,6 +85,11 @@ class ProductionState:
     final_duration_minutes: float | None = None
     final_duration_in_band: bool | None = None
     allowed_actions: tuple[str, ...] = ()
+    # The single action that moves this production forward, or None when
+    # the owner has to decide (e.g. duration outside the approval band).
+    next_action: str | None = None
+    # Stages whose artifact was built from an older upstream version.
+    stale_stages: tuple[ProductionStage, ...] = ()
 
 
 async def _latest_id(
@@ -133,6 +141,44 @@ class ProductionService:
                 )
                 .order_by(ScriptDraft.version_number.desc())
                 .limit(1)
+            )
+            # Upstream links for staleness: each artifact records which
+            # upstream version it was built from.
+            argument_from = (
+                await session.scalar(
+                    select(ArgumentPlan.evidence_matrix_id).where(
+                        ArgumentPlan.id == argument_id
+                    )
+                )
+                if argument_id is not None
+                else None
+            )
+            narrative_from = (
+                await session.scalar(
+                    select(NarrativePlan.argument_plan_id).where(
+                        NarrativePlan.id == narrative_id
+                    )
+                )
+                if narrative_id is not None
+                else None
+            )
+            master_from = (
+                await session.scalar(
+                    select(LectureMasterVersion.narrative_plan_id).where(
+                        LectureMasterVersion.id == master_id
+                    )
+                )
+                if master_id is not None
+                else None
+            )
+            draft_from = (
+                await session.scalar(
+                    select(ScriptDraft.lecture_master_version_id).where(
+                        ScriptDraft.id == draft_id
+                    )
+                )
+                if draft_id is not None
+                else None
             )
             package_exists = bool(
                 await session.scalar(
@@ -215,50 +261,57 @@ class ProductionService:
                         open_warnings = int(counts.get(FindingSeverity.WARNING, 0))
             localization_total = 0
             localization_finished = 0
-            if master_id is not None:
-                loc_rows = (
-                    await session.execute(
-                        select(LocalizationProject.status, func.count())
-                        .where(
-                            LocalizationProject.lecture_master_version_id == master_id
-                        )
-                        .group_by(LocalizationProject.status)
+            # Native localization runs (latest per language) on this brief.
+            latest_stage: dict[str, LocalizationPipelineStage] = {}
+            for language, run_stage in (
+                await session.execute(
+                    select(
+                        LocalizationPipelineRun.language,
+                        LocalizationPipelineRun.stage,
                     )
-                ).all()
-                localization_total = sum(int(row[1]) for row in loc_rows)
-                localization_finished = sum(
-                    int(row[1])
-                    for row in loc_rows
-                    if row[0]
-                    in {
-                        LocalizationStatus.READY_FOR_VOICE,
-                        LocalizationStatus.APPROVED,
-                    }
+                    .join(
+                        LocalizationSemanticPackage,
+                        LocalizationSemanticPackage.id
+                        == LocalizationPipelineRun.semantic_package_id,
+                    )
+                    .where(LocalizationSemanticPackage.content_brief_id == brief_id)
+                    .order_by(LocalizationPipelineRun.updated_at.desc())
                 )
+            ).all():
+                latest_stage.setdefault(str(language), run_stage)
+            localization_total = len(latest_stage)
+            localization_finished = sum(
+                1
+                for run_stage in latest_stage.values()
+                if run_stage is LocalizationPipelineStage.READY_FOR_VOICE
+            )
 
-        current_cycle = int(
-            (
-                await session.scalar(
-                    select(func.coalesce(func.max(ReviewCycle.cycle_number), 1)).where(
-                        ReviewCycle.content_brief_id == brief_id
+        # Fresh transaction: the session above is closed; reusing it would
+        # check out a connection that is never returned to the pool.
+        async with self.database.transaction() as session:
+            current_cycle = int(
+                (
+                    await session.scalar(
+                        select(
+                            func.coalesce(func.max(ReviewCycle.cycle_number), 1)
+                        ).where(ReviewCycle.content_brief_id == brief_id)
                     )
                 )
+                or 1
             )
-            or 1
-        )
-        # Revision budget counts persisted revisions in this cycle —
-        # ReviewRuns (initial, duplicate, failed, retried) never consume it.
-        cycle_rounds = int(
-            (
-                await session.scalar(
-                    select(func.count(ScriptDraft.id)).where(
-                        ScriptDraft.content_brief_id == brief_id,
-                        ScriptDraft.revision_cycle == current_cycle,
+            # Revision budget counts persisted revisions in this cycle —
+            # ReviewRuns (initial, duplicate, failed, retried) never consume it.
+            cycle_rounds = int(
+                (
+                    await session.scalar(
+                        select(func.count(ScriptDraft.id)).where(
+                            ScriptDraft.content_brief_id == brief_id,
+                            ScriptDraft.revision_cycle == current_cycle,
+                        )
                     )
                 )
+                or 0
             )
-            or 0
-        )
         effective = await StudioSettingsService(self.database).effective()
         max_rounds = int(str(effective.get("max_revision_rounds", 3)))
         budget_exhausted = cycle_rounds >= max_rounds
@@ -272,6 +325,27 @@ class ProductionService:
             )
             final_in_band = final_min <= final_minutes <= final_max
 
+        stale: list[ProductionStage] = []
+        if argument_id is not None and argument_from != matrix_id:
+            stale.append(ProductionStage.ARGUMENT)
+        if narrative_id is not None and (
+            narrative_from != argument_id or ProductionStage.ARGUMENT in stale
+        ):
+            stale.append(ProductionStage.NARRATIVE)
+        if master_id is not None and (
+            master_from != narrative_id or ProductionStage.NARRATIVE in stale
+        ):
+            stale.append(ProductionStage.MASTER)
+        # An approved script stays the owner's decision even if upstream
+        # was rebuilt later; only unapproved drafts are flagged.
+        if (
+            draft_id is not None
+            and draft_status is not DraftStatus.APPROVED
+            and (draft_from != master_id or ProductionStage.MASTER in stale)
+        ):
+            stale.append(ProductionStage.SCRIPT)
+        stale_stages = tuple(stale)
+
         stage = self._derive_stage(
             brief,
             matrix_id,
@@ -281,27 +355,49 @@ class ProductionService:
             draft_status,
             package_exists,
         )
+        stage_states = self._stage_states(
+            brief,
+            plan_exists,
+            draft_matrix_exists,
+            matrix_id,
+            argument_id,
+            narrative_id,
+            master_id,
+            draft_id,
+            draft_status,
+            generation_status,
+            latest_run,
+            current_run,
+            open_blockers,
+            open_warnings,
+            localization_total,
+            localization_finished,
+        )
+        for stale_stage in stale_stages:
+            stage_states[stale_stage] = StageHealth.STALE
+        allowed = self._allowed(
+            brief,
+            matrix_id,
+            argument_id,
+            narrative_id,
+            master_id,
+            draft_id,
+            draft_status,
+            open_blockers,
+            open_warnings,
+            package_exists,
+            plan_exists,
+            latest_run,
+            current_run,
+            generation_status,
+            budget_exhausted,
+            final_in_band,
+            stale_stages,
+        )
         return ProductionState(
             brief=brief,
             stage=stage,
-            stage_states=self._stage_states(
-                brief,
-                plan_exists,
-                draft_matrix_exists,
-                matrix_id,
-                argument_id,
-                narrative_id,
-                master_id,
-                draft_id,
-                draft_status,
-                generation_status,
-                latest_run,
-                current_run,
-                open_blockers,
-                open_warnings,
-                localization_total,
-                localization_finished,
-            ),
+            stage_states=stage_states,
             latest_matrix_id=matrix_id,
             latest_argument_id=argument_id,
             latest_narrative_id=narrative_id,
@@ -316,24 +412,30 @@ class ProductionService:
             revision_budget_exhausted=budget_exhausted,
             final_duration_minutes=final_minutes,
             final_duration_in_band=final_in_band,
-            allowed_actions=self._allowed(
-                brief,
-                matrix_id,
-                argument_id,
-                narrative_id,
-                master_id,
-                draft_id,
-                draft_status,
-                open_blockers,
-                open_warnings,
-                package_exists,
-                plan_exists,
-                latest_run,
-                current_run,
-                generation_status,
-                budget_exhausted,
-                final_in_band,
+            allowed_actions=allowed,
+            next_action=self._next_action(
+                brief=brief,
+                plan_exists=plan_exists,
+                matrix_id=matrix_id,
+                package_exists=package_exists,
+                argument_id=argument_id,
+                narrative_id=narrative_id,
+                master_id=master_id,
+                draft_id=draft_id,
+                draft_status=draft_status,
+                generation_status=generation_status,
+                stale_stages=stale_stages,
+                allowed=allowed,
+                open_blockers=open_blockers,
+                open_warnings=open_warnings,
+                budget_exhausted=budget_exhausted,
+                review_current=(
+                    latest_run is not None
+                    and current_run is not None
+                    and latest_run.id == current_run.id
+                ),
             ),
+            stale_stages=stale_stages,
         )
 
     @staticmethod
@@ -523,29 +625,43 @@ class ProductionService:
         generation_status: str = "",
         revision_budget_exhausted: bool = False,
         final_duration_in_band: bool | None = None,
+        stale_stages: tuple[ProductionStage, ...] = (),
     ) -> tuple[str, ...]:
-        """§17.3: actions follow persisted state, never frontend guesses."""
+        """§17.3: actions follow persisted state, never frontend guesses.
+
+        Order: plan → evidence → freeze → argument → narrative → master →
+        script → review. Research is editable only until it is frozen; every
+        later step requires its upstream artifact to be current (not STALE).
+        """
 
         actions: list[str] = []
-        if brief.status in {BriefStatus.READY, BriefStatus.LOCKED}:
+        brief_ready = brief.status in {BriefStatus.READY, BriefStatus.LOCKED}
+        if brief_ready and not package_exists:
+            # Freezing makes the research final — no new plans or matrices.
             actions.append("plan_research")
-            actions.append("build_evidence")
+            if plan_exists:
+                actions.append("build_evidence")
         if matrix_id is not None and plan_exists and not package_exists:
             # Freezing is the owner's explicit commitment that the research
             # base is final; the Semantic Master requires a FROZEN package.
             actions.append("freeze_research")
-        if matrix_id is not None:
+        if matrix_id is not None and package_exists:
             actions.append("build_argument")
-        if argument_id is not None:
+        if argument_id is not None and ProductionStage.ARGUMENT not in stale_stages:
             actions.append("build_narrative")
-        if narrative_id is not None and package_exists:
+        if (
+            narrative_id is not None
+            and package_exists
+            and ProductionStage.NARRATIVE not in stale_stages
+        ):
             actions.append("build_master")
-        if master_id is not None:
+        if master_id is not None and ProductionStage.MASTER not in stale_stages:
             actions.append("build_script")
         if (
             draft_id is not None
             and draft_status is not DraftStatus.APPROVED
             and generation_status != "FAILED"
+            and ProductionStage.SCRIPT not in stale_stages
         ):
             actions.append("run_review")
             actions.append("revise")
@@ -571,6 +687,61 @@ class ProductionService:
         if draft_status is DraftStatus.APPROVED:
             actions.append("localize")
         return tuple(actions)
+
+    @staticmethod
+    def _next_action(
+        *,
+        brief: ContentBrief,
+        plan_exists: bool,
+        matrix_id: UUID | None,
+        package_exists: bool,
+        argument_id: UUID | None,
+        narrative_id: UUID | None,
+        master_id: UUID | None,
+        draft_id: UUID | None,
+        draft_status: DraftStatus | None,
+        generation_status: str,
+        stale_stages: tuple[ProductionStage, ...],
+        allowed: tuple[str, ...],
+        open_blockers: int,
+        open_warnings: int,
+        budget_exhausted: bool,
+        review_current: bool,
+    ) -> str | None:
+        """The one action that moves the production forward right now."""
+
+        def pick(action: str) -> str | None:
+            return action if action in allowed else None
+
+        if brief.status not in {BriefStatus.READY, BriefStatus.LOCKED}:
+            return None
+        if not plan_exists and not package_exists:
+            return pick("plan_research")
+        if matrix_id is None:
+            return pick("build_evidence")
+        if not package_exists:
+            return pick("freeze_research")
+        if argument_id is None or ProductionStage.ARGUMENT in stale_stages:
+            return pick("build_argument")
+        if narrative_id is None or ProductionStage.NARRATIVE in stale_stages:
+            return pick("build_narrative")
+        if master_id is None or ProductionStage.MASTER in stale_stages:
+            return pick("build_master")
+        if (
+            draft_id is None
+            or ProductionStage.SCRIPT in stale_stages
+            or generation_status == "FAILED"
+        ):
+            return pick("build_script")
+        if draft_status is DraftStatus.APPROVED:
+            return pick("localize")
+        if not review_current:
+            return pick("run_review")
+        if open_blockers or open_warnings:
+            if budget_exhausted:
+                return pick("start_review_cycle")
+            return pick("revise")
+        return pick("approve")
 
     async def create_target(
         self,

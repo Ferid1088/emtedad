@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.ayin import router as ayin_router
@@ -202,6 +202,30 @@ def create_app(
             )
             return PlainTextResponse(f"Forbidden: {reason}", status_code=403)
         return await call_next(request)
+
+    async def owner_error_page(request: Request, exc: Exception) -> Response:
+        from html import escape
+
+        from app.web.jobs import friendly_error
+
+        back = request.headers.get("referer") or "/studio"
+        body = (
+            "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
+            "<title>Fehler</title><link rel='stylesheet' href='/static/owner.css'>"
+            "<link rel='stylesheet' href='/static/studio.css'></head><body>"
+            "<main style='max-width:720px;margin:3rem auto'>"
+            "<h1>Das hat nicht geklappt</h1>"
+            f"<p class='error'>{escape(friendly_error(exc))}</p>"
+            f"<p><a class='button' href='{escape(back)}'>Zurück</a></p>"
+            "</main></body></html>"
+        )
+        return HTMLResponse(body, status_code=502)
+
+    from app.knowledge.llm.apimaster import APIMasterError
+    from app.knowledge.llm.factory import RoutingConfigurationError
+
+    app.add_exception_handler(APIMasterError, owner_error_page)
+    app.add_exception_handler(RoutingConfigurationError, owner_error_page)
 
     @app.exception_handler(ApplicationError)
     async def application_error_handler(
