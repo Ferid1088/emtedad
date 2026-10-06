@@ -83,6 +83,7 @@ async def _source_count(database: Database) -> int:
         return int(await session.scalar(select(func.count(Source.id))) or 0)
 
 
+@pytest.mark.integration
 def test_unknown_channel_delete_returns_404() -> None:
     database_url = os.environ.get("EMTEDAD_DATABASE_URL")
     if not database_url:

@@ -42,9 +42,23 @@ class ChannelDiscoveryService:
     ) -> None:
         self.database = database
         self.adapter = adapter or resolve_youtube_adapter()
-        self.importer = importer or ExternalKnowledgeImporter(
-            database, self.adapter, resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT)
-        )
+        self._importer = importer
+
+    @property
+    def importer(self) -> ExternalKnowledgeImporter:
+        """Resolve the LLM-backed importer only when a video is ingested.
+
+        Registering, listing, ignoring, or deleting channels never calls a
+        model, so they must keep working when no LLM provider is configured.
+        """
+
+        if self._importer is None:
+            self._importer = ExternalKnowledgeImporter(
+                self.database,
+                self.adapter,
+                resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT),
+            )
+        return self._importer
 
     async def register(self, locator: str) -> MonitoredChannel:
         snapshot = await self.adapter.resolve_channel(locator)

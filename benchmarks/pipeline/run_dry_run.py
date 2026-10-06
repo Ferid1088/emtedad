@@ -293,7 +293,7 @@ async def main() -> int:
             for c in calls:
                 if c["provider"] != "apimaster":
                     continue
-                price = snapshot.models.get(str(c["model"]))
+                price = snapshot.price_for(str(c["model"]))
                 if price is None:
                     continue
                 est = estimate_cost_usd(

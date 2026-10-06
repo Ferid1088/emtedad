@@ -7,11 +7,12 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.ayin import router as ayin_router
@@ -31,6 +32,31 @@ from app.ops.logging import configure_logging
 from app.retrieval.embeddings import SentenceTransformerEmbeddingProvider
 from app.web.routes import router as web_router
 from app.web.studio_routes import router as studio_router
+
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _host_name(value: str) -> str:
+    """Host without port; IPv6 brackets removed."""
+
+    if value.startswith("["):
+        return value[1:].split("]", 1)[0].lower()
+    return value.rsplit(":", 1)[0].lower() if value.count(":") == 1 else value.lower()
+
+
+def _local_only_rejection(request: Request, allowed: frozenset[str]) -> str | None:
+    """Reason to reject a request to this single-owner local app, if any."""
+
+    if _host_name(request.headers.get("host", "")) not in allowed:
+        return "host not allowed"
+    if request.method in _UNSAFE_METHODS:
+        origin = request.headers.get("origin")
+        if origin is not None:
+            origin_host = urlsplit(origin).hostname if origin != "null" else None
+            if origin_host is None or origin_host.lower() not in allowed:
+                return "cross-origin request blocked"
+    return None
+
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
@@ -158,6 +184,24 @@ def create_app(
             request_id=request_id,
         )
         return response
+
+    allowed_hosts = frozenset(h.lower() for h in resolved_settings.allowed_hosts)
+
+    @app.middleware("http")
+    async def local_only_guard(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        reason = _local_only_rejection(request, allowed_hosts)
+        if reason is not None:
+            logger.warning(
+                "request.rejected",
+                reason=reason,
+                method=request.method,
+                path=request.url.path,
+            )
+            return PlainTextResponse(f"Forbidden: {reason}", status_code=403)
+        return await call_next(request)
 
     @app.exception_handler(ApplicationError)
     async def application_error_handler(

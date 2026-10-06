@@ -129,6 +129,17 @@ def _apimaster_provider(
             timeout_seconds=float(settings.apimaster_timeout_seconds),
             max_retries=int(settings.apimaster_max_retries),
             protocol=protocol,
+            retry_timeouts=(
+                bool(
+                    (effective or {}).get(
+                        "apimaster_premium_retry_timeouts",
+                        settings.apimaster_premium_retry_timeouts,
+                    )
+                )
+                if model_role
+                in {ModelRole.PREMIUM_CREATION, ModelRole.PREMIUM_CREATION_FAST}
+                else True
+            ),
         ),
         recorder=recorder,
         agent_role=agent_role.value,

@@ -178,7 +178,20 @@ class APIMasterConfig:
     # (undocumented POST /v1/responses — certified per §34–39 before
     # production use; failures fall back to chat once, logged).
     protocol: str = "chat"
+    # Whether client timeouts and gateway timeouts (504/524) are retried.
+    # Off for premium roles by default: a timed-out premium generation may
+    # still run (and bill) upstream, so a blind retry can pay twice.
+    retry_timeouts: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def bare_model_id(model: str) -> str:
+    """Model ID without the provider namespace (``openai/gpt-6.1-sol`` →
+    ``gpt-6.1-sol``). Capability tables and the price catalog are keyed by
+    bare IDs, while routing uses namespaced IDs because only those return
+    provider-reported cost."""
+
+    return model.rsplit("/", 1)[-1]
 
 
 # Retry decisions follow the *classified* error kind, not the bare status:
@@ -224,6 +237,9 @@ def _classify_status(status: int, model: str, body: object = None) -> APIMasterE
         return APIMasterQuotaError()
     if status == 429:
         return APIMasterRateLimitError()
+    if status in (504, 524):
+        # Gateway/edge timeout: the generation outlived the proxy window.
+        return APIMasterTimeoutError()
     if status >= 500:
         return APIMasterUpstreamError(status)
     return APIMasterError(
@@ -266,7 +282,7 @@ def json_response_format(
     schema is then carried in the prompt and enforced by validation.
     """
 
-    if model in json_object_models:
+    if model in json_object_models or bare_model_id(model) in json_object_models:
         return {"type": "json_object"}
     schema = output_model.model_json_schema()
     _strictify(schema)
@@ -547,7 +563,7 @@ class APIMasterProvider:
                     response = await client.post(path, json=body)
             except httpx.TimeoutException as exc:
                 last_error = APIMasterTimeoutError()
-                if attempt == attempts:
+                if attempt == attempts or not self.config.retry_timeouts:
                     raise last_error from exc
                 telemetry.retries += 1
                 await asyncio.sleep(_backoff_seconds(attempt, None))
@@ -576,7 +592,10 @@ class APIMasterProvider:
             header = response.headers.get("retry-after")
             if header and header.replace(".", "", 1).isdigit():
                 retry_after = float(header)
-            if error.error_kind in _RETRYABLE_KINDS and attempt < attempts:
+            retryable = error.error_kind in _RETRYABLE_KINDS and (
+                error.error_kind != "timeout" or self.config.retry_timeouts
+            )
+            if retryable and attempt < attempts:
                 telemetry.retries += 1
                 last_error = error
                 await asyncio.sleep(_backoff_seconds(attempt, retry_after))

@@ -62,7 +62,9 @@ _ORPHAN_STATES = frozenset({"blocked", "expired"})
 # share the same concurrency quota).
 _APP_TAG = "emtedad-app"
 _SWEEP_INTERVAL_SECONDS = 600.0
-_last_orphan_sweep = 0.0
+# -inf so the first sweep after process start always runs; 0.0 compared
+# against time.monotonic() skipped it whenever uptime < sweep interval.
+_last_orphan_sweep = float("-inf")
 
 
 class DevinCloudError(RuntimeError):

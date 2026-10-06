@@ -27,6 +27,8 @@ from app.ritual.safety import RitualSafetyValidator
 from app.ritual.validator import RitualStructuralValidator
 from app.storage.local import LocalObjectStore
 
+pytestmark = pytest.mark.integration
+
 AYIN_SOURCE = Path("docs/source_material/Ayin_Emtedad_Baznevisi_Shodeh.pdf")
 MANASEK_SOURCE = Path("docs/source_material/Manasek_V1.pdf")
 

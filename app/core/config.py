@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     storage_root: Path
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     log_json: bool = True
+    # Single-owner local app: no login. Requests are only accepted for these
+    # Host names (blocks DNS rebinding), and browser POSTs from any other
+    # Origin are rejected (blocks cross-site form posts from other tabs).
+    allowed_hosts: list[str] = [
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "testserver",
+    ]
     llm_provider: Literal["devin"] | None = None
     devin_api_key: SecretStr | None = None
     # Multi-model routing: when enabled, role-scoped provider resolution
@@ -53,6 +62,10 @@ class Settings(BaseSettings):
     # Bounded per-call retry for transient transport/5xx/429 failures;
     # distinct from schema repair (max one repair per call).
     apimaster_max_retries: int = 2
+    # Premium (Astra) generations can outlive the APIMaster edge window
+    # (~380 s → 524). A timed-out call may still bill upstream, so premium
+    # timeouts are NOT retried automatically unless this is enabled.
+    apimaster_premium_retry_timeouts: bool = False
     # Wire protocol for the reasoning model (Sol). "responses" passed the
     # §37 certification gate across two real loops: equal finding quality,
     # 100% schema compliance, ~41% fewer prompt tokens on large payloads
@@ -64,11 +77,13 @@ class Settings(BaseSettings):
     # GET /v1/models). Models live in configuration, never in domain code;
     # these fields are the single source of truth for the routing matrix
     # and may be overridden via EMTEDAD_* environment variables or owner
-    # settings.
+    # settings. Namespaced IDs (``openai/…``, ``google/…``) are the
+    # defaults because APIMaster only reports per-call cost for them;
+    # Qwen stays bare until a namespaced ID is verified live.
     model_role_high_volume: str = "qwen3.8-flash"
-    model_role_reasoning: str = "gpt-6.1-sol"
-    model_role_editorial: str = "gemini-3.8-flash"
-    model_role_premium: str = "gpt-6-astra"
+    model_role_reasoning: str = "openai/gpt-6.1-sol"
+    model_role_editorial: str = "google/gemini-3.8-flash"
+    model_role_premium: str = "openai/gpt-6-astra"
     # Bounded in-call retry for transient 429s and hard quota; quota
     # contention clears in minutes (foreign sessions share the account cap),
     # so both classes back off rather than fail on the first hit.

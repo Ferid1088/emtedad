@@ -700,7 +700,7 @@ async def test_orphan_sweep_reaps_old_blocked_sessions_only(
             return httpx.Response(200, json={"session_id": "s-1"})
         return httpx.Response(200, json=_session_response())
 
-    monkeypatch.setattr(devin_module, "_last_orphan_sweep", 0.0)
+    monkeypatch.setattr(devin_module, "_last_orphan_sweep", float("-inf"))
     provider = _provider(monkeypatch, httpx.MockTransport(handle))
     result = await provider.extract(_request())
     assert result == _Output(status="ok")
@@ -736,7 +736,7 @@ async def test_quota_error_triggers_sweep_then_retries(
             return httpx.Response(200, json={})
         return httpx.Response(200, json=_session_response())
 
-    monkeypatch.setattr(devin_module, "_last_orphan_sweep", 0.0)
+    monkeypatch.setattr(devin_module, "_last_orphan_sweep", float("-inf"))
     provider = _provider(monkeypatch, httpx.MockTransport(handle))
     assert await provider.extract(_request()) == _Output(status="ok")
     assert posts == 2

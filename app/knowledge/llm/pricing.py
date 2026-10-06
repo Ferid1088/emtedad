@@ -65,6 +65,11 @@ class PriceSnapshot:
     source: str
     models: dict[str, ModelPrice] = field(default_factory=dict)
 
+    def price_for(self, model: str) -> ModelPrice | None:
+        """Catalog price for a routed model ID, namespaced or bare."""
+
+        return self.models.get(model) or self.models.get(model.rsplit("/", 1)[-1])
+
 
 _TIER_EXPR = re.compile(
     r'len\s*<=\s*\d+\s*\?\s*tier\("standard",\s*'
