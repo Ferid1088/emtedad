@@ -3177,20 +3177,7 @@ async def settings_page(request: Request) -> HTMLResponse:
         title="Settings",
         environment=settings.environment.value,
         storage_root=str(settings.storage_root),
-        llm_provider=(
-            "apimaster (rollenbasiert)"
-            + (
-                " + devin (Opt-in)"
-                if web_research.get("allow_devin_runtime_fallback")
-                else " — fail-closed"
-            )
-            if web_research.get("llm_routing_enabled")
-            else (
-                "devin (Opt-in)"
-                if web_research.get("allow_devin_runtime_fallback")
-                else "unconfigured — routing aus, kein Devin-Fallback"
-            )
-        ),
+        llm_provider="APIMaster (rollenbasiert, einziger LLM-Gateway)",
         youtube_mcp_enabled=settings.youtube_mcp_enabled,
         youtube_mcp_url=settings.youtube_mcp_url,
         web_research=web_research,

@@ -164,7 +164,7 @@ def test_exhausted_attempts_are_failed() -> None:
 
 
 def test_quota_failures_retry_on_the_longer_quota_backoff() -> None:
-    assert classify_failure("DevinCloudError: out_of_quota") == FailureClass.QUOTA
+    assert classify_failure("APIMasterQuotaError: out_of_quota") == FailureClass.QUOTA
     assert classify_failure("HTTP 429: rate limit") == FailureClass.RATE_LIMIT
     assert classify_failure("ValueError: parse failed") == FailureClass.FAILED
 
@@ -172,7 +172,7 @@ def test_quota_failures_retry_on_the_longer_quota_backoff() -> None:
     evaluation = _evaluate(
         _info(
             processing_status=SourceProcessingStatus.FAILED.value,
-            last_error="DevinCloudError: out_of_quota",
+            last_error="APIMasterQuotaError: out_of_quota",
             failed_attempts=9,
             last_failed_at=NOW - timedelta(seconds=700),
         ),

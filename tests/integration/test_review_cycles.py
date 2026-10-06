@@ -494,11 +494,11 @@ async def test_waiver_is_owner_only_and_justified(
         # CASE B: agent recommendation keeps the finding OPEN and gating.
         rec = await scripts.recommend_waiver(
             finding_id,
-            recommended_by="devin-agent",
+            recommended_by="review-agent",
             reason="hedged researcher-attributed claim; minor",
         )
         assert rec.status is FindingStatus.OPEN
-        assert rec.resolution_actor == "devin-agent"
+        assert rec.resolution_actor == "review-agent"
         assert rec.resolution_note is not None
         assert rec.resolution_note.startswith("RECOMMENDATION")
 

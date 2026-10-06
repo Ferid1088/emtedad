@@ -42,20 +42,8 @@ class Settings(BaseSettings):
         "::1",
         "testserver",
     ]
-    llm_provider: Literal["devin"] | None = None
-    devin_api_key: SecretStr | None = None
-    # Multi-model routing: when enabled, role-scoped provider resolution
-    # routes AgentRoles to configured APIMaster models. APIMaster is the
-    # single external LLM gateway — there is no other runtime provider.
-    # With routing disabled every role-scoped resolution requires the
-    # explicit Devin opt-in below.
-    llm_routing_enabled: bool = False
-    # Explicit opt-in for the Devin provider. Production default is false:
-    # with routing enabled every declared AgentRole resolves through
-    # APIMaster or fails configuration; without it nothing silently falls
-    # back to Devin. Enable only for development, tests, or explicit
-    # legacy/manual operations.
-    allow_devin_runtime_fallback: bool = False
+    # APIMaster (https://apimaster.ai) is the only LLM gateway. Every
+    # AgentRole resolves to one of the model_role_* models below.
     apimaster_api_key: SecretStr | None = None
     apimaster_base_url: str = "https://apimaster.ai/v1"
     apimaster_timeout_seconds: int = 300
@@ -84,12 +72,7 @@ class Settings(BaseSettings):
     model_role_reasoning: str = "openai/gpt-6.1-sol"
     model_role_editorial: str = "google/gemini-3.8-flash"
     model_role_premium: str = "openai/gpt-6-astra"
-    # Bounded in-call retry for transient 429s and hard quota; quota
-    # contention clears in minutes (foreign sessions share the account cap),
-    # so both classes back off rather than fail on the first hit.
-    devin_rate_limit_max_attempts: int = 5
-    devin_rate_limit_initial_backoff_seconds: float = 20.0
-    devin_rate_limit_max_backoff_seconds: float = 120.0
+    # Parallel APIMaster calls (foreground / background work).
     provider_max_concurrency: int = 5
     provider_background_max_concurrency: int = 2
     background_processing_paused: bool = False

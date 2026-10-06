@@ -149,7 +149,7 @@ def test_evidence_role_taxonomy_is_independent_and_complete() -> None:
     }
 
 
-def test_classifier_schema_is_strict_for_devin_structured_output() -> None:
+def test_classifier_schema_is_strict_for_structured_output() -> None:
     schema = DialogueClassification.model_json_schema()
     assert schema["additionalProperties"] is False
     relation_schema = schema["$defs"]["ClassifiedRelation"]

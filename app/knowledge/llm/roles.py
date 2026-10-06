@@ -6,8 +6,7 @@ behind a model role lives in ``Settings`` (``model_role_*`` fields) and
 may be overridden by owner settings — no model name is hardcoded in the
 production call path.
 
-When ``llm_routing_enabled`` is false every role falls back to the Devin
-provider, preserving the pre-routing production behaviour exactly.
+All roles resolve through APIMaster, the only LLM gateway.
 """
 
 from enum import StrEnum

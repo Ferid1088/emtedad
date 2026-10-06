@@ -44,7 +44,7 @@ from app.localization.native_pipeline import NativeLocalizationPipeline
 from app.localization.semantic_package import SemanticPackageService
 
 ARTIFACT_DIR = Path(__file__).parent / "artifacts"
-DRY_RUN_OVERRIDES: dict[str, object] = {"llm_routing_enabled": True}
+DRY_RUN_OVERRIDES: dict[str, object] = {}
 
 
 async def _latest_approved_fa(database: Database) -> ScriptDraft:

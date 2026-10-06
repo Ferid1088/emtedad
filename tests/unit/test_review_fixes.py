@@ -162,7 +162,6 @@ def test_factory_disables_timeout_retries_for_premium_only(
     from app.knowledge.llm.factory import resolve_llm_provider
     from app.knowledge.llm.roles import AgentRole
 
-    monkeypatch.setenv("EMTEDAD_LLM_ROUTING_ENABLED", "true")
     monkeypatch.setenv("EMTEDAD_APIMASTER_API_KEY", "sk-unit")
     get_settings.cache_clear()
     premium = resolve_llm_provider(role=AgentRole.PERSIAN_SCRIPT_WRITER)
@@ -177,8 +176,7 @@ def test_factory_disables_timeout_retries_for_premium_only(
 
 
 def test_channel_service_does_not_need_llm_until_ingest() -> None:
-    # Default test settings: routing off and no Devin fallback, so resolving
-    # an LLM provider would raise. Construction must not resolve one.
+    # Construction must not resolve an LLM provider (no API key needed).
     service = ChannelDiscoveryService(database=object(), adapter=object())  # type: ignore[arg-type]
     assert service._importer is None
 

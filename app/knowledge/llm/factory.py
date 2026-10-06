@@ -1,14 +1,9 @@
 """Structured LLM provider boundary.
 
-Production rule: every declared ``AgentRole`` resolves through APIMaster —
-the single external LLM gateway — when ``llm_routing_enabled`` is on. A
-role without a model mapping fails as a configuration error; it never
-falls back silently.
-
-The Devin provider is opt-in only (``allow_devin_runtime_fallback``) for
-development, tests, and explicit legacy/manual operations. With the
-production default ``False``, both a missing role and a missing routing
-flag raise :class:`RoutingConfigurationError` instead of routing to Devin.
+APIMaster (https://apimaster.ai) is the only LLM gateway. Every
+``AgentRole`` resolves to an APIMaster model via its ``ModelRole``; a role
+without a mapping is a configuration error. There is no other provider and
+no fallback.
 """
 
 from typing import TYPE_CHECKING
@@ -27,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class RoutingConfigurationError(RuntimeError):
-    """Provider resolution cannot satisfy the production routing rule."""
+    """An AgentRole cannot be resolved to an APIMaster model."""
 
 
 def resolve_llm_provider(
@@ -37,8 +32,9 @@ def resolve_llm_provider(
     effective: dict[str, object] | None = None,
     recorder: "TelemetryRecorder | None" = None,
 ) -> LLMProvider:
-    """Return the APIMaster provider for a role, or the opt-in Devin default.
+    """Return the APIMaster provider for a role.
 
+    APIMaster is the only LLM gateway; there is no fallback provider.
     ``effective`` is the owner's resolved settings dict when a service
     already loaded it — DB overrides for model roles take precedence.
     ``recorder`` receives provider-reported telemetry for APIMaster calls.
@@ -46,49 +42,24 @@ def resolve_llm_provider(
 
     del default
     settings = get_settings()
-    routing_enabled = _flag("llm_routing_enabled", settings, effective)
-    allow_devin = _flag("allow_devin_runtime_fallback", settings, effective)
-    if role is not None:
-        agent_role = role if isinstance(role, AgentRole) else AgentRole(str(role))
-        if routing_enabled:
-            model_role = AGENT_TO_MODEL_ROLE.get(agent_role)
-            if model_role is None:
-                raise RoutingConfigurationError(
-                    f"AgentRole {agent_role.value!r} has no ModelRole mapping — "
-                    "routing cannot resolve it; do not fall back silently"
-                )
-            return _apimaster_provider(
-                model_role=model_role,
-                agent_role=agent_role,
-                settings=settings,
-                effective=effective,
-                recorder=recorder,
-            )
-        if not allow_devin:
-            raise RoutingConfigurationError(
-                f"role {agent_role.value!r} requested but llm_routing_enabled "
-                "is off and allow_devin_runtime_fallback is false — enable "
-                "routing for production or opt into Devin explicitly"
-            )
-    elif not allow_devin:
+    if role is None:
         raise RoutingConfigurationError(
-            "no AgentRole declared and allow_devin_runtime_fallback is "
-            "false — declare a role for production traffic or opt into "
-            "Devin explicitly"
+            "no AgentRole declared — every LLM call must name its role"
         )
-    from app.knowledge.llm.devin import DevinCloudProvider
-
-    return DevinCloudProvider()
-
-
-def _flag(
-    key: str,
-    settings: Settings,
-    effective: dict[str, object] | None,
-) -> bool:
-    if effective is not None and key in effective:
-        return bool(effective[key])
-    return bool(getattr(settings, key))
+    agent_role = role if isinstance(role, AgentRole) else AgentRole(str(role))
+    model_role = AGENT_TO_MODEL_ROLE.get(agent_role)
+    if model_role is None:
+        raise RoutingConfigurationError(
+            f"AgentRole {agent_role.value!r} has no ModelRole mapping — "
+            "add it to AGENT_TO_MODEL_ROLE"
+        )
+    return _apimaster_provider(
+        model_role=model_role,
+        agent_role=agent_role,
+        settings=settings,
+        effective=effective,
+        recorder=recorder,
+    )
 
 
 def _apimaster_provider(

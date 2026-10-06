@@ -49,7 +49,7 @@ from app.ops.settings import models as _set_models  # noqa: F401
 from app.research import models as _r_models  # noqa: F401
 from app.topics import models as _topic_models  # noqa: F401
 
-OVERRIDES: dict[str, object] = {"llm_routing_enabled": True}
+OVERRIDES: dict[str, object] = {}
 
 
 def _best_text(artifact: dict[str, object]) -> str:

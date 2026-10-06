@@ -6,7 +6,6 @@ from pydantic import SecretStr
 import app.knowledge.llm.factory as factory_module
 from app.core.config import Settings
 from app.knowledge.llm.apimaster import APIMasterProvider
-from app.knowledge.llm.devin import DevinCloudProvider
 from app.knowledge.llm.factory import (
     RoutingConfigurationError,
     resolve_llm_provider,
@@ -56,48 +55,34 @@ def test_owner_effective_settings_override_models(
     )
 
 
-def test_factory_returns_devin_only_with_explicit_opt_in(
+def test_factory_always_returns_apimaster(
     monkeypatch: pytest.MonkeyPatch, test_settings: Settings
 ) -> None:
+    """APIMaster is the only provider — no routing flag, no fallback."""
+
     monkeypatch.setattr(
         factory_module,
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=False,
-            allow_devin_runtime_fallback=True,
+            apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
     provider = resolve_llm_provider(role=AgentRole.TOPIC_MINER)
-    assert isinstance(provider, DevinCloudProvider)
-    assert isinstance(resolve_llm_provider(), DevinCloudProvider)
-
-
-def test_factory_fails_closed_when_routing_disabled(
-    monkeypatch: pytest.MonkeyPatch, test_settings: Settings
-) -> None:
-    """Production default: no routing flag, no Devin opt-in → hard error."""
-
-    monkeypatch.setattr(
-        factory_module,
-        "get_settings",
-        lambda: _settings(test_settings, llm_routing_enabled=False),
-    )
-    with pytest.raises(RoutingConfigurationError, match="llm_routing_enabled"):
-        resolve_llm_provider(role=AgentRole.TOPIC_MINER)
+    assert isinstance(provider, APIMasterProvider)
+    assert provider.config.base_url == "https://apimaster.ai/v1"
 
 
 def test_factory_fails_closed_without_role(
     monkeypatch: pytest.MonkeyPatch, test_settings: Settings
 ) -> None:
-    """No declared role + no Devin opt-in → hard error, never implicit."""
+    """No declared role → hard error, never implicit."""
 
     monkeypatch.setattr(
         factory_module,
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=True,
             apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
@@ -108,14 +93,13 @@ def test_factory_fails_closed_without_role(
 def test_every_agent_role_resolves_to_apimaster_in_production(
     monkeypatch: pytest.MonkeyPatch, test_settings: Settings
 ) -> None:
-    """§3 coverage: every production role → APIMaster, none to Devin."""
+    """§3 coverage: every production role → APIMaster."""
 
     monkeypatch.setattr(
         factory_module,
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=True,
             apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
@@ -133,7 +117,6 @@ def test_factory_routes_roles_to_apimaster_when_enabled(
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=True,
             apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
@@ -153,7 +136,6 @@ def test_factory_premium_roles_run_synchronously_on_premium_model(
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=True,
             apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
@@ -170,7 +152,6 @@ def test_factory_routes_string_roles(
         "get_settings",
         lambda: _settings(
             test_settings,
-            llm_routing_enabled=True,
             apimaster_api_key=SecretStr("sk-apimaster-testkey1234567890"),
         ),
     )
