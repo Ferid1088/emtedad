@@ -142,9 +142,7 @@ async def main() -> int:
                 )
                 if package_row is None:
                     raise SystemExit(f"package {package_override} not found")
-                pinned = await session.get(
-                    ScriptDraft, package_row.script_draft_id
-                )
+                pinned = await session.get(ScriptDraft, package_row.script_draft_id)
                 if pinned is None:
                     raise SystemExit("pinned source draft missing")
                 session.expunge(pinned)

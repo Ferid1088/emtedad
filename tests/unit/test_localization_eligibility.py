@@ -75,3 +75,42 @@ def test_malformed_hash_blocked() -> None:
     )
     assert not result.eligible
     assert any("PROVENANCE" in r for r in result.reasons)
+
+
+def test_supported_material_collects_authority_surface() -> None:
+    """Empty claim_ledger is legitimate — repair context must still list
+    the package's supported material (§patch-repair source authority)."""
+    from app.localization.native_pipeline import _supported_material
+
+    package = {
+        "thesis": "Loss aversion drives sunk-cost behaviour.",
+        "claim_ledger": [],
+        "causal_constraints": [{"rule": "never stronger certainty"}],
+        "counterarguments": [{"counter": "habit, not loss aversion"}],
+        "story_facts": [{"fact": "the ticket example"}],
+        "unresolved_ambiguities": [{"ambiguity": "scope of effect"}],
+    }
+    material = _supported_material(package)
+    assert material[0] == {"thesis": "Loss aversion drives sunk-cost behaviour."}
+    assert {"rule": "never stronger certainty"} in material
+    assert {"counter": "habit, not loss aversion"} in material
+    assert {"fact": "the ticket example"} in material
+    assert {"ambiguity": "scope of effect"} in material
+
+
+def test_supported_material_uses_claim_ledger_when_present() -> None:
+    from app.localization.native_pipeline import _supported_material
+
+    material = _supported_material({"claim_ledger": [{"claim": "c1"}], "thesis": "t"})
+    assert material[0] == {"thesis": "t"}
+    assert {"claim": "c1"} in material
+
+
+def test_supported_material_handles_missing_or_malformed_fields() -> None:
+    from app.localization.native_pipeline import _supported_material
+
+    assert _supported_material({}) == []
+    # Non-list payloads are ignored rather than crashing the repair call.
+    assert _supported_material({"claim_ledger": "oops", "thesis": "t"}) == [
+        {"thesis": "t"}
+    ]

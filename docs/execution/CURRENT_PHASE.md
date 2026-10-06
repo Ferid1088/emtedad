@@ -1,6 +1,66 @@
 # Pending Phase: Master cost-quality content pipeline — Persian owner-approved master → native DE/EN/AR, awaiting owner review
 
-Status (2026-10-05, uncommitted on `openrouter-qwen-benchmark`):
+Status (2026-10-06, certification round 2 — uncommitted on top of `9428e25`):
+
+- Section-aware patch repair replaced whole-script regeneration:
+  deterministic section splitting (paragraph groups, stable `section_id`s,
+  SHA-256 section hashes), `PatchSetOutput` contract, stale-hash and
+  malformed-hash rejection, findings routed to owning sections, one
+  bounded full rewrite only when the model declares the architecture
+  broken (`app/content_engine/patching.py`,
+  `app/localization/native_pipeline.py`).
+- Monotonic best-candidate retention: every repair and every premium
+  edit is a *candidate*; a hard ordering (blockers → warnings →
+  fidelity → duration → encoding → finding count) promotes strictly
+  better candidates, restores the incumbent on regression, archives the
+  loser, reopens exactly the addressed findings, and persists a
+  `candidate_decision` provenance record. Same rule now protects the
+  Persian revision path (`review._retain_best_candidate`) — a worse
+  revision can no longer silently overwrite a better approved-adjacent
+  draft. Verified live: topic-1 AR's premium edit regressed and the
+  pre-premium best was restored and certified.
+- Deterministic duration: per-section word budgets from
+  `NarrativePlanSection`s reach the writer, the length-repair planner,
+  and every patch payload — deletions can no longer silently collapse
+  the spoken-duration band; bounded duration-only repair operates
+  through patch ops and re-plans against patched text.
+- Source-aware repair payloads: `_supported_material()` injects thesis +
+  causal constraints + counterarguments + story facts + unresolved
+  ambiguities (plus claim ledger when present) into every section patch,
+  global patch, and length-repair call — repair models now see what the
+  source supports instead of patching fidelity findings blind.
+- Sol certified on the Responses protocol over two live loops (identical
+  inputs, both protocols: schema 100 %, zero failures, semantically
+  equivalent verdicts, ~41 % prompt-token reduction on critic payloads,
+  ~95 % on narrow claim checks) — `model_role_reasoning_protocol`
+  switched to `responses` with one-shot chat fallback recorded in
+  telemetry (`requested_protocol`/`actual_protocol`/`fallback_reason`).
+- Patch economics verified live: section patch calls ~4–6.6k prompt
+  tokens vs ~12–15.9k for whole-script review/correction (≈60 % input,
+  ≈89 % output reduction).
+- Live multilingual certification (evidence in
+  `docs/audits/APIMASTER_CERTIFICATION.md`):
+  - Topic 1: DE/EN/AR all `READY_FOR_VOICE` (25.2 / 25.2 / 25.6 min);
+    AR premium regression restored the pre-Astra best.
+  - Topic 2 (package `7550261f`, source draft `1ceed5e5`):
+    EN `READY_FOR_VOICE` (25.2 min, 3528 words); DE `READY_FOR_VOICE`
+    (25.6 min, 3325 words — premium edit regressed, pre-premium best
+    restored and certified on a fresh run after two honest budget
+    exhaustions); AR honestly `BLOCKED` across two runs — run 1
+    converged pre-premium then failed the final fidelity gate after a
+    rejected premium regression, run 2 exhausted the loop budget with 2
+    residual fidelity blockers. This topic's Arabic surface needs owner
+    review or a revised Persian master, not weaker gates.
+- Cost truth hardened: Studio aggregates provider-reported cost only —
+  NULL costs render as "nicht vom Provider gemeldet", never `$0.0000`;
+  calls-with-cost vs total-calls shown (topic-2: 108/108 calls without
+  provider cost; market estimate tracked separately).
+- Regression: 416 unit + 118 integration tests pass; ruff, format, and
+  strict mypy clean. Remaining warnings are pooled-connection cleanup
+  and httpx deprecations, not failures.
+- Stop state: NOT committed; owner review checkpoint.
+
+Status (2026-10-05, committed as `9428e25`):
 
 - APIMaster is the canonical external LLM gateway: role-based
   `resolve_llm_provider` (`AgentRole` → `ModelRole` → configured
@@ -36,7 +96,7 @@ Status (2026-10-05, uncommitted on `openrouter-qwen-benchmark`):
   Wikipedia — APIMaster is refused as a retrieval backend because it
   cannot return verifiable URLs — OpenRouter is fully retired from
   runtime, kept only as historical provenance.
-- Stop state: NOT committed; owner review checkpoint.
+- Stop state: committed `9428e25`; owner review checkpoint.
 
 Historical (OpenRouter era, 2026-10-04):
 

@@ -1,0 +1,38 @@
+{
+  "topic_brief_id": "c3e70292-3b97-4ec5-837b-8f660c83a3bd",
+  "source_draft_id": "ca83e485-0aba-486a-b40c-ec0db661f42b",
+  "source_draft_hash": "8b77ead0c0aed3d518b0e46c8990e2b3f4d15480d09700a81a3ad6b3a2b43e6e",
+  "package_id": "663ecfb8-80fe-48de-aa9c-2ea8fac9ea38",
+  "wall_clock_s": 2.9,
+  "languages": [
+    {
+      "language": "de",
+      "outcome": "EXCEPTION",
+      "error": "GateBlockedError: LOCALIZATION_RECERTIFICATION_REQUIRED — the approved Persian master does not meet current localization policy (ENCODING_CORRUPTION — replacement characters present). Owner options: re-review the existing Persian draft, regenerate it under the current pipeline, or keep the historical artifact without localization."
+    },
+    {
+      "language": "en",
+      "outcome": "EXCEPTION",
+      "error": "GateBlockedError: LOCALIZATION_RECERTIFICATION_REQUIRED — the approved Persian master does not meet current localization policy (ENCODING_CORRUPTION — replacement characters present). Owner options: re-review the existing Persian draft, regenerate it under the current pipeline, or keep the historical artifact without localization."
+    },
+    {
+      "language": "ar",
+      "outcome": "EXCEPTION",
+      "error": "GateBlockedError: LOCALIZATION_RECERTIFICATION_REQUIRED — the approved Persian master does not meet current localization policy (ENCODING_CORRUPTION — replacement characters present). Owner options: re-review the existing Persian draft, regenerate it under the current pipeline, or keep the historical artifact without localization."
+    }
+  ],
+  "calls": [],
+  "actual_provider_cost_usd": 0,
+  "cost_missing_for_calls": 0,
+  "market_estimate": {
+    "status": "ok",
+    "snapshot_at": "2026-10-06T07:46:22+00:00",
+    "pricing_version": "a42d372ccf0b5dd13ecf71203521f9d2",
+    "group": "default",
+    "source": "https://apimaster.ai/api/pricing",
+    "low_usd": 0.0,
+    "high_usd": 0.0,
+    "per_model": {}
+  },
+  "call_count": 0
+}

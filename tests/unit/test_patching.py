@@ -160,7 +160,6 @@ def test_section_provenance_restore_roundtrip() -> None:
 
 def test_restore_falls_back_when_provenance_stale() -> None:
     sections = _sections("alpha words here")
-    text = join_sections(sections)
     provenance = section_provenance(sections)
     # Tampered provenance disagrees with the text → deterministic fallback.
     restored = restore_sections(provenance, "completely different text")
@@ -236,9 +235,7 @@ def test_length_repair_plan_expand() -> None:
 
 def test_length_repair_plan_in_band_is_empty() -> None:
     sections = sections_from_paragraph_groups("word " * 3500)
-    assert (
-        length_repair_plan(sections, {}, target_min=3250, target_max=3900) == []
-    )
+    assert length_repair_plan(sections, {}, target_min=3250, target_max=3900) == []
 
 
 def test_candidate_rank_hard_ordering() -> None:

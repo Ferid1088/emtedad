@@ -1912,7 +1912,8 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
                 select(
                     LLMCallEvent.language,
                     func.count(LLMCallEvent.id),
-                    func.coalesce(func.sum(LLMCallEvent.cost_usd), 0.0),
+                    func.count(LLMCallEvent.cost_usd),
+                    func.sum(LLMCallEvent.cost_usd),
                     func.coalesce(func.sum(LLMCallEvent.prompt_tokens), 0),
                     func.coalesce(func.sum(LLMCallEvent.completion_tokens), 0),
                 )
@@ -1920,14 +1921,17 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
                 .group_by(LLMCallEvent.language)
             )
         ).all()
+        # Provider-reported cost only: NULLs stay unavailable — never
+        # present a missing upstream price as "$0.00 actual".
         llm_costs = [
             {
                 "language": language or "—",
                 "calls": int(calls),
-                "cost_usd": round(float(cost), 6),
+                "calls_with_cost": int(with_cost),
+                "cost_usd": (round(float(cost), 6) if cost is not None else None),
                 "tokens": int(tokens_in) + int(tokens_out),
             }
-            for language, calls, cost, tokens_in, tokens_out in cost_rows
+            for language, calls, with_cost, cost, tokens_in, tokens_out in cost_rows
         ]
         research_runs = list(
             await session.scalars(

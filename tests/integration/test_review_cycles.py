@@ -520,3 +520,212 @@ async def test_waiver_is_owner_only_and_justified(
             await scripts.waive_finding(finding_id, waived_by="owner", reason="again")
     finally:
         await database.dispose()
+
+
+async def _revision_fixture(
+    database: Database,
+    brief: ContentBrief,
+    *,
+    parent_blockers: int,
+    parent_severity: FindingSeverity,
+) -> tuple[ScriptDraft, ScriptDraft, ReviewFinding]:
+    """Parent (archived, completed run) + candidate (REVISED) + finding.
+
+    Mirrors the state ``revise_draft`` leaves behind: the parent is
+    archived, its open finding was marked ADDRESSED, and the candidate
+    carries ``revised_from_draft``/``parent_status``/``addressed_finding_ids``
+    provenance. The candidate has not been reviewed yet — its own run is
+    what triggers best-of-history comparison.
+    """
+
+    async with database.transaction() as session:
+        matrix = EvidenceMatrix(
+            content_brief_id=brief.id,
+            version_number=1,
+            status=EvidenceMatrixStatus.READY,
+            content_hash=hashlib.sha256(b"matrix").hexdigest(),
+        )
+        session.add(matrix)
+        await session.flush()
+        argument = ArgumentPlan(
+            content_brief_id=brief.id,
+            evidence_matrix_id=matrix.id,
+            version_number=1,
+            status=PlanStatus.READY,
+            content_hash=hashlib.sha256(b"argument").hexdigest(),
+        )
+        session.add(argument)
+        await session.flush()
+        narrative = NarrativePlan(
+            content_brief_id=brief.id,
+            argument_plan_id=argument.id,
+            version_number=1,
+            status=PlanStatus.READY,
+            content_hash=hashlib.sha256(b"narrative").hexdigest(),
+        )
+        session.add(narrative)
+        await session.flush()
+        text = "word " * 3000  # 27.3 min at 110 wpm — inside the band.
+        parent = ScriptDraft(
+            content_brief_id=brief.id,
+            narrative_plan_id=narrative.id,
+            language="en",
+            version_number=1,
+            text=text,
+            status=DraftStatus.ARCHIVED,
+            provenance_json={},
+            content_hash=hashlib.sha256(text.encode()).hexdigest(),
+            target_duration_minutes=27.5,
+            actual_word_count=3000,
+            revision_cycle=1,
+        )
+        session.add(parent)
+        await session.flush()
+        parent_run = ReviewRun(
+            content_brief_id=brief.id,
+            script_draft_id=parent.id,
+            draft_version=parent.version_number,
+            draft_hash=parent.content_hash,
+            round_number=1,
+            cycle_number=1,
+            status=ReviewRunStatus.COMPLETED,
+            critic_profile_version="test",
+            finding_count=1,
+            blocking_count=parent_blockers,
+            major_count=0 if parent_blockers else 1,
+        )
+        session.add(parent_run)
+        await session.flush()
+        finding = ReviewFinding(
+            script_draft_id=parent.id,
+            review_run_id=parent_run.id,
+            critic_role="FACT",
+            severity=parent_severity,
+            location="middle",
+            code="OVERCLAIM",
+            explanation="overclaims",
+            correction_constraint="hedge",
+            status=FindingStatus.ADDRESSED,
+        )
+        session.add(finding)
+        await session.flush()
+        cand_text = "better words " * 3000
+        candidate = ScriptDraft(
+            content_brief_id=brief.id,
+            narrative_plan_id=parent.narrative_plan_id,
+            language="en",
+            version_number=2,
+            text=cand_text,
+            status=DraftStatus.REVISED,
+            provenance_json={
+                "revised_from_draft": str(parent.id),
+                "parent_status": DraftStatus.IN_REVIEW.value,
+                "addressed_finding_ids": [str(finding.id)],
+            },
+            content_hash=hashlib.sha256(cand_text.encode()).hexdigest(),
+            target_duration_minutes=27.5,
+            actual_word_count=6000,
+            revision_cycle=1,
+        )
+        session.add(candidate)
+        await session.flush()
+        return parent, candidate, finding
+
+
+@pytest.mark.asyncio
+async def test_rejected_revision_restores_parent_and_reopens_findings(
+    migrated_database_url: str,
+) -> None:
+    """§5 best-of-history: a regression candidate never replaces the parent.
+
+    Parent reviewed clean of blockers (one WARNING the revision claimed
+    to fix); the candidate's fresh review reports one BLOCKER per critic
+    role → strictly worse → the parent is restored to its recorded
+    status, the candidate is archived, and the claimed finding is
+    reopened rather than silently staying ADDRESSED.
+    """
+
+    database = Database(migrated_database_url)
+    try:
+        scripts = ScriptService(database, provider=_Provider())
+        brief = await _brief(database, "Rejected revision?")
+        parent, candidate, finding = await _revision_fixture(
+            database,
+            brief,
+            parent_blockers=0,
+            parent_severity=FindingSeverity.WARNING,
+        )
+        parent_id, candidate_id, finding_id = parent.id, candidate.id, finding.id
+
+        await scripts.review_draft(candidate_id)
+
+        async with database.transaction() as session:
+            parent = await session.get(ScriptDraft, parent_id)
+            candidate = await session.get(ScriptDraft, candidate_id)
+            finding = await session.get(ReviewFinding, finding_id)
+            assert parent is not None and candidate is not None
+            assert finding is not None
+            assert parent.status is DraftStatus.IN_REVIEW
+            assert candidate.status is DraftStatus.ARCHIVED
+            assert finding.status is FindingStatus.OPEN
+            assert "rejected" in (finding.resolution_note or "")
+            decision = candidate.provenance_json["candidate_decision"]
+            assert decision["decision"] == "rejected"
+            assert decision["incumbent_draft_id"] == str(parent_id)
+            assert list(decision["candidate_rank"]) > list(decision["incumbent_rank"])
+    finally:
+        await database.dispose()
+
+
+class _CleanReviewProvider(_Provider):
+    """Reviews return zero findings — the candidate is genuinely clean."""
+
+    async def extract(self, request):  # noqa: ANN001, ANN201
+        if request.task == "script_review":
+            from app.content_engine.review import ReviewFindingsOutput
+
+            return ReviewFindingsOutput(findings=[])
+        return await super().extract(request)
+
+
+@pytest.mark.asyncio
+async def test_improved_revision_promotes_and_keeps_parent_archived(
+    migrated_database_url: str,
+) -> None:
+    """§5: a strictly-better candidate is promoted; history stays archived.
+
+    The parent's completed run recorded a BLOCKER that the revision
+    fixed: the candidate's clean review ranks strictly better, so it
+    keeps REVISED status and the decision is recorded in provenance.
+    """
+
+    database = Database(migrated_database_url)
+    try:
+        scripts = ScriptService(database, provider=_CleanReviewProvider())
+        brief = await _brief(database, "Improved revision?")
+        parent, candidate, finding = await _revision_fixture(
+            database,
+            brief,
+            parent_blockers=1,
+            parent_severity=FindingSeverity.BLOCKER,
+        )
+        parent_id, candidate_id, finding_id = parent.id, candidate.id, finding.id
+
+        await scripts.review_draft(candidate_id)
+
+        async with database.transaction() as session:
+            parent = await session.get(ScriptDraft, parent_id)
+            candidate = await session.get(ScriptDraft, candidate_id)
+            finding = await session.get(ReviewFinding, finding_id)
+            assert parent is not None and candidate is not None
+            assert finding is not None
+            assert parent.status is DraftStatus.ARCHIVED
+            # The candidate stays live — review_draft marked it IN_REVIEW
+            # when its own run started; promotion only means it was not
+            # archived back to history.
+            assert candidate.status is DraftStatus.IN_REVIEW
+            assert finding.status is FindingStatus.ADDRESSED
+            decision = candidate.provenance_json["candidate_decision"]
+            assert decision["decision"] == "promoted"
+    finally:
+        await database.dispose()

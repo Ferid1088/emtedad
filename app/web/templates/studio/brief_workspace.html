@@ -756,7 +756,7 @@
   </table>
   {% endif %}
   {% if llm_costs %}
-  <h3>Modellkosten (tatsächlich, provider-seitig)</h3>
+  <h3>Modellkosten (provider-gemeldet)</h3>
   <table>
     <thead><tr><th>Sprache</th><th>Calls</th><th>Tokens</th><th>Kosten USD</th></tr></thead>
     <tbody>
@@ -765,7 +765,14 @@
         <td>{{ row.language }}</td>
         <td>{{ row.calls }}</td>
         <td>{{ row.tokens }}</td>
-        <td>{{ '%.4f' | format(row.cost_usd) }}</td>
+        <td>
+          {% if row.cost_usd is not none %}
+            {{ '%.4f' | format(row.cost_usd) }}
+            {% if row.calls_with_cost < row.calls %}<span class="muted">({{ row.calls_with_cost }}/{{ row.calls }} Calls)</span>{% endif %}
+          {% else %}
+            <span class="muted">nicht vom Provider gemeldet</span>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

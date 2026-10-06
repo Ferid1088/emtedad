@@ -223,8 +223,6 @@ class _PipelineProvider(_Provider):
             )
         if task in (
             "localization_coverage_translation",
-            "localization_native_reconstruction",
-            "localization_narrative_edit",
             "localization_final_edit",
             "localization_targeted_correction",
         ):
@@ -237,6 +235,38 @@ class _PipelineProvider(_Provider):
                 for i in range(max(1, words // 7))
             )
             return request.output_model.model_validate({"text": sentence})
+        if task in (
+            "localization_native_reconstruction",
+            "localization_narrative_edit",
+        ):
+            # Sectioned writer contract (§13): exactly one entry per
+            # section_id the caller's section_budgets demand — the total
+            # must sit inside the DE 25–30 min band (3250–3900 words).
+            payload = json.loads(request.input_text)
+            budgets = payload.get("section_budgets") or [
+                {"section_id": "s01", "target_words": 3650}
+            ]
+            per = max(40, 3650 // len(budgets))
+            sentence = " ".join(
+                f"Ein deutscher Satz Nummer {i} mit Varianz."
+                for i in range(max(1, per // 7))
+            )
+            return request.output_model.model_validate(
+                {
+                    "sections": [
+                        {"section_id": b["section_id"], "text": sentence}
+                        for b in budgets
+                    ]
+                }
+            )
+        if task.startswith(
+            (
+                "localization_section_patch",
+                "localization_global_patch",
+                "localization_length_",
+            )
+        ):
+            return request.output_model.model_validate({"patches": []})
         if task in (
             "localization_native_critic",
             "localization_audience_critic",

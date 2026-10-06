@@ -299,6 +299,9 @@ Rules:
   it, not just the changed sentences.
 - Fix only what the findings name; preserve every other sentence,
   claim, qualifier, caveat, evidence reference, and epistemic status.
+- Minimal intervention: a good patch changes only the sentences the
+  findings name. Do not restyle, reorder, expand, or compress
+  unaffected sentences — every unrequested change risks new defects.
 - The semantic package is the sole authority — patches may never add
   claims, examples, numbers, or stronger certainty.
 - For TARGET_ONLY / SOURCE_ONLY findings, check the flagged content
@@ -306,6 +309,11 @@ Rules:
   (softened or attributed as the package frames it); otherwise remove or
   rewrite it. Never answer an unsupported claim with a different
   unsupported claim.
+- Every target section carries a word_budget — the replacement must
+  land inside its min_words/max_words range. Removing unsupported
+  content must not collapse the section: rebuild the affected sentences
+  from package-supported material at comparable length instead of
+  deleting outright.
 - Sections you are not asked about do not appear in your output at all.
 - Never emit two patches for the same section.
 - If the findings genuinely cannot be fixed section-by-section (the

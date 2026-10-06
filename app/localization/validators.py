@@ -264,13 +264,9 @@ class ProtectedTerminologyValidator:
         )
         for term in CANONICAL_AYIN_TERMS:
             term_without_marks = _strip_marks(term.persian_form)
-            if not _present_as_word(
-                source_without_marks, term_without_marks
-            ):
+            if not _present_as_word(source_without_marks, term_without_marks):
                 continue
-            if flagged_text is not None and not _term_flagged(
-                term, flagged_text
-            ):
+            if flagged_text is not None and not _term_flagged(term, flagged_text):
                 continue
             expected = term.language_rendering.get(language.value)
             if expected is None:

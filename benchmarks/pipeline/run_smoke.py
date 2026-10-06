@@ -179,9 +179,7 @@ async def main() -> int:
         results.append({"task": "batch_capability", "status": "NOT_AVAILABLE"})
 
         out_path = ARTIFACT_DIR / f"smoke_{int(time.time())}.json"
-        out_path.write_text(
-            json.dumps(results, ensure_ascii=False, indent=2)
-        )
+        out_path.write_text(json.dumps(results, ensure_ascii=False, indent=2))
         print(f"wrote {out_path}")
         return 0 if all(r.get("ok", True) for r in results) else 1
     finally:

@@ -33,9 +33,9 @@ from app.knowledge.llm.apimaster import (
     CallTelemetry,
 )
 from app.knowledge.llm.base import StructuredExtractionRequest
+from app.lecture.domain import PublicationLanguage
 from app.localization.models import LocalizationSemanticPackage
 from app.localization.native_prompts import fidelity_critic_instructions
-from app.lecture.domain import PublicationLanguage
 
 ARTIFACT_DIR = Path(__file__).parent / "artifacts"
 CERT_PACKAGE = UUID("eba81c94-f335-49f1-85c4-4be172f89edc")

@@ -155,7 +155,10 @@ def _supported_material(package_payload: dict[str, object]) -> list[object]:
     fidelity critic itself judges against.
     """
 
-    material: list[object] = list(package_payload.get("claim_ledger") or [])
+    material: list[object] = []
+    ledger = package_payload.get("claim_ledger")
+    if isinstance(ledger, list):
+        material.extend(ledger)
     for key in (
         "causal_constraints",
         "counterarguments",
@@ -914,9 +917,7 @@ class NativeLocalizationPipeline:
             best_raw = work.get("best")
             best = best_raw if isinstance(best_raw, dict) else None
             decisions_raw = work.get("candidate_decisions")
-            decisions = (
-                list(decisions_raw) if isinstance(decisions_raw, list) else []
-            )
+            decisions = list(decisions_raw) if isinstance(decisions_raw, list) else []
             decision_entry: dict[str, object] = {
                 "loop": loop,
                 "candidate_draft_id": str(draft.id),
@@ -941,15 +942,12 @@ class NativeLocalizationPipeline:
                 # best draft and reopen the findings this candidate was
                 # produced to address — they still stand.
                 repairs_raw = work.get("repairs")
-                repairs = (
-                    list(repairs_raw) if isinstance(repairs_raw, list) else []
-                )
+                repairs = list(repairs_raw) if isinstance(repairs_raw, list) else []
                 addressed: list[UUID] = []
                 for entry in repairs:
-                    if (
-                        isinstance(entry, dict)
-                        and entry.get("candidate_draft_id") == str(draft.id)
-                    ):
+                    if isinstance(entry, dict) and entry.get(
+                        "candidate_draft_id"
+                    ) == str(draft.id):
                         entry_addressed = entry.get("addressed") or []
                         addressed = [
                             UUID(str(fid))
@@ -1061,6 +1059,29 @@ class NativeLocalizationPipeline:
         )
         return PatchSetOutput.model_validate(_dump(result))
 
+    @staticmethod
+    def _word_budget_entry(
+        section: ScriptSection, budgets: dict[str, SectionBudget]
+    ) -> dict[str, object]:
+        """The section's length contract for the patch model.
+
+        Without it a repair that removes unsupported content shrinks the
+        section silently and the candidate fails the duration band —
+        the model must rebuild at comparable length instead of deleting.
+        """
+
+        budget = budgets.get(section.section_id)
+        entry: dict[str, object] = {"current_words": section.words}
+        if budget is not None:
+            entry.update(
+                {
+                    "min_words": budget.min_words,
+                    "target_words": budget.target_words,
+                    "max_words": budget.max_words,
+                }
+            )
+        return entry
+
     async def _section_patch_call(
         self,
         run: LocalizationPipelineRun,
@@ -1070,6 +1091,7 @@ class NativeLocalizationPipeline:
         *,
         idx: int,
         section_id: str,
+        budgets: dict[str, SectionBudget] | None = None,
     ) -> PatchSetOutput:
         """One scoped patch call for the findings of a single section."""
 
@@ -1095,6 +1117,7 @@ class NativeLocalizationPipeline:
                     "section_id": section.section_id,
                     "sha256": section.sha256,
                     "text": section.text,
+                    "word_budget": self._word_budget_entry(section, budgets or {}),
                 }
             ],
             "neighbor_context": neighbor_context,
@@ -1129,6 +1152,8 @@ class NativeLocalizationPipeline:
         sections: list[ScriptSection],
         findings: list[ReviewFinding],
         package_payload: dict[str, object],
+        *,
+        budgets: dict[str, SectionBudget] | None = None,
     ) -> PatchSetOutput:
         """Patch call for findings that span the whole script."""
 
@@ -1143,6 +1168,13 @@ class NativeLocalizationPipeline:
         payload: dict[str, object] = {
             "target_script": labeled_script(sections),
             "package": package_payload,
+            "section_budgets": [
+                {
+                    "section_id": s.section_id,
+                    "word_budget": self._word_budget_entry(s, budgets or {}),
+                }
+                for s in sections
+            ],
             "findings": [
                 {
                     "location": f.location,
@@ -1331,13 +1363,19 @@ class NativeLocalizationPipeline:
         for sid, group in by_section.items():
             idx = next(i for i, s in enumerate(sections) if s.section_id == sid)
             output = await self._section_patch_call(
-                run, sections, group, package_payload, idx=idx, section_id=sid
+                run,
+                sections,
+                group,
+                package_payload,
+                idx=idx,
+                section_id=sid,
+                budgets=budgets,
             )
             rewrite_required = rewrite_required or output.full_rewrite_required
             patches.extend(output.patches)
         if global_findings:
             output = await self._global_patch_call(
-                run, sections, global_findings, package_payload
+                run, sections, global_findings, package_payload, budgets=budgets
             )
             rewrite_required = rewrite_required or output.full_rewrite_required
             patches.extend(output.patches)
@@ -1387,11 +1425,12 @@ class NativeLocalizationPipeline:
                     package_payload,
                     idx=idx,
                     section_id=sid,
+                    budgets=budgets,
                 )
                 retry_patches.extend(output.patches)
             if global_findings:
                 output = await self._global_patch_call(
-                    run, sections, global_findings, package_payload
+                    run, sections, global_findings, package_payload, budgets=budgets
                 )
                 retry_patches.extend(output.patches)
             result = apply_patches(sections, PatchSetOutput(patches=retry_patches))
@@ -1495,9 +1534,7 @@ class NativeLocalizationPipeline:
             run_row = await session.get(LocalizationPipelineRun, run_id)
             if run_row is not None:
                 repairs_raw = run_row.work_json.get("repairs")
-                repairs = (
-                    list(repairs_raw) if isinstance(repairs_raw, list) else []
-                )
+                repairs = list(repairs_raw) if isinstance(repairs_raw, list) else []
                 repairs.append(
                     {
                         "candidate_draft_id": str(candidate_draft_id),
@@ -1896,6 +1933,13 @@ class NativeLocalizationPipeline:
             sections = restore_sections(
                 (draft.provenance_json or {}).get("sections"), draft.text
             )
+        budgets_raw = run.work_json.get("section_plan")
+        budgets = budget_map(
+            [
+                SectionBudget.model_validate(b)
+                for b in (budgets_raw if isinstance(budgets_raw, list) else [])
+            ]
+        )
         by_section: dict[str, list[ReviewFinding]] = {}
         global_findings: list[ReviewFinding] = []
         for f in blockers:
@@ -1908,12 +1952,18 @@ class NativeLocalizationPipeline:
         for sid, group in by_section.items():
             idx = next(i for i, s in enumerate(sections) if s.section_id == sid)
             output = await self._section_patch_call(
-                run, sections, group, package_payload, idx=idx, section_id=sid
+                run,
+                sections,
+                group,
+                package_payload,
+                idx=idx,
+                section_id=sid,
+                budgets=budgets,
             )
             patches.extend(output.patches)
         if global_findings:
             output = await self._global_patch_call(
-                run, sections, global_findings, package_payload
+                run, sections, global_findings, package_payload, budgets=budgets
             )
             patches.extend(output.patches)
         result = apply_patches(sections, PatchSetOutput(patches=patches))

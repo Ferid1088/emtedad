@@ -1012,3 +1012,144 @@ async def test_waive_finding_route(studio_client) -> None:
         assert "error=" in response.headers["location"]
     finally:
         await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_approved_stage_cost_truth(studio_client) -> None:
+    """§40: missing provider cost renders as unavailable, never $0.0000.
+
+    One language with all-NULL costs must show the honest label; a second
+    language with partial coverage shows the reported sum plus the
+    coverage count.
+    """
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        import hashlib
+
+        from app.content_engine.domain import DraftStatus, PlanStatus
+        from app.content_engine.models import (
+            ArgumentPlan,
+            NarrativePlan,
+            ScriptDraft,
+        )
+        from app.knowledge.llm.models import LLMCallEvent
+        from app.research.domain import EvidenceMatrixStatus
+        from app.research.models import EvidenceMatrix
+
+        channel = await EditorialChannelService(database).get_channel("emtedad")
+        strategies = await EditorialChannelService(database).list_strategies(channel.id)
+        active = next(s for s in strategies if s.status.value == "ACTIVE")
+        candidate = await TopicService(database).create_manual(
+            channel.id, active.id, question="Cost truth?"
+        )
+        brief = await BriefService(database).create_for_candidate(
+            candidate.id,
+            BriefInput(
+                question="Cost truth?",
+                thesis="T.",
+                target_duration_minutes=27.5,
+            ),
+        )
+        async with database.transaction() as session:
+            matrix = EvidenceMatrix(
+                content_brief_id=brief.id,
+                version_number=1,
+                status=EvidenceMatrixStatus.READY,
+                content_hash=hashlib.sha256(b"matrix").hexdigest(),
+            )
+            session.add(matrix)
+            await session.flush()
+            argument = ArgumentPlan(
+                content_brief_id=brief.id,
+                evidence_matrix_id=matrix.id,
+                version_number=1,
+                status=PlanStatus.READY,
+                content_hash=hashlib.sha256(b"argument").hexdigest(),
+            )
+            session.add(argument)
+            await session.flush()
+            narrative = NarrativePlan(
+                content_brief_id=brief.id,
+                argument_plan_id=argument.id,
+                version_number=1,
+                status=PlanStatus.READY,
+                content_hash=hashlib.sha256(b"narrative").hexdigest(),
+            )
+            session.add(narrative)
+            await session.flush()
+            text = "word " * 3000
+            session.add(
+                ScriptDraft(
+                    content_brief_id=brief.id,
+                    narrative_plan_id=narrative.id,
+                    language="fa",
+                    version_number=1,
+                    text=text,
+                    status=DraftStatus.APPROVED,
+                    provenance_json={},
+                    content_hash=hashlib.sha256(text.encode()).hexdigest(),
+                    target_duration_minutes=27.5,
+                    actual_word_count=3000,
+                )
+            )
+            # de: all calls lack provider cost; en: one of two reported.
+            for _ in range(2):
+                session.add(
+                    LLMCallEvent(
+                        provider="apimaster",
+                        model="gpt-6.1-sol",
+                        agent_role="localization_fidelity_critic",
+                        task="localization_review",
+                        prompt_tokens=100,
+                        completion_tokens=50,
+                        latency_ms=10,
+                        ok=True,
+                        language="de",
+                        content_brief_id=brief.id,
+                        cost_usd=None,
+                    )
+                )
+            session.add(
+                LLMCallEvent(
+                    provider="apimaster",
+                    model="gpt-6.1-sol",
+                    agent_role="localization_fidelity_critic",
+                    task="localization_review",
+                    prompt_tokens=100,
+                    completion_tokens=50,
+                    latency_ms=10,
+                    ok=True,
+                    language="en",
+                    content_brief_id=brief.id,
+                    cost_usd=0.0123,
+                )
+            )
+            session.add(
+                LLMCallEvent(
+                    provider="apimaster",
+                    model="gpt-6.1-sol",
+                    agent_role="localization_fidelity_critic",
+                    task="localization_review",
+                    prompt_tokens=100,
+                    completion_tokens=50,
+                    latency_ms=10,
+                    ok=True,
+                    language="en",
+                    content_brief_id=brief.id,
+                    cost_usd=None,
+                )
+            )
+
+        page = client.get(f"/studio/production/{brief.id}?stage=APPROVED")
+        assert page.status_code == 200
+        body = page.text
+        assert "Modellkosten (provider-gemeldet)" in body
+        assert "nicht vom Provider gemeldet" in body
+        assert "$0.0000" not in body
+        assert "0.0123" in body
+        assert "(1/2 Calls)" in body
+    finally:
+        await database.dispose()

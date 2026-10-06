@@ -263,3 +263,110 @@ recorded as follow-up work, not waived.
 - `run_scope` vocabulary (`production` / `localization` / `dry_run` /
   `ab_test` / `certification`) is consistent but informal — worth
   pinning as an enum in a cleanup phase.
+
+## Certification round 2 — patch repair, retention, Responses, live loops (2026-10-06)
+
+### Architecture changes certified live
+
+- **Section-aware patch repair** (`app/content_engine/patching.py`):
+  deterministic paragraph-group splitting yields stable `section_id`s;
+  every `PatchOp` carries the current section SHA-256; stale/malformed
+  hashes are rejected; findings route to owning sections; at most one
+  full rewrite when the model declares the architecture broken.
+- **Monotonic best-candidate retention**: repair patches and premium
+  edits are candidates compared under a hard ordering (blockers →
+  warnings → fidelity → duration → encoding → findings). Regressions
+  restore the incumbent, archive the loser, reopen exactly the
+  addressed findings, and persist `candidate_decision` provenance.
+  Wired into both `native_pipeline` (DE/EN/AR) and
+  `content_engine.review._retain_best_candidate` (Persian revisions).
+- **Deterministic duration**: per-section word budgets from
+  `NarrativePlanSection`s flow into the writer contract, the
+  length-repair planner, and every patch payload, so deletions cannot
+  silently collapse the spoken band. Length repair operates through
+  patch ops and re-plans against patched text.
+- **Source-aware repair payloads**: `_supported_material()` injects
+  thesis + causal constraints + counterarguments + story facts +
+  unresolved ambiguities (+ claim ledger when present). Root-caused
+  live: the first loop-1 run patched fidelity findings against an empty
+  claim ledger and invented new unsupported content (DE TARGET_ONLY
+  blockers went 2→5→6→3 blind); with the package material present,
+  patches promoted monotonically instead.
+
+### Sol Responses protocol — certified and adopted
+
+Two live loops over real production payloads (fidelity critic + claim
+check), identical inputs on Chat vs Responses: 24/24 calls succeeded,
+schema compliance 100 % both, zero failures, semantically equivalent
+verdicts. Prompt-token reduction: ~41 % on critic payloads
+(~10,560 → ~6,184 avg), ~95 % on narrow claim checks (~4,619 → ~243).
+`model_role_reasoning_protocol=responses` is now the default for Sol;
+telemetry records `requested_protocol`/`actual_protocol`/
+`fallback_used`/`fallback_reason`. Production traffic confirmed on
+`responses` (fidelity critic 8,836 prompt tokens vs ~12k on chat).
+
+### Patch economics
+
+Section patch calls run ~4–6.6k prompt / ~0.5–1.6k completion tokens
+vs ~12–15.9k / ~15.5k for whole-script review+correction — ≈60 % input
+and ≈89 % output reduction per repair call, and only affected sections
+are rewritten.
+
+### Live multilingual certification
+
+Topic 1 (package from approved Persian master):
+
+| lang | outcome | duration | decisions | premium |
+|---|---|---|---|---|
+| DE | READY_FOR_VOICE | 25.2 min | seeded→promoted→promoted | accepted |
+| EN | READY_FOR_VOICE | 25.2 min | seeded→promoted | accepted |
+| AR | READY_FOR_VOICE | 25.6 min | seeded→promoted | rejected → pre-Astra best restored |
+
+Topic 2 (package `7550261f-3418-4b7b-8cf4-1de30704de4a`, source draft
+`1ceed5e5`):
+
+| lang | outcome | notes |
+|---|---|---|
+| EN | READY_FOR_VOICE | 25.2 min, 3528 words, premium accepted, one bounded duration repair |
+| DE | READY_FOR_VOICE | 25.6 min, 3325 words — two honest budget exhaustions (7→4→2 blockers), fresh run converged; Astra premium regressed → `premium_rejected`, pre-premium best restored and certified |
+| AR | BLOCKED (2 runs) | run 1: converged pre-premium, Astra 5xx edge timeouts (524×4, 503×1 at ~770s), premium attempt 3 succeeded but regressed at the final gate → repair failed → restored best failed re-gate → BLOCKED; run 2 (fresh): 4 loops, 2 residual FIDELITY blockers → BLOCKED |
+
+### Cost truth
+
+Studio now aggregates provider-reported cost only: `cost_usd` NULLs
+stay unavailable ("nicht vom Provider gemeldet"), never rendered as
+`$0.0000`; the UI shows calls-with-cost vs total calls. Dry-run
+telemetry across both certification topics: 975 calls, 44 with
+provider-reported cost ($1.62 total). Reporting is inconsistent
+upstream: provider-namespaced model IDs (`openai/gpt-6-astra`,
+`google/gemini-3.8-flash`, `openai/gpt-6.1-sol`) return cost, bare IDs
+do not — 34/34 and 9/11 vs 0/557 and 0/351. Market-rate estimate for
+topic-2 alone was $3.72–$4.03 (https://apimaster.ai/api/pricing); the
+true total remains an estimate until APIMaster reports cost
+consistently.
+
+### Regression
+
+- ruff check / format: clean. mypy strict: clean.
+- Unit: 416 passed (incl. patch engine, eligibility, retention,
+  supported-material, Responses protocol, firewall tests).
+- Integration: 118 passed, 7 deselected (incl. candidate
+  promote/reject-restore, cost-truth UI, gate stub updated for
+  sectioned writer output).
+
+### Unresolved risks carried forward
+
+- **Astra premium edge timeouts**: single non-streaming calls
+  generating ~3k-word edits intermittently exceed the APIMaster edge
+  timeout (~380s/attempt → 524). Transient in aggregate (topic-1 AR
+  succeeded after two failures) but systematic under congestion;
+  options: spaced retries (implemented ad hoc), streaming transport,
+  or sectioned premium output.
+- **Provider cost reporting**: APIMaster does not return `cost` fields
+  for these models — actual spend is a market-rate estimate, and the
+  UI/telemetry now say so honestly.
+- **Topic-specific convergence**: topic-2 DE needed >4 repair loops
+  (heavier unsupported-claim surface); budgets stayed honest rather
+  than waiving.
+- SQLAlchemy pooled-connection cleanup warnings in integration teardown
+  (cosmetic; no failures).

@@ -308,9 +308,7 @@ async def run_loop(db: Database, loop: int) -> dict[str, Any]:
             "angle": brief.angle,
             "target_audience": brief.target_audience,
         }
-        roles: list[
-            tuple[str, str, dict[str, object], type[BaseModel]]
-        ] = [
+        roles: list[tuple[str, str, dict[str, object], type[BaseModel]]] = [
             (
                 "SEARCH_PLANNER",
                 PLANNER_INSTRUCTIONS,

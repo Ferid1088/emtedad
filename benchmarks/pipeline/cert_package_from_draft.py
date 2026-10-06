@@ -1,15 +1,13 @@
-"""Build a certification LocalizationSemanticPackage from an Astra script.
+"""Certification package from an existing Persian draft (loop-2 topics).
 
-Reads an ``astra_fa_loop`` artifact, persists its script as a
-``lineage='dry_run'`` Persian ScriptDraft (status DRAFT — never approved,
-never owner state), then builds the semantic package with the same Sol
-extraction task the production service uses. The owner-approval gate in
-``SemanticPackageService.create_for_draft`` stays intact; this benchmark
-path declares provenance via ``created_by='dry_run_astra'`` and a dry_run
-lineage draft row.
+``make_cert_package.py`` ingests an Astra artifact; this variant pins an
+already-persisted Persian draft's text as a ``lineage='dry_run'``
+certification source and builds the semantic package through the same
+Sol extraction task as production. The owner-approval gate is untouched —
+the package is current only while the pinned text is unchanged, and it
+is truthfully marked ``certification='dry_run_pinned'``.
 
-    uv run python -m benchmarks.pipeline.make_cert_package \
-        benchmarks/pipeline/artifacts/astra_fa_loop2_*.json
+    uv run python -m benchmarks.pipeline.cert_package_from_draft <draft_id>
 """
 
 from __future__ import annotations
@@ -18,19 +16,14 @@ import asyncio
 import hashlib
 import json
 import sys
-from pathlib import Path
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.briefs import models as _brief_models  # noqa: F401
 from app.content_engine import models as _ce_models  # noqa: F401
 from app.content_engine.domain import DraftStatus
-from app.content_engine.models import (
-    ArgumentPlan,
-    NarrativePlan,
-    ScriptDraft,
-)
+from app.content_engine.models import ScriptDraft
 from app.core.config import get_settings
 from app.db.session import Database
 from app.knowledge.llm.base import StructuredExtractionRequest
@@ -52,53 +45,14 @@ from app.topics import models as _topic_models  # noqa: F401
 OVERRIDES: dict[str, object] = {"llm_routing_enabled": True}
 
 
-def _best_text(artifact: dict[str, object]) -> str:
-    """The highest-scoring text: raw script or its best revision."""
-
-    candidates: dict[str, str] = {
-        "script": str(artifact["script"]["text"])  # type: ignore[index]
-    }
-
-    def _score(crit: object) -> float:
-        if not isinstance(crit, dict):
-            return 0.0
-        n = (crit.get("native_critic") or {}).get("score") or 0  # type: ignore[union-attr]
-        e = (crit.get("evidence_critic") or {}).get("score") or 0  # type: ignore[union-attr]
-        return float(n) + float(e)
-
-    scores: dict[str, float] = {"script": _score(artifact)}
-    for key, value in artifact.items():
-        if not str(key).startswith("revision") or not isinstance(value, dict):
-            continue
-        candidates[key] = str(value.get("text") or "")
-        scores[key] = _score(artifact.get(f"critics_after_{key}"))
-    best = max(candidates, key=lambda k: scores.get(k, 0.0))
-    print(f"using {best} (score {scores.get(best, 0.0)})")
-    return candidates[best]
-
-
-async def main(artifact_path: Path) -> int:
-    artifact = json.loads(artifact_path.read_text())
-    brief_id = UUID(artifact["brief_id"])
-    script_text = _best_text(artifact)
-    book_refs = artifact["semantic_master"]["output"].get("allowed_book_references", [])
+async def main(draft_id: UUID) -> int:
     db = Database(get_settings().database_url.get_secret_value())
     try:
-        content_hash = hashlib.sha256(script_text.encode()).hexdigest()
         async with db.transaction() as session:
-            # The draft row needs the brief's narrative plan FK.
-            narrative_plan_id = await session.scalar(
-                select(NarrativePlan.id)
-                .join(
-                    ArgumentPlan,
-                    NarrativePlan.argument_plan_id == ArgumentPlan.id,
-                )
-                .where(ArgumentPlan.content_brief_id == brief_id)
-                .order_by(NarrativePlan.created_at.desc())
-                .limit(1)
-            )
-            if narrative_plan_id is None:
-                raise SystemExit(f"no narrative plan found for brief {brief_id}")
+            source = await session.get(ScriptDraft, draft_id)
+            if source is None or source.language != "fa":
+                raise SystemExit(f"no Persian draft {draft_id}")
+            content_hash = hashlib.sha256(source.text.encode()).hexdigest()
             existing = await session.scalar(
                 select(ScriptDraft).where(
                     ScriptDraft.content_hash == content_hash,
@@ -108,33 +62,50 @@ async def main(artifact_path: Path) -> int:
             if existing is not None:
                 draft = existing
             else:
+                # 101+ keeps the (brief, language, version) constraint
+                # clear of real primary drafts (v1..).
+                next_version = (
+                    await session.scalar(
+                        select(
+                            func.coalesce(func.max(ScriptDraft.version_number), 100)
+                        ).where(
+                            ScriptDraft.content_brief_id == source.content_brief_id,
+                            ScriptDraft.language == "fa",
+                            ScriptDraft.lineage == "dry_run",
+                        )
+                    )
+                    or 100
+                ) + 1
                 draft = ScriptDraft(
                     id=uuid4(),
-                    content_brief_id=brief_id,
-                    narrative_plan_id=narrative_plan_id,
+                    content_brief_id=source.content_brief_id,
+                    narrative_plan_id=source.narrative_plan_id,
                     language="fa",
                     lineage="dry_run",
-                    # 101 keeps the (brief, language, version) unique
-                    # constraint clear of real primary drafts (v1..).
-                    version_number=101,
+                    version_number=next_version,
                     status=DraftStatus.DRAFT,
-                    text=script_text,
+                    text=source.text,
                     content_hash=content_hash,
-                    target_duration_minutes=27.5,
-                    actual_word_count=len(script_text.split()),
-                    # FA spoken pace is ~110 wpm (studio speech_wpm).
-                    estimated_duration_seconds=int(len(script_text.split()) / 110 * 60),
+                    target_duration_minutes=source.target_duration_minutes,
+                    actual_word_count=len(source.text.split()),
+                    estimated_duration_seconds=int(len(source.text.split()) / 110 * 60),
                     provenance_json={
-                        "source": "astra_persian_writer benchmark",
-                        "artifact": artifact_path.name,
+                        "source": "certification pin of existing draft",
+                        "pinned_from_draft": str(source.id),
+                        "pinned_from_lineage": source.lineage,
                         "approved_by": "",
-                        "book_references": book_refs,
-                        "created_by": "dry_run_astra",
+                        "book_references": source.provenance_json.get(
+                            "book_references", []
+                        ),
+                        "created_by": "dry_run_pinned",
                     },
                 )
                 session.add(draft)
                 await session.flush()
             draft_id = draft.id
+            brief_id = draft.content_brief_id
+            script_text = draft.text
+            book_refs = draft.provenance_json.get("book_references", [])
         print(f"draft={draft_id} (lineage=dry_run, status=DRAFT)")
 
         provider = resolve_llm_provider(
@@ -191,18 +162,15 @@ async def main(artifact_path: Path) -> int:
                 "source_draft_hash": content_hash,
                 "lecture_master_version_id": None,
                 "approved_by": "",
-                "certification": "dry_run_astra",
+                "certification": "dry_run_pinned",
             },
         }
         async with db.transaction() as session:
             version = (
                 await session.scalar(
                     select(
-                        __import__("sqlalchemy").func.coalesce(
-                            __import__("sqlalchemy").func.max(
-                                LocalizationSemanticPackage.version_number
-                            ),
-                            0,
+                        func.coalesce(
+                            func.max(LocalizationSemanticPackage.version_number), 0
                         )
                     ).where(LocalizationSemanticPackage.script_draft_id == draft_id)
                 )
@@ -219,9 +187,9 @@ async def main(artifact_path: Path) -> int:
                 provenance_json={
                     "prompt_version": PACKAGE_PROMPT_VERSION,
                     "agent_role": AgentRole.SEMANTIC_PACKAGE.value,
-                    "certification": "dry_run_astra",
+                    "certification": "dry_run_pinned",
                 },
-                created_by="dry_run_astra",
+                created_by="dry_run_pinned",
             )
             session.add(package)
             await session.flush()
@@ -233,5 +201,5 @@ async def main(artifact_path: Path) -> int:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        raise SystemExit("usage: make_cert_package <astra_artifact.json>")
-    raise SystemExit(asyncio.run(main(Path(sys.argv[1]))))
+        raise SystemExit("usage: cert_package_from_draft <draft_id>")
+    raise SystemExit(asyncio.run(main(UUID(sys.argv[1]))))
