@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198145-tF9nG4OsT8BOPoVNs5tl",
+ "object": "chat.completion",
+ "created": 1791198145,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "GMICloud",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "کتاب *«انسان خردمند»* نوشتهٔ یووال نوح هراری، یکی از آثار بحث‌برانگیز و پرفروش دههٔ اخیر در حوزهٔ تاریخ و فلسفهٔ تمدن است. یکی از ادعاهای جنجالی هراری این است که انقلاب معرفتی انسان نه به‌خاطر هوش بالاترش بوده، بلکه به‌دلیل توانایی‌اش در داستان‌سرایی جمعی — مثل باور به خدایان، ملت‌ها یا پول — بوده است. او معتقد است این توانایی تخیلی، انسان را از یک حیوان نسبتاً بی‌اهمیت به برترین گونهٔ زمین تبدیل کرده. البته منتقدان می‌گویند این دیدگاه بیش‌ازحد ساده‌انگارانه و غرب‌زده است و نقش فرهنگ‌های غیرغربی را کمرنگ می‌کند.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 437,
+  "completion_tokens": 444,
+  "total_tokens": 881,
+  "cost": 0.0001936375,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0001936375,
+   "upstream_inference_prompt_cost": 3.82375e-05,
+   "upstream_inference_completions_cost": 0.0001554
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

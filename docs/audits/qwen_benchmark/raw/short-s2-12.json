@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198210-5Ju5nz3C2qDV4fwvFgg8",
+ "object": "chat.completion",
+ "created": 1791198210,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Google",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "STOP",
+   "message": {
+    "role": "assistant",
+    "content": "فهمیدن خودمون شاید هیچ‌وقت کامل نشه. و شاید هم نباید باشه. ما انگار توی این راهِ پیچ‌درپیچِ خودشناخت، بیشتر از اینکه به جواب‌ها برسیم، به سوال‌ها عادت می‌کنیم. یه سوالِ باز مونده، یه تناقضِ درونی که دیگه حالا بهش عادت کردیم، شاید خودش یه نوع نزدیکی به خودمون باشه. پس شاید به جای گشتن بعد از یه هویتِ کامل و قطعی، بهتره کمی بیشتر گم شد، و کمی بیشتر با این گم‌شدگی آشنا شد. شما چی فکر می‌کنید؟",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 411,
+  "completion_tokens": 331,
+  "total_tokens": 742,
+  "cost": 0.00043375,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00043375,
+   "upstream_inference_prompt_cost": 0.00010275,
+   "upstream_inference_completions_cost": 0.000331
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

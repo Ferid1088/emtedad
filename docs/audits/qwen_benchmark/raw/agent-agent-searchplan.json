@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198505-9yHuMDUDl8wtkiQNPq9R",
+ "object": "chat.completion",
+ "created": 1791198505,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Google",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\"queries\": [\n  \"scientific evidence on emotional recovery through silence and solitude\",\n  \"تأثیر سکوت و تنهایی بر بهبود سلامت روان: مطالعات عصب‌شناختی\",\n  \"neurobiological effects of solitude on emotional regulation peer-reviewed studies\",\n  \"شواهد تجربی از بازسازی عاطفی در محیط‌های بدون محرک اجتماعی\"\n]}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 83,
+  "completion_tokens": 104,
+  "total_tokens": 187,
+  "cost": 0.00010978,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 2,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00010978,
+   "upstream_inference_prompt_cost": 1.826e-05,
+   "upstream_inference_completions_cost": 9.152e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

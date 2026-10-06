@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197892-mxzmD22oXmAKQASxDDrK",
+ "object": "chat.completion",
+ "created": 1791197892,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "سوالِ اینکه «آیا ارادهٔ آزاد داریم؟» یکی از قدیمی‌ترین و در عین حال بی‌پاسخ‌ترین پرسش‌های فلسفی است. از یک سو، تجربهٔ درونی ما حاکی از این است که می‌توانیم انتخاب کنیم: مثلاً الان تصمیم بگیریم بلغزنیم یا نه، یا صبح از راه‌های مختلف به محل کار برویم. این حسِ \"من می‌توانستم غیر از این کار کنم\" خیلی قوی است. اما از سوی دیگر، اگر همهٔ چیز — از جمله ذهن و شرایط محیطی — تحت قانون‌های طبیعی باشد، آیا واقعاً انتخاب آزادانه وجود دارد؟ یا همهٔ تصمیماتمان نتیجهٔ زنجیره‌ای از علت و معلول است که از قبل تعیین شده؟ بعضی فیلسوفان می‌گویند ارادهٔ آزاد با بخشیدن مسئولیت معنا پیدا می‌کند؛ بدون آن، تقصیر یا ستایش بی‌معنی می‌شود. ولی بعضی دیگر معتقدند حتی اگر آزادی به معنای کامل نداشته باشیم، نوعی «آزادی عمل» در چارچوب شرایطمان وجود دارد. در نهایت، پاسخ قطعی نداریم. مهم این است که بپذیریم این سوال هنوز باز است — و شاید همین ابهام، فضایی برای تفکر و مسئولیت فردی باقی می‌گذارد.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 307,
+  "completion_tokens": 512,
+  "total_tokens": 819,
+  "cost": 0.00032459,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00032459,
+   "upstream_inference_prompt_cost": 2.763e-05,
+   "upstream_inference_completions_cost": 0.00029696
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

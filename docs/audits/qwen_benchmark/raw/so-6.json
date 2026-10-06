@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197701-S9dZYgtNz9QysqmzllHe",
+ "object": "chat.completion",
+ "created": 1791197701,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\n  \"classification\": \"CONTESTED\",\n  \"reason_fa\": \"این گزاره بیان می‌کند که پژوهش‌ها دربارهٔ رابطهٔ رسانه‌های اجتماعی و افسردگی نوجوانان نتایج متناقضی ارائه داده‌اند، که نشان‌دهندهٔ وجود اختلاف نظر علمی و عدم قطعیت در یک نتیجه واحد است. بنابراین، موضوع هنوز در حال بحث و مناقشه است و طبقه‌بندی مناسب «CONTESTED» (مورد مناقشه) می‌باشد.\"\n}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 104,
+  "completion_tokens": 172,
+  "total_tokens": 276,
+  "cost": 0.00010912,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00010912,
+   "upstream_inference_prompt_cost": 9.36e-06,
+   "upstream_inference_completions_cost": 9.976e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

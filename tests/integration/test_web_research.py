@@ -90,7 +90,9 @@ class TestSettingsService:
         service = StudioSettingsService(database, settings)
         effective = await service.effective()
         assert effective["web_research_enabled"] is False
-        assert effective["web_research_provider"] == "openrouter"
+        # Retrieval defaults to a real URL backend; the APIMaster LLM
+        # answer path was demoted — it cannot supply verifiable URLs.
+        assert effective["web_research_provider"] == "tavily"
         assert effective["target_duration_default_minutes"] == 27.5
         assert effective["units_per_video_minute"] == 1.5
 
@@ -134,7 +136,7 @@ class TestImportWebResource:
             url="https://example.com/article",
             title="Example article",
             text=_PAGE_TEXT,
-            provider="openrouter",
+            provider="apimaster",
             query="test query",
             answer_text="synthesized answer must not be evidence",
             schedule=False,

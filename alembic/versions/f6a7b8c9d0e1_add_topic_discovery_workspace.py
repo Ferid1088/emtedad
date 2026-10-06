@@ -1,8 +1,9 @@
 """Add persistent dynamic topic discovery batches and workspace state."""
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "f6a7b8c9d0e1"
 down_revision = "e4f5a6b7c8d9"

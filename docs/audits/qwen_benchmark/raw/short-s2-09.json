@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198152-7kvWUyCGz2iXXptidJ7j",
+ "object": "chat.completion",
+ "created": 1791198152,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "کتاب *The Body Keeps the Score* نوشتهٔ بسل فان در کولک، یکی از مهم‌ترین منابع در حوزهٔ تروما و روان‌درمانی است. این کتاب نشان می‌دهد که چگونه تجربیات آسیب‌زا به شکل فیزیکی و عصبی در بدن ثبت می‌شوند و روی عملکرد مغز، احساسات و رفتار تأثیر می‌گذارند. فان در کولک با ترکیب نورولوژی، روان‌درمانی و تجربیات بالینی، راه‌هایی مثل یوگا، حرکت، هنر و روان‌درمانی را برای بازسازی ارتباط با بدن پیشنهاد می‌دهد. این کتاب به‌خوبی توجه جامعهٔ علمی و عمومی را جلب کرده، اما یک نقد رایج این است که گاهی شواهد علمی پشت برخی روش‌های پیشنهادی، مثل درمان‌های جایگزین، ضعیف یا غیرقطعی است و ممکن است نویسنده بیش‌ازحد به آنها اعتماد کند. با این حال، تأثیر کتاب در آگاهی‌بخشی دربارهٔ تروما بی‌بدیل است.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 304,
+  "completion_tokens": 387,
+  "total_tokens": 691,
+  "cost": 0.00033344,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 208,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00033344,
+   "upstream_inference_prompt_cost": 2.384e-05,
+   "upstream_inference_completions_cost": 0.0003096
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

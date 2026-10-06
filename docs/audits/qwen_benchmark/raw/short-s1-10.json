@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197956-aKXrnu9NuGoPkIi4dR7M",
+ "object": "chat.completion",
+ "created": 1791197956,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "آرمان‌شهرِ جورج اورول در کتاب *1984* در واقع یک کابوس سیاسی است، نه رویایی انسانی. این جهان، جایی است که حقیقت نه تنها کنترل می‌شود، بلکه به‌طور مداوم ساخته و دوباره ساخته می‌شود. حکومت تمام‌الاختیار، از طریق نظارت گسترده، دستکاری زبان و تغییر تاریخ، ذهن شهروندان را تسخیر کرده است. حتی عشق و خاطرات شخصی هم از سوی نظام کنترل می‌شوند. اورول با دقت وحشتناکی نشان می‌دهد که چگونه قدرت می‌تواند واقعیت را منحصراً برای حفظ خودش بازتعریف کند.\n\nاما نقد این آرمان‌شهر این است که اورول، در ترس از دیکتاتوری، شاید انسان را بیش از حد فرمان‌بردار و بی‌اراده نشان داده است. در دنیای واقعی، حتی در سخت‌ترین رژیم‌ها، مقاومت، شک و خلاقیت انسانی کاملاً نابود نشده‌اند. همچنین، تمرکز شدید او بر کنترل افکار، گاه به سمت یک نگرش تقریباً گنایی گرایش پیدا می‌کند — گویی ذهن تنها صحنهٔ نبرد است، در حالی که زندگی اجتماعی و عاطفی پیچیده‌تر از این ساده‌انگاری است. با این همه، هشدار او هنوز تازه و ضروری است.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 318,
+  "completion_tokens": 518,
+  "total_tokens": 836,
+  "cost": 0.00045892,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00045892,
+   "upstream_inference_prompt_cost": 4.452e-05,
+   "upstream_inference_completions_cost": 0.0004144
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

@@ -1,0 +1,262 @@
+[
+ {
+  "case_id": "s1-01",
+  "naturalness": 7,
+  "spoken_fluency": 7,
+  "grammar": 8,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 6,
+  "epistemic_honesty": 7,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 6,
+  "attribution_discipline": 9,
+  "flags": [
+   "laptop metaphor feels imported from English pop-science",
+   "'سیستم اجرایی مغز' is technical for a friendly chat",
+   "mixed formal/dialectal registers ('نشون می‌دی' vs 'ترش می‌کنه')",
+   "slightly over the 150-word target"
+  ],
+  "notes": "Mostly natural spoken Persian; minor register drift and simplified neuroscience claims."
+ },
+ {
+  "case_id": "s1-02",
+  "naturalness": 7,
+  "spoken_fluency": 6,
+  "grammar": 8,
+  "idiomatic_vocabulary": 6,
+  "semantic_correctness": 9,
+  "terminology": 8,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 5,
+  "attribution_discipline": 9,
+  "flags": [
+   "register slips: starts written ('ایجاد می‌شود', 'درحالی که') then switches to spoken ('می‌تونه', 'مهربون‌تر')",
+   "'نشانهٔ چیزی عمیق‌تر مثل افسردگی' slightly overclaims a mood-depression link",
+   "written-style em-dash scaffolding feels translated"
+  ],
+  "notes": "Content accurate; register inconsistency between formal و informal Persian is the main flaw."
+ },
+ {
+  "case_id": "s1-03",
+  "naturalness": 6,
+  "spoken_fluency": 6,
+  "grammar": 8,
+  "idiomatic_vocabulary": 5,
+  "semantic_correctness": 8,
+  "terminology": 8,
+  "nuance": 7,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 4,
+  "attribution_discipline": 9,
+  "flags": [
+   "'آبمیوه‌های یخی' is an odd calque — the canonical example is ice cream, and 'آبمیوه یخی' is not a common Persian term",
+   "formal verbs ('تغییر می‌کنند', 'افزایش می‌ده') mixed with spoken ('می‌شه', 'میرن')",
+   "'طبیعی به نظر میاد بگیم' awkward word order"
+  ],
+  "notes": "Classic ice-cream/drowning example translated awkwardly; inconsistent register lowers fluency."
+ },
+ {
+  "case_id": "s1-04",
+  "naturalness": 6,
+  "spoken_fluency": 5,
+  "grammar": 8,
+  "idiomatic_vocabulary": 5,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 9,
+  "instruction_following": 8,
+  "repetition_freedom": 7,
+  "native_not_translated": 4,
+  "attribution_discipline": 8,
+  "flags": [
+   "'بلغزنیم' is a strange choice for an example of free choice (means 'to slip') — likely a mistranslation",
+   "heavily written/literary register throughout, English-style periodic sentences",
+   "'حاکی از این است که' is bookish for this genre",
+   "quoted phrase uses English-style double quotes in Persian text"
+  ],
+  "notes": "Preserves the question's openness well but reads like translated expository prose, not conceived Persian."
+ },
+ {
+  "case_id": "s1-05",
+  "naturalness": 5,
+  "spoken_fluency": 4,
+  "grammar": 8,
+  "idiomatic_vocabulary": 4,
+  "semantic_correctness": 9,
+  "terminology": 7,
+  "nuance": 9,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 3,
+  "attribution_discipline": 8,
+  "flags": [
+   "markdown asterisks leaked into spoken text (*شبکه‌ای از عوامل*, *محتمل‌تر*)",
+   "'تغییرات اقلیمی' is a translated term for historical context",
+   "dense subordinate-clause structure modeled on English academic prose",
+   "'نمی‌تواند تنها به یک علت نسبت داده شود' passivized English-like construction"
+  ],
+  "notes": "Historiographically sound argument; the prose is distinctly translated-academic, and markdown leakage violates the spoken format."
+ },
+ {
+  "case_id": "s1-06",
+  "naturalness": 6,
+  "spoken_fluency": 5,
+  "grammar": 8,
+  "idiomatic_vocabulary": 5,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 4,
+  "attribution_discipline": 8,
+  "flags": [
+   "'پرخطر' is nonstandard — should be 'پرخطر/خطرناک' → 'خطرناک' intended; 'پرخطر' is awkward",
+   "'فلج عاطفی' and 'جدایی از واقعیت' are clinical translations (dissociation/derealization rendered loosely)",
+   "consistently written register despite conversational framing of the task family",
+   "'تعمیم آن به عنوان راه‌حل جهانی' heavy noun-phrase style"
+  ],
+  "notes": "Fair and genuinely strong counterargument; execution is formal-written rather than natural Persian."
+ },
+ {
+  "case_id": "s1-07",
+  "naturalness": 7,
+  "spoken_fluency": 7,
+  "grammar": 7,
+  "idiomatic_vocabulary": 6,
+  "semantic_correctness": 8,
+  "terminology": 6,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 7,
+  "native_not_translated": 5,
+  "attribution_discipline": 8,
+  "flags": [
+   "'با صدای بلند اعتراض کنیم، فرار کنیم، سکوت کنیم یا تعریف کنیم' — 'تعریف کردن' (praising) doesn't fit the list of defensive habits; likely mistranslation of a term like 'placate'",
+   "mixed registers again ('میشه/می‌کنن' vs 'حرف می‌زنه')",
+   "'دو انسانِ ناقص که دارن سعی می‌کنن به هم گوش بدن' is fine but the closing aphorism flirts with cliché"
+  ],
+  "notes": "Avoids gender stereotypes as instructed; one semantically wrong verb and register mixing hurt fluency."
+ },
+ {
+  "case_id": "s1-08",
+  "naturalness": 5,
+  "spoken_fluency": 4,
+  "grammar": 6,
+  "idiomatic_vocabulary": 4,
+  "semantic_correctness": 8,
+  "terminology": 6,
+  "nuance": 9,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 3,
+  "attribution_discipline": 8,
+  "flags": [
+   "untranslated English word '-threatening' left inline — serious code-switch/formatting failure",
+   "'درگیرِ فرهنگ ... هم هست' awkward opening",
+   "'ذاتاً بدیم' colloquially odd in a formal paragraph",
+   "uniformly written register; hedges well against evolutionary just-so stories"
+  ],
+  "notes": "Epistemically careful and covers all three requested angles, but the stray English token and translated syntax are clear flaws."
+ },
+ {
+  "case_id": "s1-09",
+  "naturalness": 7,
+  "spoken_fluency": 7,
+  "grammar": 7,
+  "idiomatic_vocabulary": 6,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 7,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 7,
+  "native_not_translated": 6,
+  "attribution_discipline": 9,
+  "flags": [
+   "book referenced indirectly without title or fabricated quote — good discipline, though prompt asked to name the book '«Thinking, Fast and Slow»' which it never does",
+   "'یه روانشناس اسرائیلی' — Kahneman is Israeli-American; defensible but imprecise",
+   "'ماشین دوسرعته' is a slightly forced metaphor",
+   "some repetition of 'سریع/سرعت'"
+  ],
+  "notes": "Natural spoken flow; loses points for not actually naming the book the prompt asked it to reference."
+ },
+ {
+  "case_id": "s1-10",
+  "naturalness": 5,
+  "spoken_fluency": 4,
+  "grammar": 8,
+  "idiomatic_vocabulary": 4,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 8,
+  "repetition_freedom": 8,
+  "native_not_translated": 3,
+  "attribution_discipline": 8,
+  "flags": [
+   "'آرمان‌شهر' (utopia) misapplied — 1984 is a dystopia; Persian convention is 'دیستوپیا/واقع‌نمایه', calling it آرمان‌شهر is a terminology error even framed ironically",
+   "'نگرش تقریباً گنایی' is an obscure calque ('gnomic'?), unclear in Persian",
+   "markdown asterisks around *1984* leak formatting",
+   "highly literary register throughout, English-style periodic sentences"
+  ],
+  "notes": "Genuine critique and no fabricated quotes, but the utopia mislabel and translated-essay register are real problems."
+ },
+ {
+  "case_id": "s1-11",
+  "naturalness": 6,
+  "spoken_fluency": 5,
+  "grammar": 8,
+  "idiomatic_vocabulary": 5,
+  "semantic_correctness": 9,
+  "terminology": 8,
+  "nuance": 7,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 9,
+  "native_not_translated": 5,
+  "attribution_discipline": 9,
+  "flags": [
+   "Korzybski is never named though the prompt frames the idea as attributed to him — mild attribution gap",
+   "'فیلترهای محدود' is a calque",
+   "fully written register; fine for a paraphrase task but stiff"
+  ],
+  "notes": "Accurate paraphrase, no fake quote, correct idea; omits the thinker's name and reads translated."
+ },
+ {
+  "case_id": "s1-12",
+  "naturalness": 7,
+  "spoken_fluency": 7,
+  "grammar": 8,
+  "idiomatic_vocabulary": 6,
+  "semantic_correctness": 8,
+  "terminology": 6,
+  "nuance": 6,
+  "epistemic_honesty": 8,
+  "instruction_following": 7,
+  "repetition_freedom": 7,
+  "native_not_translated": 6,
+  "attribution_discipline": 8,
+  "flags": [
+   "ZWNJ mostly correct ('می‌کنند', 'خانواده‌ات') but inconsistent: 'میشه', 'می‌تونه' mix half-space and joined forms",
+   "guillemets used correctly but question marks inside them are fine; the '…' ellipsis is used correctly yet twice — borderline overuse",
+   "clichéd motivational register ('عادت‌های کوچیک، تفاوت‌های بزرگ می‌سازن')",
+   "'یه یادداشت کوچیک از اهداف روزم بنویسم' slightly awkward"
+  ],
+  "notes": "Hits the punctuation checklist competently; content is pleasant but generic, and ZWNJ usage is inconsistent."
+ }
+]

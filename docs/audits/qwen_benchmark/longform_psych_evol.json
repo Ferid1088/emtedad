@@ -1,0 +1,445 @@
+{
+ "brief_id": "61d3f6eb-d81b-44ec-9c09-9988a479cd8e",
+ "tag": "psych_evol",
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "narrative_plan_id": "b6c15c77-1044-4ffb-8eb5-b4afa8a934c7",
+ "word_count": 1250,
+ "duration_minutes": 11.36,
+ "wpm": 110,
+ "generation_seconds": 342.1,
+ "text_sha256": "c829a8bdcb5d852548d77ed0ed2f67ed317a73ebc690b89dedfa8b05a8584e27",
+ "text": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید. برای اینکه در گروه بمانید، حمایت کنید، حمایت بگیرید، عشق بورزید و عشق ببینید. این نیاز به ارتباط عمیق تنها یک تمایل عاطفی نیست — یک ضرورت بقا بوده است. انسان‌های اولیه که از گروه جدا می‌شدند، شانس بسیار کمی برای زنده ماندن داشتند. بنابراین مغز ما به گونه‌ای شکل گرفته که تشخیص ارتباط، ایجاد پیوند و حفظ آن را به عنوان یک اولویت بیولوژیکی قرار دهد. سیستم عصبی ما به طور خودکار به علائم پذیرش و ردپذیرش واکنش نشان می‌دهد. وقتی احساس تعلق می‌کنیم، بدن ما آرام می‌گیرد، قلب ما می‌زند با یک ریتم ثابت، تنفس ما عمیق می‌شود. اما وقتی احساس طرد شدن می‌کنیم، سیستم عصبی ما فرمان هشدار می‌دهد: خطر است. این واکنش تنها در گذشته نبوده — هنوز هم در هر باری که در جمع احساس تنهایی می‌کنیم، وقتی نظری نمی‌گیریم، وقتی حرفمان را قطع می‌کنند، بدن ما همان پاسخ قدیمی را می‌دهد. اما حالا در دنیایی زندگی می‌کنیم که به جای تقویت این نیاز اساسی، از ما می‌خواهد بی‌حس شویم. از ما انتظار می‌رود همیشه کامل باشیم، همیشه مطمئن باشیم، همیشه کنترل داشته باشیم. در خانواده، در کار، در شبکه‌های اجتماعی — اگر ضعفی نشان دهی، اگر شک کنی، اگر گریه کنی، گاهی انگار داری از لیست قابلیت‌های انسانی حذف می‌شوی. ما به جای اینکه درد را بپذیریم به عنوان بخشی از تجربه انسانی، آن را نشانه‌ای از ضعف می‌دانیم. به جای اینکه گفتگو کنیم درباره ترس‌هایمان، آنها را مخفی می‌کنیم. به جای اینکه بگوییم «من نمی‌دانم»، فریب می‌دهیم. به جای اینکه بگوییم «من نیاز دارم»، تظاهر به استقلال می‌کنیم. این فرهنگ کمال‌گرایی و قطعیت، نه تنها واقعیت را نادیده می‌گیرد، بلکه با ذات عمیق ما در تضاد است. ما موجوداتی شکننده، نامطمئن، ناکامل هستیم — اما فرهنگ مدرن از ما می‌خواهد که این حقیقت را انکار کنیم. پس سوال اینجاست: اگر ذات ما ارتباط است، چرا در دنیای امروز، برای مقابله با آنچه درونمان است، به بی‌حسی، کمال‌گرایی و قطعیت روی می‌آوریم؟ چرا درد را خاموش می‌کنیم، در حالی که شاید تنها راه رسیدن به زندگی عمیق، عبور از همان درد باشد؟ این ناهماهنگی، این شکاف بین آنچه مغزمان براش ساخته شده و آنچه فرهنگمان از ما می‌خواهد، جایی است که شرم ریشه می‌گیرد — و از آنجا، چرخه‌ای از قطع ارتباط با خود و دیگران آغاز می‌شود. اما شرم دقیقاً چیست؟ شرم این نیست که گناه کرده باشیم. شرم این احساس است که شاید چیزی در وجودمان آنقدر ناپاک یا ناکافی است که اگر دیگران بفهمند، دیگر ما را دوست نخواهند داشت، قبول نخواهند کرد، به ما عشق نخواهند ورزید. شرم این پرسش درونی است: آیا چیزی در من هست که مرا غیرقابل ارتباط می‌کند؟ این احساس، همه‌گیر است. در هر طبقه، هر فرهنگ، هر جنسیت، هر سنی وجود دارد. اما شکل آن متفاوت است. برای بعضی، شرم درباره ظاهر است؛ برای بعضی دیگر، درباره درآمد، موفقیت، تحصیلات، والدین بودن، یا روابط عاطفی. شرم همیشه بر این باور تغذیه می‌شود که «من کافی نیستم» — نه زیبا کافی، نه قوی کافی، نه موفق کافی، نه عاقل کافی. این باور، یک تجربه بسیار آسیب‌پذیر است، چون در لحظه‌ای که آن را احساس می‌کنیم، احساس می‌کنیم تنها هستیم. اما واقعیت این است: همه ما این را تجربه می‌کنیم. تفاوت اینجاست که بعضی از ما می‌توانیم درباره آن صحبت کنیم، و بعضی نه. تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند — اما تفاوت آنها این است که به آن اجازه نمی‌دهند تعریف‌کننده هویتشان باشد. این افراد یک ویژگی مشترک دارند: این باور که «من شایسته عشق و تعلق هستم». این جمله به نظر ساده می‌آید، اما در دنیایی که از ما می‌خواهد همیشه بهتر باشیم، همیشه پیشرفت کنیم، همیشه کامل باشیم، گفتن این جمله یک عمل شجاعانه است. این باور، تنها نتیجه موفقیت نیست — بسیاری از افراد موفق همچنان احساس می‌کنند که کافی نیستند. این باور یک انتخاب است. یک تصمیم درونی برای پذیرش خود، با همه شکنندگی‌ها و ناکامل بودن‌ها. وقتی این باور وجود دارد، شرم دیگر نمی‌تواند قدرت خود را اعمال کند. چون شرم نیاز دارد که ما در تاریکی بمانیم، که در انزوا باشیم. اما وقتی شرم را به نور می‌آوریم، وقتی می‌گوییم «من این احساس را دارم»، قدرتش از بین می‌رود. حالا فرض کنیم این باور، «من شایسته عشق هستم»، واقعاً کلید باشد. پس چرا بقیه ما به آن نمی‌رسیم؟ چون فرهنگ ما به ما یاد داده که شکنندگی — که دریچه ورود به این باور است — یک ضعف است. ما به جای اینکه شکنندگی را بپذیریم، آن را مدیریت می‌کنیم. چگونه؟ با سه استراتژی اصلی: بی‌حس کردن، قطعیت خواهی، و کمال‌گرایی. اول، بی‌حس کردن. ما از هر راهی استفاده می‌کنیم تا احساساتمان را کم‌رنگ کنیم: از زیادخوری گرفته تا اعتیاد، از مصرف بی‌رویه رسانه تا فرار به مشغله‌های بی‌پایان. ما نمی‌خواهیم از درد بیرون بیاییم، اما نمی‌دانیم چطور از آن عبور کنیم. دوم، قطعیت خواهی. در دنیایی پر از عدم قطعیت، ما به دنبال جواب‌های قطعی می‌گردیم. در سیاست، در دین، در روابط — ما ترجیح می‌دهیم اشتباه باشیم اما مطمئن، تا اینکه در میانه سوال باشیم. ما به جای گفتن «نمی‌دانم»، داستان می‌سازیم. سوم، کمال‌گرایی. ما نه تنها خودمان را تحت فشار می‌آوریم، بلکه فرزندانمان را هم به سمت کمال سوق می‌دهیم. ما می‌خواهیم آنها همیشه برندگان باشند، همیشه شاد باشند، همیشه موفق. اما در این میان، به آنها یاد نمی‌دهیم چطور شکست بخورند، چطور گریه کنند، چطور بگویند «نیاز دارم». اما این استراتژی‌ها کار نمی‌کنند. چون احساسات انسانی را نمی‌توان انتخابی بی‌حس کرد. وقتی تصمیم می‌گیریم ترس و شرم را خاموش کنیم، نمی‌توانیم همزمان شادی، قدردانی و عشق را روشن نگه داریم. مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد. این مثل این است که بخواهیم تنها نیمی از خون‌رسانی قلب را قطع کنیم. وقتی عمق درد را نمی‌پذیریم، عمق شادی را هم از دست می‌دهیم. این بی‌حسی نه تنها ما را از خودمان جدا می‌کند، بلکه از دیگران هم. ما دیگر نمی‌توانیم به شکل واقعی به دیگران وصل شویم، چون خودمان را نمی‌بینیم. ما در یک چرخه گرفتار می‌شویم: هرچه بیشتر بی‌حس می‌شویم، بیشتر احساس تنهایی می‌کنیم؛ هرچه بیشتر تنهایی می‌کنیم، بیشتر به بی‌حسی نیاز داریم. اما راه دیگری هم هست. راهی که درد را نه به عنوان دشمن، بلکه به عنوان مسیر می‌بیند. این راه، شکنندگی آگاهانه است. این یعنی اینکه بگذاریم خودمان را ببینند — نه فقط زمانی که قوی هستیم، بلکه زمانی که ضعیف هستیم. این یعنی اینکه «من دوستت دارم» را بگوییم، بدون اینکه بدانیم طرف مقابل چه احساسی دارد. این یعنی اینکه در رابطه‌ای سرمایه‌گذاری کنیم، بدون اینکه مطمئن باشیم که طول می‌کشد. این یعنی اینکه در اتاق انتظار بنشینیم، در حالی که منتظر نتیجه ماموگرافی هستید، و هنوز هم بگویید «من اینجا هستم». این شکنندگی نه یک ضعف است، بلکه شجاعت است. شجاعت اینکه در عین ناامنی، وصل بمانیم. و این شجاعت از یک جای ساده شروع می‌شود: باور اینکه «من کافی هستم». این جمله، انتهای چرخه شرم و بی‌حسی است. وقتی این باور ریشه می‌گیرد، دیگر نیازی نیست فریاد بزنیم تا توجه کنند. دیگر نیازی نیست کنترل کنیم تا ایمن باشیم. دیگر نیازی نیست کامل باشیم تا قابل قبول باشیم. ما شروع می‌کنیم به گوش دادن — به خودمان، به دیگران. و از آنجا، مهربانی شروع می‌شود. نه مهربانی نمایشی، بلکه مهربانی عمیق، که از پذیرش خود سرچشمه می‌گیرد. اگر مغز ما برای ارتباط ساخته شده، پس راه بازگشت به ذاتمان از طریق پذیرش شکنندگی است. و این راه، با یک جمله شروع می‌شود: «من کافی هستم».",
+ "provenance": {
+  "model": "qwen/qwen3-235b-a22b-2507",
+  "narrative_plan_version": 1,
+  "lecture_master_version": 1,
+  "style_instruction": null,
+  "book_references": [
+   {
+    "author": "Brené Brown",
+    "title": "Daring Greatly: How the Courage to Be Vulnerable Transforms the Way We Live, Love, Parent, and Lead",
+    "original_language": "en",
+    "supported_idea": "پذیرش آسیب‌پذیری شرط ایجاد ارتباط واقعی است و بی‌حسی انتخابی احساسات، هم درد و هم شادی را می‌کُند.",
+    "author_fa": "برنه براون",
+    "title_fa": "شجاعت بزرگ: چگونه جسارت داشتن برای آسیب‌پذیری راه زندگی، عشق، والدین‌شدن و رهبری ما را دگرگون می‌کند",
+    "verified_quote": ""
+   }
+  ],
+  "generation_validation": {
+   "status": "FAILED",
+   "max_correction_attempts": 2,
+   "attempts": [
+    {
+     "passed": false,
+     "word_count": 173,
+     "duration_minutes": 1.57,
+     "band_min_words": 2571,
+     "band_max_words": 3479,
+     "failed_checks": [
+      "DURATION_BELOW_GENERATION_BAND",
+      "NARRATIVE_STRUCTURE_COLLAPSED"
+     ]
+    },
+    {
+     "passed": false,
+     "word_count": 1250,
+     "duration_minutes": 11.36,
+     "band_min_words": 2571,
+     "band_max_words": 3479,
+     "failed_checks": [
+      "DURATION_BELOW_GENERATION_BAND",
+      "NARRATIVE_STRUCTURE_COLLAPSED"
+     ]
+    },
+    {
+     "passed": false,
+     "word_count": 1250,
+     "duration_minutes": 11.36,
+     "band_min_words": 2571,
+     "band_max_words": 3479,
+     "failed_checks": [
+      "DURATION_BELOW_GENERATION_BAND",
+      "NARRATIVE_STRUCTURE_COLLAPSED"
+     ]
+    }
+   ],
+   "passed": false,
+   "word_count": 1250,
+   "duration_minutes": 11.36,
+   "band_min_words": 2571,
+   "band_max_words": 3479,
+   "failed_checks": [
+    "DURATION_BELOW_GENERATION_BAND",
+    "NARRATIVE_STRUCTURE_COLLAPSED"
+   ]
+  }
+ },
+ "findings": [
+  {
+   "critic_role": "DURATION",
+   "severity": "WARNING",
+   "code": "DURATION_TOO_SHORT",
+   "location": "EDITORIAL_DURATION",
+   "explanation": "Der Entwurf ist zu kurz für die gewünschte Sprechdauer."
+  },
+  {
+   "critic_role": "PERSIAN_QUALITY",
+   "severity": "WARNING",
+   "code": "ROBOTIC_SENTENCE_SYMMETRY",
+   "location": "NATIVE_PERSIAN",
+   "explanation": "Mehrere Sätze beginnen mit derselben mechanischen Struktur."
+  },
+  {
+   "critic_role": "FACT",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "ADAPTATIONISM",
+   "location": "آغاز متن: «مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید»",
+   "explanation": "The draft upgrades the source claim ('از نظر عصب‌شناختی ما برای اتصال ساخته شده‌ایم') into a teleological just-so story: the brain was built 'for one specific thing' over millions of years, and isolated early humans 'had very little chance of surviving'. This presents an evolutionary narrative as settled fact without evidence and narrows brain function to a single purpose."
+  },
+  {
+   "critic_role": "FACT",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "INDIVIDUAL_DIFFERENCES",
+   "location": "بخش TURN: «این باور یک انتخاب است. یک تصمیم درونی برای پذیرش خود»",
+   "explanation": "The draft reframes the single separating variable from Brown's interviews (the belief 'I am worthy of love and belonging') as a free individual choice. This ignores individual differences — attachment history, trauma, mental health, social conditions — and risks implying that people who struggle with shame simply failed to choose otherwise."
+  },
+  {
+   "critic_role": "FACT",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "NEUROSCIENCE_OVERCLAIM",
+   "location": "بخش CLIMAX: «مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد»",
+   "explanation": "The source supports 'you cannot selectively numb hard feelings' as a research finding, but the draft adds a specific mechanistic claim about the brain lacking the ability to filter emotions, plus an invented blood-flow-to-the-heart analogy. This asserts neurobiological mechanism beyond the evidence."
+  },
+  {
+   "critic_role": "FACT",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "CULTURE_BIOLOGY_ALTERNATIVE",
+   "location": "بخش DEEPENING: سه استراتژی «بی‌حس کردن، قطعیت خواهی، کمال‌گرایی» به‌عنوان پاسخ فرهنگ",
+   "explanation": "The script frames numbing/certainty/perfectionism purely as a culture-vs-evolved-biology mismatch and does not acknowledge alternative or complementary explanations (economic pressure, media/technology incentives, individual temperament). The angle calls for testing the alternative hypothesis; the draft dramatizes it but does not weigh competing causes."
+  },
+  {
+   "critic_role": "FACT",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "OVERGENERALIZATION",
+   "location": "بخش SETUP: «این احساس، همه‌گیر است. در هر طبقه، هر فرهنگ، هر جنسیت، هر سنی وجود دارد»",
+   "explanation": "The universality claim is supported by the source, but the draft omits the source's important corollary — that people who do not experience shame lack empathy and capacity for connection — and presents 'everyone experiences this' in a way that flattens variation in intensity and form across individuals."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "ADAPTATIONISM",
+   "location": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده",
+   "explanation": "Opening claims the brain was 'built for one thing' over millions of years — a strong teleological/adaptationist framing not grounded in the evidence list, which only supports the weaker claim that we are neurobiologically wired for connection."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "ADAPTATIONISM",
+   "location": "مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد. این مثل این است که بخواهیم تنها نیمی از خون‌رسانی قلب را قطع کنیم.",
+   "explanation": "The invented blood-supply analogy asserts a neurological mechanism ('the brain cannot filter negative feelings') beyond what the evidence supports — the evidence is behavioral ('cannot selectively numb'), not a neural-capacity claim."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "CULTURE_BIOLOGY_ALTERNATIVE",
+   "location": "این فرهنگ کمال‌گرایی و قطعیت، نه تنها واقعیت را نادیده می‌گیرد، بلکه با ذات عمیق ما در تضاد است.",
+   "explanation": "Script treats the evolved-connection-vs-modern-culture mismatch as the only explanation and never seriously entertains the alternative that shame/numbing themselves could be ancient or culturally variable adaptations; the 'deep nature' language forecloses the alternative rather than testing it."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "INDIVIDUAL_DIFFERENCES",
+   "location": "تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند... این باور یک انتخاب است. یک تصمیم درونی برای پذیرش خود",
+   "explanation": "The evidence supports a correlational split (the only separating variable was the belief 'I am worthy'). The draft upgrades it to a voluntary 'choice/decision', implying individual agency and direction of causation the data does not establish, and erases structural/temperamental differences."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "INDIVIDUAL_DIFFERENCES",
+   "location": "این باور، تنها نتیجه موفقیت نیست — بسیاری از افراد موفق همچنان احساس می‌کنند که کافی نیستند",
+   "explanation": "Good gesture at within-group variation, but it remains anecdotal and does not address other plausible separating variables (attachment history, social support) the comparison design could not rule out."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "INDIVIDUAL_DIFFERENCES",
+   "location": "این احساس، همه‌گیر است. در هر طبقه، هر فرهنگ، هر جنسیت، هر سنی وجود دارد.",
+   "explanation": "Universality claim matches the evidence ('shame is universal'), but the following sentence that 'some can talk about it, some cannot' is left unexplained — an individual-difference point that the script neither tests nor attributes."
+  },
+  {
+   "critic_role": "CHANNEL_SPECIFIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "ADAPTATIONISM",
+   "location": "Opening paragraphs: \"مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید... انسان‌های اولیه که از گروه جدا می‌شدند، شانس بسیار کمی برای زنده ماندن داشتند\"",
+   "explanation": "The draft presents a speculative evolutionary just-so story (a brain built over millions of years specifically for connection, isolated early humans having little chance of survival) as settled fact. The grounded evidence only supports the weaker claim that humans are neurobiologically wired for connection after ten years of social work research; the survival-of-the-isolated narrative is an embellishment not present in the source."
+  },
+  {
+   "critic_role": "CHANNEL_SPECIFIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "EVIDENCE_OVERCLAIM",
+   "location": "\"تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند — اما تفاوت آنها این است که به آن اجازه نمی‌دهند تعریف‌کننده هویتشان باشد\"",
+   "explanation": "The grounded finding is that the only variable separating people with strong belonging was the belief 'I am worthy of love and belonging.' The draft's additional differentiator — that connected people feel shame but do not let it define their identity — is not in the source and inflates the finding."
+  },
+  {
+   "critic_role": "CHANNEL_SPECIFIC",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "EVIDENCE_OVERCLAIM",
+   "location": "\"این باور یک انتخاب است. یک تصمیم درونی برای پذیرش خود\"",
+   "explanation": "The source establishes a correlational separation (people with belonging believed they were worthy), not that worthiness is a voluntary choice or decision. Reframing the finding as 'a choice' adds an unsupported causal/volitional claim."
+  },
+  {
+   "critic_role": "CHANNEL_SPECIFIC",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "UNSUPPORTED_CLAIM",
+   "location": "\"وقتی احساس تعلق می‌کنیم، بدن ما آرام می‌گیرد، قلب ما می‌زند با یک ریتم ثابت، تنفس ما عمیق می‌شود... سیستم عصبی ما فرمان هشدار می‌دهد\"",
+   "explanation": "Specific physiological details (steady heart rhythm, deeper breathing, nervous-system alarm commands) are invented color not present in the grounded source text; presented as mechanism-level fact."
+  },
+  {
+   "critic_role": "CHANNEL_SPECIFIC",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "EVIDENCE_OVERCLAIM",
+   "location": "\"مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد. این مثل این است که بخواهیم تنها نیمی از خون‌رسانی قلب را قطع کنیم\"",
+   "explanation": "The evidence supports the behavioral finding that hard feelings cannot be selectively numbed; the draft upgrades this to a neurological incapacity ('the brain does not have this ability') and adds an invented cardiac analogy, slightly overstating the mechanism."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "ADAPTATIONISM_CHECK",
+   "location": "Opening — «مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده… انسان‌های اولیه که از گروه جدا می‌شدند، شانس بسیار کمی برای زنده ماندن داشتند»",
+   "explanation": "The draft upgrades the source's modest claim (we are neurobiologically wired for connection) into a full adaptationist just-so story: the brain was built 'for one specific thing' over 'millions of years' and early humans who left the group had little survival chance. No evidence_claim supports the evolutionary-survival framing; it is asserted as settled fact, which is exactly the kind of unverified evolutionary narrative the check targets."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "devin",
+   "severity": "BLOCKER",
+   "code": "CULTURE_BIOLOGY_ALTERNATIVE",
+   "location": "«این ناهماهنگی… جایی است که شرم ریشه می‌گیرد» vs. «در هر طبقه، هر فرهنگ، هر جنسیت، هر سنی وجود دارد»",
+   "explanation": "Internal contradiction: the draft roots shame in the specific mismatch between evolved needs and modern culture, then a few lines later asserts shame is universal across every culture and class. If shame is pan-cultural, the modern-culture mismatch cannot be its origin; the draft never considers the alternative that shame is a stable feature of human social life rather than a product of modernity. The source treats shame as universal, not as a modern invention."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "INDIVIDUAL_DIFFERENCES_CHECK",
+   "location": "«این باور یک انتخاب است. یک تصمیم درونی برای پذیرش خود»",
+   "explanation": "The source finding is descriptive and correlational: the only variable separating the two groups was the belief 'I am worthy of love and belonging.' The draft converts it into a deliberate 'choice' and 'internal decision,' implying anyone can simply decide to feel worthy — which both overstates causality and erases the individual differences (upbringing, attachment history, social conditions) the data do not address."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "INDIVIDUAL_DIFFERENCES_CHECK",
+   "location": "«وقتی این باور وجود دارد، شرم دیگر نمی‌تواند قدرت خود را اعمال کند» and «مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند»",
+   "explanation": "Two overstatements of the mechanism: (1) the draft itself acknowledges wholehearted people still feel shame, so claiming the belief renders shame powerless contradicts its own earlier statement; (2) the source says feelings cannot be selectively numbed (a behavioral/empirical claim), but the draft reframes it as a hard brain-inability claim ('the brain lacks this ability'), adding a neuroscience mechanism not present in the material."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "adaptationism-check",
+   "location": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید.",
+   "explanation": "Cold open upgrades the sourced claim ('we are neurobiologically wired for connection') into a strong adaptationist just-so story: the brain was 'built over millions of years for one specific thing'. The evidence base only supports a neurobiological orientation toward connection, not a single-purpose evolved design. The justificationist framing is asserted, not tested."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "culture-biology-alternative",
+   "location": "منطق کلی مقاله — «فرهنگ مدرن» به‌عنوان مقصر اصلی",
+   "explanation": "The draft settles fully on the culture explanation (modern perfectionism/certainty culture corrupts an evolved need) without ever staging the alternative biological interpretation the angle calls for (e.g. evolved shame-monitoring itself generating these responses, or the mismatch being in the mechanism rather than the culture). The plan requires the alternative hypothesis to be surfaced and tested, not assumed away."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "WARNING",
+   "code": "individual-differences-check",
+   "location": "تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند",
+   "explanation": "The draft reports the group-level contrast (worthy-belief vs struggle) but erases the sharpest individual-difference finding in the evidence: people who do NOT experience shame at all also lack empathy and human connection. Universalizing shame ('in every class, every culture, every gender, every age') without this qualifier flattens the distribution and loses the finding's edge."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "evidence-fidelity",
+   "location": "وقتی احساس طرد شدن می‌کنیم، سیستم عصبی ما فرمان هشدار می‌دهد... بدن ما همان پاسخ قدیمی را می‌دهد",
+   "explanation": "The autonomic-detection detail (heart rhythm steadying, breath deepening, alarm signal on rejection) is physiological color not present in the sourced evidence, which grounds the connection claim in interview data, not body-response neuroscience. It reads as borrowed self-regulation literature grafted onto Brown's findings."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "evidence-omission",
+   "location": "ما از هر راهی استفاده می‌کنیم تا احساساتمان را کم‌رنگ کنیم: از زیادخوری گرفته تا اعتیاد...",
+   "explanation": "The numbing passage drops the sourced statistic that this cohort is 'the most in-debt, obese, addicted, and medicated adult cohort in American history' — the only quantitative evidence backing the numbing claim. Without it the numbing strategy rests on rhetorical enumeration alone."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "evidence-omission",
+   "location": "شش هفته پس از شروع پژوهش با عاملی مواجه شد که ارتباط را از هم می‌گسست: شرم",
+   "explanation": "The draft introduces shame definitionally but omits the discovery narrative in the evidence: six weeks into the research an unnamed factor kept disconnecting people, and interviewees asked about love described heartbreak, asked about belonging described exclusion, asked about connection described disconnection. This is the empirical route to shame in the source and its absence weakens the SETUP."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "coverage",
+   "location": "برای بعضی، شرم درباره ظاهر است؛ برای بعضی دیگر، درباره درآمد، موفقیت، تحصیلات...",
+   "explanation": "Planned beats are thinned: shame organized by gender (body/appearance vs work/adequacy) and by web of competing expectations is generalized into a flat list, and the 'perfect our children' beat loses its sharpest sourced detail (children as 'hardwired for struggle', the hundred-years-hence horror line)."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "devin",
+   "severity": "INFO",
+   "code": "counterargument-closure",
+   "location": "این راه، شکنندگی آگاهانه است... «من کافی هستم»",
+   "explanation": "Resolution asserts the way out but skips the sourced mechanism for why the worthy-belief group could do it: they fully embraced vulnerability as necessary (neither comfortable nor excruciating) and believed what made them vulnerable made them beautiful — plus the authenticity point (letting go of who they should be). The draft names the belief but not the stance toward vulnerability that enables it."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "adaptationism_check",
+   "location": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید.",
+   "explanation": "ادعای تکاملی به صورت قطعی و بدون شرط بیان شده است — یعنی مغز 'برای' ارتباط ساخته شده. این نوع بیان نشان‌دهنده رویکردی ادابیتیونیستی (adaptationist) است که تکامل را هدفمند و علّی فرض می‌کند، در حالی که تکامل از طریق فرآیندهای غیرهدفمند و جمع‌آوری تدریجی صفات مناسب رخ داده است. بیان 'ساخته شده برای' ممکن است تداعی‌کننده طراحی علی باشد."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "culture/biology_alternative",
+   "location": "سیستم عصبی ما به طور خودکار به علائم پذیرش و ردپذیرش واکنش نشان می‌دهد.",
+   "explanation": "واکنش به پذیرش یا طرد ممکن است تحت تأثیر عوامل فرهنگی، تربیتی و تجربیات شخصی نیز باشد، نه فقط تعیین‌شده بیولوژیکی. اشاره به «به طور خودکار» بدون اشاره به تنوع فرهنگی یا تفاوت‌های فردی می‌تواند بیولوژیکی‌انگاری ایجاد کند."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "individual-differences_check",
+   "location": "اما حالا در دنیایی زندگی می‌کنیم که به جای تقویت این نیاز اساسی، از ما می‌خواهد بی‌حس شویم.",
+   "explanation": "نقد فرهنگ مدرن به صورت کلی بیان شده و فرض می‌شود همه افراد به یک شکل تحت تأثیر فرهنگ کمال‌گرایی و بی‌حسی قرار گرفته‌اند. این بیان ممکن است تفاوت‌های فردی، فرهنگی و اجتماعی در نحوه تجربه و مقابله با شرم و آسیب‌پذیری را نادیده بگیرد."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "BLOCKER",
+   "code": "evidence_claim_alignment",
+   "location": "تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند — اما تفاوت آنها این است که به آن اجازه نمی‌دهند تعریف‌کننده هویتشان باشد.",
+   "explanation": "ادعای «تحقیقات نشان می‌دهد» بدون ارجاع مستقیم به منبع یا طرح مطالعه مشخص است. در حالی که در context به Brené Brown و پژوهش او اشاره شده، این جمله به صورت کلی بیان شده و ممکن است به عنوان تعمیم غیرمستند تلقی شود. این با epistemic_status = UNKNOWN در evidence_claims همخوانی دارد و نیاز به دقیق‌تر شدن دارد."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "culture/biology_alternative",
+   "location": "ما به جای اینکه شکنندگی را بپذیریم، آن را مدیریت می‌کنیم. چگونه؟ با سه استراتژی اصلی: بی‌حس کردن، قطعیت خواهی، و کمال‌گرایی.",
+   "explanation": "استراتژی‌های بی‌حس کردن، قطعیت‌طلبی و کمال‌گرایی به عنوان پاسخی یکنواخت فرهنگ مدرن ارائه شده‌اند، در حالی که این رفتارها ممکن است در فرهنگ‌های مختلف یا زمینه‌های اجتماعی-اقتصادی متفاوت شکل‌های گوناگونی داشته باشند. این بیان ممکن است نسبی‌گرایی فرهنگی را نادیده بگیرد."
+  },
+  {
+   "critic_role": "LOGIC",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "adaptationism_check",
+   "location": "مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد.",
+   "explanation": "بیان «مغز ما این توانایی را ندارد» فرض می‌کند که طراحی مغز باید شامل این توانایی باشد، در حالی که این یک استنتاج از عملکرد فعلی است، نه یک ضعف تکاملی. این ممکن است به اشتباه به نقص در طراحی اشاره کند."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "adaptationism_check",
+   "location": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید.",
+   "explanation": "ادعای تکاملی به صورت قطعی و بدون محدودیت بیان شده است ('برای یک چیز خاص ساخته شده'). این نوع بیان نشان‌دهنده رویکرد آداپتیونیستی افراطی است، زیرا فرض می‌کند مغز دقیقاً برای 'اتصال' بهینه‌سازی شده، در حالی که تکامل ممکن است انتخاب‌های متعددی را تحت فشار قرار داده باشد (مانند همکاری، رقابت، بقا در محیط)."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "culture/biology_alternative",
+   "location": "این نیاز به ارتباط عمیق تنها یک تمایل عاطفی نیست — یک ضرورت بقا بوده است. انسان‌های اولیه که از گروه جدا می‌شدند، شانس بسیار کمی برای زنده ماندن داشتند.",
+   "explanation": "استدلال به درستی نیاز بیولوژیکی به گروه‌محوری را برجسته می‌کند، اما فرهنگ نیز می‌تواند به عنوان عامل مکمل (نه جایگزین) تقویت کننده این نیاز عمل کند. با این حال، از آنجا که این موضوع در ادامه با تضاد فرهنگ مدرن مطرح می‌شود، این یافته صرفاً نیاز به آگاهی دارد."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "qwen",
+   "severity": "BLOCKER",
+   "code": "evidence_claim_mismatch",
+   "location": "تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند — اما تفاوت آنها این است که به آن اجازه نمی‌دهند تعریف‌کننده هویتشان باشد.",
+   "explanation": "ادعای «تحقیقات نشان می‌دهد» بدون ارجاع مستقیم به پژوهش براون یا منبع دیگری ارائه شده است. در حالی که در context به Brené Brown و کتاب Daring Greatly اشاره شده، این ارجاع در متن نیامده و خواننده نمی‌داند این یافته از کجا آمده است."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "individual-differences_check",
+   "location": "اما حالا در دنیایی زندگی می‌کنیم که به جای تقویت این نیاز اساسی، از ما می‌خواهد بی‌حس شویم.",
+   "explanation": "متن به صورت کلی و یکنواخت فرهنگ مدرن را به عنوان فرهنگی که بی‌حسی را تشویق می‌کند توصیف می‌کند، در حالی که تفاوت‌های فردی، فرهنگی و اجتماعی قابل توجهی در نحوه پاسخ به شرم و آسیب‌پذیری وجود دارد (مثلاً در فرهنگ‌های جمع‌گرا یا مذهبی). این بیان ممکن است تجربه تمام مخاطبان را نادیده بگیرد."
+  },
+  {
+   "critic_role": "RETENTION",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "biological_metaphor_inaccuracy",
+   "location": "این مثل این است که بخواهیم تنها نیمی از خون‌رسانی قلب را قطع کنیم.",
+   "explanation": "استعاره قلب و خون‌رسانی از نظر زیستی دقیق نیست؛ قلب به صورت دوطرفه خون را پمپ می‌کند و نمی‌توان 'نیمی' از خون‌رسانی آن را قطع کرد بدون توقف کامل عملکرد. این ممکن است باعث سوءتفاهم علمی شود."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "adaptationism_check",
+   "location": "تصور کنید مغز شما طی میلیون‌ها سال تکامل برای یک چیز خاص ساخته شده: اینکه به دیگران وصل شوید.",
+   "explanation": "این جمله به صورت مستقیم و بدون ابهام ادعا می‌کند که مغز انسان به‌طور تکاملی *برای* ارتباط با دیگران ساخته شده است. این یک حالت شدید از آداپتیونیسم (adaptationism) است — یعنی تفسیر هر ویژگی رفتاری به عنوان یک سازش مستقیم برای بقا، بدون در نظر گرفتن سایر مکانیسم‌های تکاملی مانند هم‌تکامل (exaptation)، تصادف (drift)، یا محدودیت‌های توسعه‌ای. این ادعا به صورت تک‌عاملی و تک‌منظوره، عملکرد مغز را به یک هدف اجتماعی اختصاص می‌دهد، در حالی که شواهد تکاملی پیچیده‌تر هستند."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "culture/biology_alternative",
+   "location": "انسان‌های اولیه که از گروه جدا می‌شدند، شانس بسیار کمی برای زنده ماندن داشتند.",
+   "explanation": "این جمله به درستی بر مزیت بیولوژیکی بقا درون گروه تأکید دارد، اما به طور کامل از نقش فرهنگ و یادگیری اجتماعی در حفظ ارتباط چشم‌پوشی می‌کند. در حالی که فرهنگ مدرن ممکن است از بی‌حسی حمایت کند، فرهنگ‌های سنتی نیز می‌توانند از طریق آیین‌ها، داستان‌ها و ساختارهای اجتماعی، ارتباط و تعلق را تقویت کنند. بنابراین، تضاد بین بیولوژی و فرهنگ به صورت دوگانه و مطلق نشان داده شده است، در حالی که فرهنگ می‌تواند هم مانع و هم تسهیل‌گر باشد."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "individual-differences_check",
+   "location": "تحقیقات نشان می‌دهد که افرادی که به شکل عمیق و معنادار به دیگران وصل می‌شوند، این احساس شرم را هم دارند — اما تفاوت آنها این است که به آن اجازه نمی‌دهند تعریف‌کننده هویتشان باشد.",
+   "explanation": "این بخش به درستی به تفاوت‌های فردی در رابطه با شرم و تعلق اشاره می‌کند، اما به صورت ضمنی ممکن است خواننده را به سمت عمومیت‌سازی سوق دهد: یعنی اینکه *همه* افراد با احساس شرم مواجه می‌شوند و تنها تفاوت در مدیریت آن است. در حالی که شواهد نشان می‌دهند سطوح شرم، حساسیت به طردشدن و تمایل به ارتباط عمیق از نظر فردی و فرهنگی متغیر است. این تفاوت‌ها ممکن است ریشه در ژنتیک، تجربه کودکی یا ساختارهای اجتماعی داشته باشند."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "qwen",
+   "severity": "INFO",
+   "code": "adaptationism_check",
+   "location": "ما به جای اینکه درد را بپذیریم به عنوان بخشی از تجربه انسانی، آن را نشانه‌ای از ضعف می‌دانیم.",
+   "explanation": "این جمله ضمن توصیف فرهنگ مدرن، به طور ضمنی پیش‌فرض می‌گیرد که «درد» و «شکنندگی» خود به خود بخش طبیعی و تکاملی تجربه انسانی هستند — که ممکن است درست باشد، اما بدون اشاره به تنوع فرهنگی در تفسیر درد، این ادعا به یک نسخه جهان‌شمول از «طبیعت انسانی» تبدیل می‌شود. این می‌تواند به شکلی نامحسوس از آداپتیونیسم فرهنگی نیز باشد: یعنی اینکه «فرهنگ سالم» باید درد را بپذیرد، در حالی که این ممکن است یک ارزش‌گذاری فرهنگی باشد، نه یک نتیجه تکاملی ضروری."
+  },
+  {
+   "critic_role": "ORIGINALITY",
+   "critic_provider": "qwen",
+   "severity": "WARNING",
+   "code": "culture/biology_alternative",
+   "location": "مغز ما این توانایی را ندارد که احساسات منفی را فیلتر کند و مثبت‌ها را نگه دارد.",
+   "explanation": "این ادعا به صورت کاملاً بیولوژیکی ارائه شده و به عنوان یک واقعیت عصبی مطلق بیان می‌شود، در حالی که شواهد در روان‌شناسی و علوم اعصاب نشان می‌دهند که تنظیم هیجانی (emotion regulation) می‌تواند انتخابی باشد — مثلاً افراد متدین یا مدیتیشن‌کنندگان ممکن است به طور فعال احساسات منفی را کاهش دهند بدون از دست دادن شادی یا قدردانی. همچنین، فرهنگ‌هایی که بر کنترل هیجان تأکید دارند (مانند برخی فرهنگ‌های شرق آسیایی) ممکن است الگوهای متفاوتی از تجربه هیجانی داشته باشند. بنابراین، این ادعا یک تعیین‌گرایی بیولو"
+  }
+ ]
+}

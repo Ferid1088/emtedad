@@ -19,6 +19,7 @@ from app.db.session import Database
 from app.knowledge.domain import RunStatus
 from app.knowledge.llm.base import LLMProvider
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import ExtractionRun, Source, SourceSegment
 from app.knowledge.structure.agent import SourceStructureAgent
 from app.knowledge.structure.domain import (
@@ -59,7 +60,7 @@ class SourceStructureService:
         overlap: int = 16,
     ) -> None:
         self.database = database
-        self.provider = provider or resolve_llm_provider()
+        self.provider = provider or resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT)
         self.model = model
         self.window_size = window_size
         self.overlap = overlap

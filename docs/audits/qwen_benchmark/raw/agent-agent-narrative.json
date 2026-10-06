@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198541-34n2DJ4WKe9LwkpLnCYc",
+ "object": "chat.completion",
+ "created": 1791198541,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{  \n  \"sections\": [  \n    {  \n      \"role\": \"hook\",  \n      \"purpose\": \"جذب توجه با یک تجربه رایج و آشنا: حسرت پس از تکرار یک رفتار ناخوشایند، مثلاً قول دادن به خود برای بیدار شدن زود و دوباره ندادن به آن.\",  \n      \"target_minutes\": 3  \n    },  \n    {  \n      \"role\": \"context\",  \n      \"purpose\": \"معرفی ایدهٔ مرزبندی بین شناخت (فهم از رفتار) و پذیرش (قبول عمقانی آن): بسیاری می‌دانیم چه می‌کنیم، اما هنوز تغییر نمی‌کنیم، چون قلب ما با آن هم‌صدایی ندارد.\",  \n      \"target_minutes\": 5  \n    },  \n    {  \n      \"role\": \"turn\",  \n      \"purpose\": \"نمایش شکاف بین دانستن و پذیرش با مثالی داستانی: شخصی که می‌داند از تنها بودن می‌ترسد، اما تا زمانی که درد آن را در قلب نپذیرد، به روابط ناسالم ادامه می‌دهد.\",  \n      \"target_minutes\": 6  \n    },  \n    {  \n      \"role\": \"deepening\",  \n      \"purpose\": \"بررسی چرایی این شکاف: چگونه شناخت سطحی، دفاعی می‌شود و چرا پذیرش — که شامل آسیب‌پذیری، ایمان و ارتباط با احساسات است — نقطهٔ عبور اصلی است.\",  \n      \"target_minutes\": 8  \n    },  \n    {  \n      \"role\": \"resolution\",  \n      \"purpose\": \"پیشنهاد مسیری عملی: از شناخت به پذیرش — با تمرین شنیدن درونی، پرسش از خود «آیا واقعاً این را می‌پذیرم؟» و پذیرفتن درد به جای فرار از آن.\",  \n      \"target_minutes\": 4  \n    },  \n    {  \n      \"role\": \"closing\",  \n      \"purpose\": \"جمع‌بندی شاعرانه: تغییر نه در سر، که در قلب رخ می‌دهد؛ و شکاف بین دانستن و پذیرش، همان جایی است که نور وارد می‌شود.\",  \n      \"target_minutes\": 1  \n    }  \n  ]  \n}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 150,
+  "completion_tokens": 673,
+  "total_tokens": 823,
+  "cost": 0.00040384,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00040384,
+   "upstream_inference_prompt_cost": 1.35e-05,
+   "upstream_inference_completions_cost": 0.00039034
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

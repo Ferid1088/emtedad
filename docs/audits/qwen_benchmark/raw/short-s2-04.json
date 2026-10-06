@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198091-xyfkXeTBc86XGrvvu9Oo",
+ "object": "chat.completion",
+ "created": 1791198092,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Google",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "STOP",
+   "message": {
+    "role": "assistant",
+    "content": "گاهی یه اسم توی تلفن می‌فته، یه پیام قدیمی میاد بالا، و یه لحظه همه چیز یادت میاد: صدای خنده‌اش، یه جمله که همیشه تکرار می‌کرد، یه عادت آدم‌نواز که داشت. بعدش یه سکوت درونی می‌گیره. نه گریه، نه فریاد. فقط یه حس سنگین تو قفسه سینه، مثل اینکه چیزی که همیشه فکر می‌کردی جلوِ دستته، ناگهان رفت.\n\nاز دست دادن یه دوست قدیمی اینجوریه. مثل یه خونهٔ خالی که هنوز بوی قهوه و خندهٔ دو سال پیش تو دیوارهاش مونده. می‌دونی که زندگی ادامه داره، می‌دونی که همه میرن یا میرن، ولی بعضی‌ها جاشون تو خاطره یه جور دیگه فرق داره. یه جای خالی می‌مونه، نه برای اینکه جاشو نشه پر کرد، بلکه چون بعضی جاهای وجودِ آدم، فقط یه نفر می‌تونسته پر کنه. و حالا اونجا سکوتِ مهربونی حکمفرمایه.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 400,
+  "completion_tokens": 552,
+  "total_tokens": 952,
+  "cost": 0.000652,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.000652,
+   "upstream_inference_prompt_cost": 0.0001,
+   "upstream_inference_completions_cost": 0.000552
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

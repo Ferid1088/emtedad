@@ -122,7 +122,18 @@ class ProductionService:
                 session, NarrativePlan, brief_id, [PlanStatus.READY]
             )
             master_id = await self._latest_ready_master(session, brief_id)
-            draft_id = await _latest_id(session, ScriptDraft, brief_id)
+            # Production stage derives from the primary editorial script
+            # (the Persian master the owner approves) — localized drafts
+            # never move the master pipeline backwards or forwards.
+            draft_id = await session.scalar(
+                select(ScriptDraft.id)
+                .where(
+                    ScriptDraft.content_brief_id == brief_id,
+                    ScriptDraft.lineage == "primary",
+                )
+                .order_by(ScriptDraft.version_number.desc())
+                .limit(1)
+            )
             package_exists = bool(
                 await session.scalar(
                     select(func.count(ResearchPackage.id)).where(

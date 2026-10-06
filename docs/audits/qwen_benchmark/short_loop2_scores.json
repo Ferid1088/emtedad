@@ -1,0 +1,257 @@
+[
+ {
+  "case_id": "s2-01",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 8,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 9,
+  "terminology": 8,
+  "nuance": 8,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 7,
+  "native_not_translated": 7,
+  "attribution_discipline": 9,
+  "flags": [
+   "mixed register: colloquial 'می‌تونه/می‌خورن' alongside literary 'گویی'",
+   "repetitive hedging 'مخصوصاً' used three times",
+   "'کافئین می‌خورن' slightly informal for neutral narration but acceptable"
+  ],
+  "notes": "Balanced both-sides treatment, genuinely hedged conclusion, mostly natural spoken Persian with minor register inconsistency."
+ },
+ {
+  "case_id": "s2-02",
+  "naturalness": 8,
+  "spoken_fluency": 7,
+  "grammar": 9,
+  "idiomatic_vocabulary": 8,
+  "semantic_correctness": 9,
+  "terminology": 8,
+  "nuance": 9,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 8,
+  "attribution_discipline": 9,
+  "flags": [
+   "'ذهنمان می‌بندد' is nonstandard—should be 'بسته می‌شود'",
+   "rain simile slightly clichéd though competently executed",
+   "register leans literary rather than spoken"
+  ],
+  "notes": "Preserves ambiguity well, answers with 'it depends how we relate to it' rather than cheap resolution; good but more essayistic than spoken."
+ },
+ {
+  "case_id": "s2-03",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 8,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 9,
+  "terminology": 8,
+  "nuance": 9,
+  "epistemic_honesty": 10,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 8,
+  "attribution_discipline": 9,
+  "flags": [
+   "'پاکسازی مغز از مواد زائد شیمیایی' slightly calqued phrasing",
+   "enumeration of theories borders on list-like"
+  ],
+  "notes": "Excellent honest boundary between known correlates and unknown function; clearly states 'نمی‌دانیم' without false resolution."
+ },
+ {
+  "case_id": "s2-04",
+  "naturalness": 7,
+  "spoken_fluency": 7,
+  "grammar": 6,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 8,
+  "repetition_freedom": 7,
+  "native_not_translated": 6,
+  "attribution_discipline": 9,
+  "flags": [
+   "garbled sentence 'می‌دونی که همه میرن یا میرن' — repeated word, likely error",
+   "'سکوتِ مهربونی حکمفرمایه' awkward/literary flourish verging on melodrama",
+   "'آدم‌نواز' unusual coinage",
+   "some imagery (empty house, smell of laughter) borders on cliché"
+  ],
+  "notes": "Mostly restrained and human but has a probable typo/reduplication and a few overwrought images."
+ },
+ {
+  "case_id": "s2-05",
+  "naturalness": 7,
+  "spoken_fluency": 8,
+  "grammar": 8,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 7,
+  "terminology": 8,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 8,
+  "repetition_freedom": 8,
+  "native_not_translated": 8,
+  "attribution_discipline": 8,
+  "flags": [
+   "opening correction about Eastern vs Western Rome is unnecessary and slightly pedantic—prompt never specified",
+   "'تاریخ نه علم دقیق' awkward ellipsis",
+   "claim 'حقیقت کامل وجود داشته' philosophically overreaching"
+  ],
+  "notes": "Sound treatment of historiographical disagreement; loses points for unprompted pedantic correction and slight overclaim."
+ },
+ {
+  "case_id": "s2-06",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 7,
+  "idiomatic_vocabulary": 8,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 9,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 7,
+  "attribution_discipline": 9,
+  "flags": [
+   "'یه نوع صداقت نسبیه' vague/unclear phrase",
+   "'مثل یه غریبه با چشمان آشنا' literary mixed metaphor",
+   "minor markdown-style double-space line breaks leakage"
+  ],
+  "notes": "Empathetic, avoids cure-all promises, honest about possibly being too late; a few hazy abstractions."
+ },
+ {
+  "case_id": "s2-07",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 7,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 7,
+  "attribution_discipline": 8,
+  "flags": [
+   "'قصه‌های بعدِ واقعه' awkward rendering of 'just-so stories/just-so story' concept",
+   "'انسان‌های نوسنگری' should be 'انسان‌های عصر نوسنگی'",
+   "'جنسیتی' used where 'جنسی' (sexual) is meant—terminology slip",
+   "example given is presented as plausible but itself is a just-so story, which is fine but the irony is unacknowledged"
+  ],
+  "notes": "Correctly explains unfalsifiability of adaptationist stories with a concrete example; a few terminology and phrasing slips."
+ },
+ {
+  "case_id": "s2-08",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 9,
+  "idiomatic_vocabulary": 8,
+  "semantic_correctness": 8,
+  "terminology": 8,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 10,
+  "repetition_freedom": 9,
+  "native_not_translated": 8,
+  "attribution_discipline": 9,
+  "flags": [
+   "markdown asterisks around book title — formatting leakage in spoken text",
+   "'غرب‌زده' applied to the view is a stretch; critique usually targets Eurocentrism/oversimplification",
+   "Harari's claim slightly paraphrased loosely ('داستان‌سرایی جمعی' for shared myths/fictions is defensible)"
+  ],
+  "notes": "Correct Persian title and author name, real controversial claim accurately summarized; markdown formatting leak in a spoken context."
+ },
+ {
+  "case_id": "s2-09",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 9,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 8,
+  "terminology": 8,
+  "nuance": 8,
+  "epistemic_honesty": 9,
+  "instruction_following": 9,
+  "repetition_freedom": 8,
+  "native_not_translated": 7,
+  "attribution_discipline": 9,
+  "flags": [
+   "markdown asterisks around English title",
+   "'نورولوژی' informal—'علم اعصاب/نوروساینس' more standard in Persian",
+   "English-book-name pattern 'بسل فان در کولک' correct but 'فان در کولک' repetition is slightly awkward",
+   "'تأثیر ... بی‌بدیل است' mild overstatement"
+  ],
+  "notes": "Title kept in English per instruction, author name correct, a real common criticism (weak evidence for somatic/adjunctive therapies) given; formatting leak."
+ },
+ {
+  "case_id": "s2-10",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 9,
+  "idiomatic_vocabulary": 7,
+  "semantic_correctness": 8,
+  "terminology": 8,
+  "nuance": 7,
+  "epistemic_honesty": 10,
+  "instruction_following": 9,
+  "repetition_freedom": 9,
+  "native_not_translated": 8,
+  "attribution_discipline": 10,
+  "flags": [
+   "title 'دیرین‌پیمان' is a less common Persian rendering of Man's Search for Meaning (usually 'انسان در جست‌وجوی معنا') but the prompt supplied it, so following it is correct",
+   "slightly preachy closing line 'صداقت مهم‌تر از ظاهر دانستن است'"
+  ],
+  "notes": "Refuses to fabricate a quote, states limits honestly, offers a constructive path — model epistemic honesty."
+ },
+ {
+  "case_id": "s2-11",
+  "naturalness": 6,
+  "spoken_fluency": 7,
+  "grammar": 6,
+  "idiomatic_vocabulary": 6,
+  "semantic_correctness": 6,
+  "terminology": 6,
+  "nuance": 6,
+  "epistemic_honesty": 7,
+  "instruction_following": 6,
+  "repetition_freedom": 7,
+  "native_not_translated": 6,
+  "attribution_discipline": 7,
+  "flags": [
+   "invented personal anecdote 'بچه‌ی داییم می‌گفت' — fabricated speaker memory for a generic script",
+   "'دیروز حضرت علی رو دیدم، یعنی کارم راه میفته' — 'راه میفته' is nonstandard/unidiomatic (should be 'راه می‌افته/می‌افتد' meaning works out; 'راه افتادن' means to set off — wrong verb)",
+   "double-space markdown line breaks leak into spoken text",
+   "runs to four sentences, exceeds 'دو جمله' instruction",
+   "'همون رؤیاها' with ellipsis is fine but the anecdote derails the transition"
+  ],
+  "notes": "Conversational tone is decent but disobeys the two-sentence constraint and invents a personal anecdote — the most instructurally problematic case."
+ },
+ {
+  "case_id": "s2-12",
+  "naturalness": 8,
+  "spoken_fluency": 8,
+  "grammar": 8,
+  "idiomatic_vocabulary": 8,
+  "semantic_correctness": 8,
+  "terminology": 7,
+  "nuance": 8,
+  "epistemic_honesty": 8,
+  "instruction_following": 9,
+  "repetition_freedom": 7,
+  "native_not_translated": 7,
+  "attribution_discipline": 9,
+  "flags": [
+   "repetitive 'شاید' hedging used five times — monotonous",
+   "'خودشناخت' vs 'فهمیدن خودمان' register slightly elevated",
+   "'گم شد/گم‌شدگی' repetition within two lines"
+  ],
+  "notes": "Open, inviting ending with a direct question; effective but over-relies on 'شاید' as its only hedging device."
+ }
+]

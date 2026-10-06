@@ -1,0 +1,15 @@
+{
+ "tag": "psych_evol",
+ "slot_A_is": "qwen_psych_text.fa.txt",
+ "slot_B_is": "baseline_psych_v8.fa.txt",
+ "verdict": {
+  "naturalness": "B",
+  "spoken_rhythm": "B",
+  "narrative_quality": "B",
+  "factual_discipline": "B",
+  "epistemic_honesty": "B",
+  "book_reference_quality": "B",
+  "publishability": "B",
+  "justification": "A is fluent but generic: it lectures in abstractions, cites vague 'تحقیقات' with no attribution, and asserts claims flatly (evolutionary framing, 'مغز ما این توانایی را ندارد') with no hedging or sourcing. B opens with a concrete cinematic scene and a sustaining metaphor (the locked drawer), returns to it at the end for a real arc, paces beats with questions and concessions, and—critically—anchors every strong claim to Brené Brown's actual research and real books (Daring Greatly, The Gifts of Imperfection), flagging her population statistics as her own claim rather than fact and marking interpretive moves as 'خوانش ما نه داده‌ها'. Its hedging ('فعلاً در دست است', 'بعید است') preserves uncertainty where A simply asserts. B reads as written for the ear by a native; A reads as a competent but translated-feeling summary. B is publishable nearly as-is."
+ }
+}

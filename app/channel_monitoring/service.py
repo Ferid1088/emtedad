@@ -17,6 +17,7 @@ from app.knowledge.adapters.youtube import (
 from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import Source
 from app.knowledge.structure.scheduler import schedule_structure_analysis
 
@@ -42,7 +43,7 @@ class ChannelDiscoveryService:
         self.database = database
         self.adapter = adapter or resolve_youtube_adapter()
         self.importer = importer or ExternalKnowledgeImporter(
-            database, self.adapter, resolve_llm_provider()
+            database, self.adapter, resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT)
         )
 
     async def register(self, locator: str) -> MonitoredChannel:

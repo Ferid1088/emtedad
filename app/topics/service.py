@@ -17,9 +17,11 @@ from app.editorial_channels.models import (
 )
 from app.knowledge.llm.base import LLMProvider
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import ExternalConcept, SourceVersion
 from app.knowledge.units.concepts import normalize_concept_name
 from app.knowledge.units.models import KnowledgeUnit
+from app.ops.settings.service import StudioSettingsService
 from app.topics import scorer
 from app.topics.domain import DEFAULT_COVERAGE_THRESHOLD, TopicStatus
 from app.topics.miner import TopicMiner
@@ -140,7 +142,10 @@ class TopicService:
                 return []
             existing_concepts = await _channel_candidate_concepts(session, channel.id)
             signatures = await _published_signatures(session, channel.id)
-            provider = self.provider or resolve_llm_provider()
+            effective = await StudioSettingsService(self.database).effective()
+            provider = self.provider or resolve_llm_provider(
+                role=AgentRole.TOPIC_MINER, effective=effective
+            )
             editorial_language = strategy.editorial_language or "fa"
             miner = TopicMiner(provider, model=self.model)
             batch, labels = await miner.propose(

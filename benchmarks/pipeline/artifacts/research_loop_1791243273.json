@@ -1,0 +1,24 @@
+{
+  "provider": "wikipedia",
+  "loops": [
+    {
+      "loop": 1,
+      "query": "shame vulnerability Brené Brown research",
+      "error": "web_research_base_url is not configured",
+      "findings": [],
+      "answer_text": "",
+      "ingested": [],
+      "new_source_ids": []
+    },
+    {
+      "loop": 2,
+      "query": "alcohol dependence craving cue exposure",
+      "error": "web_research_base_url is not configured",
+      "findings": [],
+      "answer_text": "",
+      "ingested": [],
+      "new_source_ids": []
+    }
+  ],
+  "timestamp": 1791243273.157428
+}

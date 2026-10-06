@@ -1,0 +1,53 @@
+{
+  "model": "gpt-6.1-sol",
+  "tasks": {
+    "counterargument_steelman": {
+      "chat": {
+        "status": 400,
+        "latency_s": 52.0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "cost": null,
+        "raw_text_len": 0,
+        "schema_ok": false,
+        "objection_count": 0,
+        "error": "{'error': {'message': \"Invalid schema for response_format 'result': In context=('properties', 'objections', 'items'), 'additionalProperties' is required to be supplied and to be false.\", 'type': 'inva"
+      },
+      "responses": {
+        "status": 400,
+        "latency_s": 44.2,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "cost": null,
+        "raw_text_len": 0,
+        "schema_ok": false,
+        "objection_count": 0,
+        "error": "invalid_json_schema"
+      }
+    },
+    "epistemic_drift_audit": {
+      "chat": {
+        "status": 400,
+        "latency_s": 26.1,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "cost": null,
+        "raw_text_len": 0,
+        "schema_ok": false,
+        "objection_count": 0,
+        "error": "{'error': {'message': \"Invalid schema for response_format 'result': In context=('properties', 'objections', 'items'), 'additionalProperties' is required to be supplied and to be false.\", 'type': 'inva"
+      },
+      "responses": {
+        "status": 400,
+        "latency_s": 26.9,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "cost": null,
+        "raw_text_len": 0,
+        "schema_ok": false,
+        "objection_count": 0,
+        "error": "invalid_json_schema"
+      }
+    }
+  }
+}

@@ -1,5 +1,8 @@
 # Process Optimization Loop — Controller Log
 
+> HISTORICAL — OpenRouter-era references inside are provenance only;
+> APIMaster is the canonical gateway since 2026-10-05.
+
 Date: 2025-10-03
 Scope: `docs/EMTEDAD_MASTER_PROCESS_AUDIT_OPTIMIZATION_LOOP.md` implementation,
 truthfulness pass over the ContentBrief production pipeline.
@@ -260,3 +263,42 @@ No commit performed; no new product features.
   owner waiver/accept decisions pending (UI shows owner checkpoint).
 - History: BLOCKED, 1 blocker + 23.8 min; cycle 3 requires explicit
   owner authorization — unchanged, as instructed.
+
+# PHASE 8 — master cost-quality content pipeline (2026-10-04)
+
+OpenRouter multi-model routing, Persian owner-approval gate, shared
+semantic package, native DE/EN/AR production pipeline, batch execution,
+provider telemetry. No commit performed.
+
+| # | Process | Baseline | Fix | Re-test | Real result | Decision |
+|---|---------|----------|-----|---------|-------------|----------|
+| 76 | Localization gate | `LocalizationService.create` only required a READY master — any draft could seed translation | `require_approved_persian_draft` hard gate on all entry points; latest APPROVED fa/primary draft with recorded `approved_by` only | `test_localization_gate` ×4 | Unapproved/stale/no-actor drafts rejected with `GateBlockedError` | PASS |
+| 77 | Staleness | Package could stay "current" after a newer approved Persian version | `package_is_current` compares pinned draft vs latest approved + hash; `staleness_sweep` marks runs STALE_SOURCE | integration staleness test | Superseded package blocks target production | PASS |
+| 78 | Role routing | All extraction went to one implicit provider | `AgentRole`→`ModelRole`→configured model; `llm_routing_enabled` gates OpenRouter; Devin default preserved | `test_llm_routing` | Disabled routing returns Devin provider unchanged; enabled routes per role | PASS |
+| 79 | Premium billing | Sync premium call could silently bill standard mode while batch configured | `premium_execution_mode=batch` refuses sync premium extraction; batch requires `BatchJobService` | unit + live dry run | No downgrade path exists; OWNER_ACTION_REQUIRED surfaced | PASS |
+| 80 | Strict schema | Pydantic defaults omitted from `required` → upstream strict mode rejected (400 "Provider returned error") | `_strictify` rewrites schema (all properties required, `additionalProperties:false`); shared `strict_response_format` for sync+batch | live Sol call | SemanticPackage built successfully on first call after fix | PASS |
+| 81 | Error truth | 400s carried no provider detail | `_error_detail` surfaces bounded provider message (300 chars, no request payload) | live reproduction | Actionable provider errors in exceptions | PASS |
+| 82 | Batch results | Result shape unverified | Live completed batch inspected: `item.response.body.choices[0].message.content`; per-request `error` field surfaced | `test_batch_client` + live job `batch-1791210015` | Extraction verified against real payload; per-request failures block honestly | PASS |
+| 83 | Context firewall | No enforcement that prompts stay bounded | Per-role allowlists + forbidden credential keys + serialized secret scan before every provider call | `test_context_firewall` | Unexpected keys raise; key/bearer/URI patterns detected | PASS |
+| 84 | Telemetry | No cost/token truth | `ops.llm_call_events` provider-reported only (tokens incl. cached/reasoning, cost, latency, retries, repairs, role, scope) | live canary | 46 dry-run calls = $1.6186 actual; zero estimates stored | PASS |
+| 85 | Provenance truth | Localized drafts recorded `"configured-default"` model | `_persist_draft` resolves role→model via `model_for_role` + effective overrides | code review | Draft provenance names the real producing model | PASS |
+| 86 | Dry-run isolation | — | `run_scope='dry_run'` + `effective_overrides` (in-memory only, never `owner_settings`); localized lineage | DB inspection | All fa/primary drafts unchanged; additive localized rows only | PASS |
+| 87 | Live gates | — | Real DE/EN/AR runs against live providers | `dry_run_1791211658.json` | DE: batch premium edit COMPLETED, final fidelity gate BLOCKED real drift; EN: honest loop-budget stop; AR: clean quota stop. No silent pass anywhere | PASS |
+
+## Phase 8 regression evidence
+
+- ruff check / format: clean on changed scope.
+- mypy --strict app: clean (232 files).
+- tests/unit: 386 passed. tests/integration: 122 passed.
+- Migration `l4d5e6f7g8h9`: upgrade/downgrade/upgrade verified on PostgreSQL.
+- Live evidence: `docs/audits/COST_QUALITY_CONTENT_PIPELINE.md`,
+  `benchmarks/pipeline/artifacts/smoke_*.json`, `dry_run_*.json`.
+
+## Phase 8 remaining owner decisions
+
+- German: BLOCKED at final fidelity gate — 2 BLOCKER findings (premium
+  editor added unsupported claims). Owner may authorize a repair cycle or
+  accept a new premium run.
+- English: loop budget exhausted without convergence — repair calibration
+  or a fresh run is an owner decision.
+- Arabic: rerun pending OpenRouter credit top-up (quota stop, not a defect).

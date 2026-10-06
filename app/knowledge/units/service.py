@@ -18,6 +18,7 @@ from app.db.session import Database
 from app.knowledge.domain import RunStatus
 from app.knowledge.llm.base import LLMProvider
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import (
     ExtractionRun,
     Source,
@@ -65,7 +66,7 @@ class KnowledgeUnitService:
         batch_size: int = 10,
     ) -> None:
         self.database = database
-        self.provider = provider or resolve_llm_provider()
+        self.provider = provider or resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT)
         self.model = model
         self.batch_size = batch_size
 

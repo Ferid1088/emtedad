@@ -18,6 +18,7 @@ from app.db.base import Base
 from app.dialogue import models as dialogue_models  # noqa: F401
 from app.editorial_channels import models as editorial_channel_models  # noqa: F401
 from app.knowledge import models as knowledge_models  # noqa: F401
+from app.knowledge.llm import models as llm_models  # noqa: F401
 from app.knowledge.structure import models as source_structure_models  # noqa: F401
 from app.knowledge.units import models as knowledge_unit_models  # noqa: F401
 from app.lecture import models as lecture_models  # noqa: F401

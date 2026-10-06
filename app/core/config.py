@@ -35,6 +35,40 @@ class Settings(BaseSettings):
     log_json: bool = True
     llm_provider: Literal["devin"] | None = None
     devin_api_key: SecretStr | None = None
+    # Multi-model routing: when enabled, role-scoped provider resolution
+    # routes AgentRoles to configured APIMaster models. APIMaster is the
+    # single external LLM gateway — there is no other runtime provider.
+    # With routing disabled every role-scoped resolution requires the
+    # explicit Devin opt-in below.
+    llm_routing_enabled: bool = False
+    # Explicit opt-in for the Devin provider. Production default is false:
+    # with routing enabled every declared AgentRole resolves through
+    # APIMaster or fails configuration; without it nothing silently falls
+    # back to Devin. Enable only for development, tests, or explicit
+    # legacy/manual operations.
+    allow_devin_runtime_fallback: bool = False
+    apimaster_api_key: SecretStr | None = None
+    apimaster_base_url: str = "https://apimaster.ai/v1"
+    apimaster_timeout_seconds: int = 300
+    # Bounded per-call retry for transient transport/5xx/429 failures;
+    # distinct from schema repair (max one repair per call).
+    apimaster_max_retries: int = 2
+    # Wire protocol for the reasoning model (Sol). "responses" passed the
+    # §37 certification gate across two real loops: equal finding quality,
+    # 100% schema compliance, ~41% fewer prompt tokens on large payloads
+    # and ~95% on small ones (it skips the injected Chat prefix). Any
+    # Responses failure falls back to Chat exactly once, recorded in
+    # telemetry (requested/actual/fallback fields).
+    apimaster_sol_protocol: Literal["chat", "responses"] = "responses"
+    # Role→model defaults (APIMaster marketplace IDs, verified live against
+    # GET /v1/models). Models live in configuration, never in domain code;
+    # these fields are the single source of truth for the routing matrix
+    # and may be overridden via EMTEDAD_* environment variables or owner
+    # settings.
+    model_role_high_volume: str = "qwen3.8-flash"
+    model_role_reasoning: str = "gpt-6.1-sol"
+    model_role_editorial: str = "gemini-3.8-flash"
+    model_role_premium: str = "gpt-6-astra"
     # Bounded in-call retry for transient 429s and hard quota; quota
     # contention clears in minutes (foreign sessions share the account cap),
     # so both classes back off rather than fail on the first hit.
@@ -56,15 +90,19 @@ class Settings(BaseSettings):
     youtube_mcp_enabled: bool = False
     youtube_mcp_url: str = "http://127.0.0.1:8790"
     youtube_mcp_timeout_seconds: int = 60
-    # Owner-configurable web research. Provider-agnostic: "openrouter" calls a
-    # chat-completions endpoint with web-search annotations, "tavily" calls a
-    # search endpoint, "custom" posts {query} to base_url and parses common
-    # result shapes. Owner overrides persist in the owner_settings table.
+    # Owner-configurable web research retrieval. "tavily" calls a search
+    # endpoint, "custom" posts {query} to base_url and parses common result
+    # shapes. "apimaster" is retained in the value space for stored owner
+    # overrides but is refused at build time: an LLM answer endpoint cannot
+    # provide verifiable source URLs — retrieval must come from a real
+    # search backend. Owner overrides persist in the owner_settings table.
     web_research_enabled: bool = False
-    web_research_provider: Literal["openrouter", "tavily", "custom"] = "openrouter"
-    web_research_base_url: str = "https://openrouter.ai/api/v1"
+    web_research_provider: Literal["apimaster", "tavily", "custom", "wikipedia"] = (
+        "tavily"
+    )
+    web_research_base_url: str = "https://api.tavily.com"
     web_research_api_key: SecretStr | None = None
-    web_research_model: str = "openai/gpt-4o-mini:online"
+    web_research_model: str = ""
     web_research_max_results: int = 5
     web_research_timeout_seconds: int = 90
     web_research_max_page_bytes: int = 1_500_000

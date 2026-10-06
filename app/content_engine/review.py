@@ -32,6 +32,7 @@ from app.content_engine.models import (
     ReviewRun,
     ScriptDraft,
 )
+from app.content_engine.patching import candidate_rank, is_better_candidate
 from app.content_engine.service import GateBlockedError
 from app.content_engine.writing.books import (
     BOOK_REFERENCE_CHECKS,
@@ -67,6 +68,8 @@ from app.editorial_channels.models import (
 )
 from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
+from app.knowledge.llm.telemetry import DatabaseLLMRecorder
 from app.knowledge.units.models import KnowledgeUnit
 from app.lecture.domain import MasterOriginType, MasterStatus
 from app.lecture.models import (
@@ -476,9 +479,24 @@ class ScriptService:
             )
             effective = await StudioSettingsService(self.database).effective()
             wpm = speech_wpm(effective, language)
-            provider = self.provider or resolve_llm_provider()
+            recorder = DatabaseLLMRecorder(
+                self.database,
+                run_scope="production",
+                content_brief_id=brief_id,
+                language=language,
+            )
+            provider = self.provider or resolve_llm_provider(
+                role=AgentRole.PERSIAN_SCRIPT_WRITER,
+                effective=effective,
+                recorder=recorder,
+            )
+            book_provider = self.provider or resolve_llm_provider(
+                role=AgentRole.BOOK_REFERENCE_SELECTOR,
+                effective=effective,
+                recorder=recorder,
+            )
             book_refs = await self._select_book_references(
-                session, provider, brief, master
+                session, book_provider, brief, master
             )
             duration_min = float(str(effective.get("target_duration_min_minutes", 25)))
             duration_max = float(str(effective.get("target_duration_max_minutes", 30)))
@@ -796,7 +814,10 @@ class ScriptService:
         review; a provider failure leaves a FAILED run with its error.
         """
 
-        provider = self.provider or resolve_llm_provider()
+        provider = self.provider or resolve_llm_provider(
+            role=AgentRole.FACT_CRITIC,
+            recorder=DatabaseLLMRecorder(self.database, run_scope="production"),
+        )
         run_id = await self._start_review_run(draft_id, provider)
         started = time.monotonic()
         try:
@@ -985,7 +1006,112 @@ class ScriptService:
             run.status = ReviewRunStatus.COMPLETED
             run.latency_ms = int((time.monotonic() - started) * 1000)
             run.completed_at = utc_now()
+            await self._retain_best_candidate(session, draft, run, findings, brief)
             return findings
+
+    async def _retain_best_candidate(
+        self,
+        session: AsyncSession,
+        draft: ScriptDraft,
+        run: ReviewRun,
+        findings: list[ReviewFinding],
+        brief: ContentBrief | None,
+    ) -> None:
+        """Best-of-history promotion for revision candidates (§3–§5).
+
+        A revision is a CANDIDATE: when its own review completes, its
+        rank is compared against the parent draft's last completed
+        review under the hard ordering. If the candidate is not strictly
+        better, the parent is un-archived, the candidate is archived,
+        and the findings the revision claimed to address are reopened —
+        a newer version never silently replaces a better one.
+        """
+
+        parent_raw = draft.provenance_json.get("revised_from_draft")
+        if not isinstance(parent_raw, str) or not parent_raw:
+            return
+        parent = await session.get(ScriptDraft, UUID(parent_raw))
+        if parent is None or parent.status is not DraftStatus.ARCHIVED:
+            return
+        parent_run = await session.scalar(
+            select(ReviewRun)
+            .where(
+                ReviewRun.script_draft_id == parent.id,
+                ReviewRun.status == ReviewRunStatus.COMPLETED,
+            )
+            .order_by(ReviewRun.round_number.desc())
+            .limit(1)
+        )
+        if parent_run is None:
+            return
+        effective = await StudioSettingsService(self.database).effective()
+        wpm = speech_wpm(effective, draft.language)
+        min_min = float(str(effective.get("target_duration_min_minutes", 25)))
+        max_min = float(str(effective.get("target_duration_max_minutes", 30)))
+
+        def in_band(text: str) -> bool:
+            return min_min <= _words(text) / wpm <= max_min
+
+        parent_fact_blockers = (
+            await session.scalar(
+                select(func.count(ReviewFinding.id)).where(
+                    ReviewFinding.review_run_id == parent_run.id,
+                    ReviewFinding.critic_role == CriticRole.FACT.value,
+                    ReviewFinding.severity == FindingSeverity.BLOCKER,
+                )
+            )
+            or 0
+        )
+        cand_rank = candidate_rank(
+            blockers=run.blocking_count or 0,
+            warnings=run.major_count or 0,
+            fidelity_failed=any(
+                f.critic_role == CriticRole.FACT.value
+                and f.severity is FindingSeverity.BLOCKER
+                for f in findings
+            ),
+            duration_in_band=in_band(draft.text),
+            encoding_clean="\ufffd" not in draft.text,
+            total_findings=run.finding_count or 0,
+        )
+        parent_rank = candidate_rank(
+            blockers=parent_run.blocking_count or 0,
+            warnings=parent_run.major_count or 0,
+            fidelity_failed=parent_fact_blockers > 0,
+            duration_in_band=in_band(parent.text),
+            encoding_clean="\ufffd" not in parent.text,
+            total_findings=parent_run.finding_count or 0,
+        )
+        decision = {
+            "candidate_rank": list(cand_rank),
+            "incumbent_rank": list(parent_rank),
+            "incumbent_draft_id": str(parent.id),
+        }
+        if is_better_candidate(cand_rank, parent_rank):
+            draft.provenance_json = {
+                **draft.provenance_json,
+                "candidate_decision": {**decision, "decision": "promoted"},
+            }
+            return
+        # Reject the regression: restore the parent as the live draft and
+        # reopen exactly the findings this candidate was produced to fix.
+        parent.status = DraftStatus(
+            str(draft.provenance_json.get("parent_status") or "REVISED")
+        )
+        draft.status = DraftStatus.ARCHIVED
+        draft.provenance_json = {
+            **draft.provenance_json,
+            "candidate_decision": {**decision, "decision": "rejected"},
+        }
+        addressed_raw = draft.provenance_json.get("addressed_finding_ids")
+        addressed = addressed_raw if isinstance(addressed_raw, list) else []
+        for fid in addressed:
+            finding = await session.get(ReviewFinding, UUID(str(fid)))
+            if finding is not None and finding.status is FindingStatus.ADDRESSED:
+                finding.status = FindingStatus.OPEN
+                finding.resolution_note = (
+                    "revision candidate rejected — finding reopened"
+                )
 
     async def revise_draft(self, draft_id: UUID) -> ScriptDraft:
         """Create a new draft version addressing all OPEN findings.
@@ -1060,8 +1186,17 @@ class ScriptService:
                         "Waive findings, approve, or start a new review "
                         "cycle explicitly."
                     )
-            provider = self.provider or resolve_llm_provider()
             effective = await StudioSettingsService(self.database).effective()
+            provider = self.provider or resolve_llm_provider(
+                role=AgentRole.PREMIUM_TARGETED_REVISION,
+                effective=effective,
+                recorder=DatabaseLLMRecorder(
+                    self.database,
+                    run_scope="production",
+                    content_brief_id=draft.content_brief_id,
+                    language=draft.language,
+                ),
+            )
             revision_wpm = speech_wpm(effective, draft.language)
             brief = await session.get(ContentBrief, draft.content_brief_id)
             result = await provider.extract(
@@ -1122,6 +1257,7 @@ class ScriptService:
                 provenance_json={
                     **draft.provenance_json,
                     "revised_from_draft": str(draft.id),
+                    "parent_status": draft.status.value,
                     "addressed_finding_ids": [str(f.id) for f in open_findings],
                 },
                 content_hash=_hash(revised.text),

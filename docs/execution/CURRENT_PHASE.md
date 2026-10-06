@@ -1,4 +1,53 @@
-# Pending Phase: Phase 6.2 — approval semantics + cycles + quote provenance + real translation, awaiting owner review
+# Pending Phase: Master cost-quality content pipeline — Persian owner-approved master → native DE/EN/AR, awaiting owner review
+
+Status (2026-10-05, uncommitted on `openrouter-qwen-benchmark`):
+
+- APIMaster is the canonical external LLM gateway: role-based
+  `resolve_llm_provider` (`AgentRole` → `ModelRole` → configured
+  marketplace model ID: `gpt-6.1-sol`, `gemini-3.8-flash`,
+  `gpt-6-astra`; `qwen3.8-flash` holds `HIGH_VOLUME_REASONING` which no
+  live role maps to — it failed live A/B certification, see
+  `docs/audits/APIMASTER_CERTIFICATION.md`) with owner DB overrides;
+  the factory fails closed — disabled routing, unmapped roles, or
+  missing role declarations raise `RoutingConfigurationError` unless
+  `allow_devin_runtime_fallback` is explicitly set.
+- APIMaster provider (`app/knowledge/llm/apimaster.py`): strict
+  JSON-schema output (`json_object` mode for `gemini-3.8-flash`, which
+  ignores `json_schema` — verified live), Pydantic validation, one
+  bounded repair, typed errors, bounded retries, provider-reported
+  telemetry only; `ops.llm_call_events` records real tokens/costs.
+- No batch API: live `POST /v1/batches` → 404. All premium work runs
+  synchronously; `ProviderBatchJob`, the poller, and batch pipeline
+  stages were removed.
+- Persian owner-approval is now a hard gate on every localization entry
+  point; stale Persian sources invalidate packages and runs.
+- Shared `LocalizationSemanticPackage` (reasoning model) is the single
+  semantic contract for all target languages; deterministic validation
+  against the master forbids invented claims and epistemic drift.
+- Native pipeline per language: coverage → reconstruction → narrative edit
+  → native/audience/fidelity critics + deterministic duration finding
+  inside the review loop → bounded targeted repair (plus exactly one
+  dedicated duration-only pass when length is the sole remaining
+  blocker) → premium final editor → final fidelity + duration +
+  scoped protected-terminology gates → `READY_FOR_VOICE`/`BLOCKED`;
+  localized texts are `ScriptDraft`s with `lineage="localized"`.
+- Studio shows per-language pipeline truth and actual provider costs;
+  web research retrieves through Tavily (default), custom, or keyless
+  Wikipedia — APIMaster is refused as a retrieval backend because it
+  cannot return verifiable URLs — OpenRouter is fully retired from
+  runtime, kept only as historical provenance.
+- Stop state: NOT committed; owner review checkpoint.
+
+Historical (OpenRouter era, 2026-10-04):
+
+- Multi-model routing, provider telemetry, and the localization gate
+  architecture were first delivered over OpenRouter, including a batch
+  execution path. Evidence: `docs/audits/COST_QUALITY_CONTENT_PIPELINE.md`.
+- Evidence: 386 unit + 122 integration tests, mypy/ruff clean, migration
+  upgrade/downgrade verified, live canary `docs/audits/COST_QUALITY_CONTENT_PIPELINE.md`.
+- Stop state: NOT committed; owner review checkpoint.
+
+# Earlier state: Phase 6.2 — approval semantics + cycles + quote provenance + real translation, awaiting owner review
 
 Status (2026-10-06, Phase 7 pre-commit integrity audit — uncommitted):
 

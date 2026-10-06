@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198111-s4dvg1OqPOSQXHkJpH2o",
+ "object": "chat.completion",
+ "created": 1791198111,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "وقتی حرف‌های نگفته انباشته میشن، این فقط یه علامت خستگی عاطفی نیست؛ یه فاصلهٔ تدریجیه که تو رابطه جا افتاده. شاید اولش ترس از درد دیگری بود، شاید ترس از شنیده نشدن. بعد هر بار که سکوت کردی، یه ذره بیشتر از وجودت تو اون فضای مشترک کم شد. حالا دیگه حس می‌کنی مثل یه غریبه با چشمان آشنا هستی.  \nاما این پریشانی خودش یه نوع صداقت نسبیه — یعنی هنوز می‌تونی ببینی چی از قلم افتاده. این یعنی فضایی برای صحبت کردن هنوز باقی مونده، حتی اگه تنگ و شکننده باشه.  \nالبته لزوماً معنی‌اش این نیست که همه چیز قابل جبرانه یا باید جبران بشه. شاید بعضی حرف‌ها الان زیادی دیر رسیده باشن، شاید طرف مقابل دیگه ظرفیتش رو نداشته باشه. ولی مهم اینه که تو الان این رو حس می‌کنی. و این حس، ارزشِ یه تلاش صادقانه رو داره — نه به خاطر تعهد کلیشه‌ای، بلکه به خاطر احترام به خودت، به اون چیزی که وقتی ساکت می‌مونی، داخلت می‌سوزه.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 300,
+  "completion_tokens": 476,
+  "total_tokens": 776,
+  "cost": 0.00030308,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00030308,
+   "upstream_inference_prompt_cost": 2.7e-05,
+   "upstream_inference_completions_cost": 0.00027608
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

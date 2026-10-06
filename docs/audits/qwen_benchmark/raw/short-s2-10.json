@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198167-9gJ6Cyet5qTcCFrbNvaB",
+ "object": "chat.completion",
+ "created": 1791198167,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "متأسفانه من به متن اصلی کتاب «دیرین‌پیمان» ویکتور فرانکل دسترسی مستقیم ندارم و نمی‌توانم جمله‌ای دقیق از آن نقل کنم. اما می‌دانم که این کتاب دربارهٔ تجربهٔ فرانکل در اردوگاه‌های مرگ نازی و جست‌وجوی معنا در میانهٔ رنج است. اگر بخواهیم با صداقت کار کنیم، بهترین کار این است که به جای ساختن یا حدس زدن نقل‌قول، به منابع معتبر مراجعه کنیم یا اشاره کنیم که متن اصلی در دسترس نیست. در آموزش، صداقت مهم‌تر از ظاهر دانستن است.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 317,
+  "completion_tokens": 239,
+  "total_tokens": 556,
+  "cost": 0.00016715,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00016715,
+   "upstream_inference_prompt_cost": 2.853e-05,
+   "upstream_inference_completions_cost": 0.00013862
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

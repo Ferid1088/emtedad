@@ -4,7 +4,6 @@ Revision ID: c7d8e9f0a1b2
 Revises: b5c6d7e8f9a0
 """
 
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 

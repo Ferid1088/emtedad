@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197691-c36ybHOrcFN3vjLq4EEP",
+ "object": "chat.completion",
+ "created": 1791197691,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Google",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\n  \"classification\": \"HYPOTHESIS\",\n  \"reason_fa\": \"این گزاره یک نظریه یا فرضیه جدید را بیان می‌کند که هنوز مورد آزمون تجربی قرار نگرفته است. اشاره به «پیشنهاد می‌کند» و «هنوز آزمون تجربی مستقیم نداشته است» نشان‌دهندهٔ ماهیت فرضی و آزمایش‌نشده آن است، که ویژگی اصلی یک فرضیه (HYPOTHESIS) محسوب می‌شود.\"\n}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 113,
+  "completion_tokens": 172,
+  "total_tokens": 285,
+  "cost": 0.00017622,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 2,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00017622,
+   "upstream_inference_prompt_cost": 2.486e-05,
+   "upstream_inference_completions_cost": 0.00015136
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

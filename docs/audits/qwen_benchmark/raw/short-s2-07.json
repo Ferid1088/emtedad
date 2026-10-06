@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198123-3qo21H7YD6CBxYxYLim5",
+ "object": "chat.completion",
+ "created": 1791198123,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "وقتی می‌گیم یه رفتار یا ویژگی تکاملی «چون در گذشته فایده داشته» بقای بیشتری می‌داده، گاهی داریم یه داستان منطقی تعریف می‌کنیم — ولی نه لزوماً یه دانش قابل آزمون. مثلاً می‌گیم زنان از صدای مردان عمیق‌تر جذب می‌شن چون قبلاً نشانهٔ بدنِ قوی و سلامتی بوده و این باعث بقا و تولیدمثل بهتر می‌شد. این توضیح جالبه، منطقی هم به نظر میاد، ولی مشکل اینجاست که نمی‌تونیم واقعاً آزمایش کنیم که آیا این واقعاً در گذشتهٔ تکاملی انسان اون‌جوری بوده یا نه. شواهد مستقیم از رفتار جنسیتی در انسان‌های نوسنگری نداریم. پس این توضیحات ممکنه «قصه‌های بعدِ واقعه» باشن: تفسیرهای جذاب که با داده‌ها سازگارن، ولی به‌راحتی رد یا اثبات نمی‌شن. این رو به اسم «فرضیه‌های تکاملی غیرآزمون‌پذیر» می‌شناسن. دانشمندا اینو می‌دونن، ولی گاهی رسانه‌ها یا حتی برخی مطالعات این داستان‌ها رو مثل حقیقت ارائه می‌دن. در حالی که علم واقعی وقتی میاد جلوه که بتونیم پیش‌بینی کنیم، آزمایش کنیم، و اشتباه‌مون رو بپذیریم.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 301,
+  "completion_tokens": 535,
+  "total_tokens": 836,
+  "cost": 0.00045142,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 208,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00045142,
+   "upstream_inference_prompt_cost": 2.342e-05,
+   "upstream_inference_completions_cost": 0.000428
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

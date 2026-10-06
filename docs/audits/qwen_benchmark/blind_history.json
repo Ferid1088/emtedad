@@ -1,0 +1,15 @@
+{
+ "tag": "history",
+ "slot_A_is": "longform_history_text.fa.txt",
+ "slot_B_is": "baseline_history_v11.fa.txt",
+ "verdict": {
+  "naturalness": "B",
+  "spoken_rhythm": "B",
+  "narrative_quality": "B",
+  "factual_discipline": "B",
+  "epistemic_honesty": "B",
+  "book_reference_quality": "B",
+  "publishability": "B",
+  "justification": "B reads as written for the ear: varied pacing, concrete imagery (distant campfire smoke, shared water sources), and smooth transitions that carry a listener through the argument. A is competent but choppier and repetitive, with staccato fragments that feel written rather than spoken. Both preserve uncertainty honestly, but B states its caveats more fully and concretely (replication limits of oxytocin findings, counterexamples of peaceful coexistence). B also grounds the argument in a real, correctly attributed reference (Haidt's The Righteous Mind), while A cites no sources. Neither invents facts, but B's hedged framing ('a possible path, not a mechanical law') is more disciplined. B is closer to voicing-ready; A needs tightening."
+ }
+}

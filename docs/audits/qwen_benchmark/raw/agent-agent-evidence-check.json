@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198507-sPgzp33roH1lGuwONSxh",
+ "object": "chat.completion",
+ "created": 1791198508,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\"confidence\": 0.95, \"reason_fa\": \"ادعای مطرح شده بیان می‌کند که تحمل عدم قطعیت در افراد بالاتر با اضطراب کمتری همراه است. در این پاراگراف اشاره شده که مطالعات همبستگی نشان می‌دهند نمرات بالاتر در 'عدم تحمل عدم قطعیت' با سطح بالاتر اضطراب همراه است، که به‌طور غیرمستقیم نشان می‌دهد تحمل بیشتر (به‌عنوان معکوس عدم تحمل) با اضطراب کمتری مرتبط است. اگرچه جهت علّیت مشخص نیست، اما رابطه معکوس بین متغیرها در متن تأیید می‌شود. بنابراین، این مطلب از ادعا حمایت مستقیم می‌کند.\" , \"supported\": true}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 114,
+  "completion_tokens": 263,
+  "total_tokens": 377,
+  "cost": 0.0001628,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0001628,
+   "upstream_inference_prompt_cost": 1.026e-05,
+   "upstream_inference_completions_cost": 0.00015254
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

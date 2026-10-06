@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198078-nyxXRHiSO7yNVv2Qq96g",
+ "object": "chat.completion",
+ "created": 1791198078,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "GMICloud",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "هنوز دقیقاً نمی‌دانیم چرا می‌خوابیم، چون خواب یک پدیدهٔ پیچیده و چندلایه است که در سطوح مختلف زیستی، شناختی و روانی اتفاق می‌افتد. می‌دانیم خواب بر یادگیری، تثبیت خاطرات، ترمیم بدن و تنظیم هورمون‌ها تأثیر دارد، اما این‌ها لزوماً دلیل اصلی خواب نیستند — شاید فقط فواید جانبی باشند. بعضی نظریه‌ها می‌گویند خواب برای پاکسازی مغز از مواد زائد شیمیایی است، بعضی می‌گویند برای کاهش مصرف انرژی، و بعضی دیگر فکر می‌کنند نقشی در تکامل هوش داشته. اما هیچ‌کدام جواب کامل نیستند. آزمایش روی حیوانات نشان می‌دهد که محرومیت از خواب کشنده است، پس باید ضرورتی حیاتی داشته باشد. اما دقیقاً چه نیازی را برآورده می‌کند؟ نمی‌دانیم. مرز دانش ما اینجاست: می‌فهمیم چه چیزهایی در حین خواب اتفاق می‌افتد، اما نمی‌فهمیم چرا ذات خواب — یعنی از دست دادن هوشیاری — برای بقای ما ضروری شده است. شاید جواب در رابطهٔ پیچیدهٔ مغز با زمان، انرژی و اطلاعات نهفته باشد. هنوز رازش باقی است.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 284,
+  "completion_tokens": 505,
+  "total_tokens": 789,
+  "cost": 0.00018732,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 204,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00018732,
+   "upstream_inference_prompt_cost": 1.057e-05,
+   "upstream_inference_completions_cost": 0.00017675
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

@@ -9,8 +9,9 @@ from sqlalchemy import select
 
 from app.core.ayin.domain import LanguageCode
 from app.db.session import Database
-from app.knowledge.llm.base import StructuredExtractionRequest
+from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.lecture.domain import PublicationLanguage
 from app.lecture.models import LectureMasterVersion, LectureProject
 from app.lecture.service import LectureMasterService
@@ -21,6 +22,7 @@ from app.localization.domain import (
     PronunciationStatus,
     SemanticValidationStatus,
 )
+from app.localization.gate import require_approved_persian_draft
 from app.localization.models import (
     LocalizationProject,
     LocalizationStatement,
@@ -55,7 +57,9 @@ class LocalizationService:
     def __init__(self, database: Database) -> None:
         self.database = database
         self.master_service = LectureMasterService(database)
-        self.provider = resolve_llm_provider()
+        # Resolved lazily per call so tests/operators can inject a stub and
+        # construction never hides an LLM side effect.
+        self.provider: LLMProvider | None = None
 
     async def create(
         self,
@@ -64,6 +68,18 @@ class LocalizationService:
         *,
         created_by: str = "operator",
     ) -> UUID:
+        async with self.database.transaction() as session:
+            master = await session.get(LectureMasterVersion, master_id)
+            if master is None:
+                raise ValueError("lecture master not found")
+            brief_id = master.content_brief_id
+        if brief_id is not None:
+            await require_approved_persian_draft(self.database, brief_id)
+        else:
+            raise ValueError(
+                "localization requires a content-brief master with an "
+                "owner-approved Persian script"
+            )
         export = await self.master_service.export(master_id)
         if export.master.get("status") != "READY":
             raise ValueError("localization requires a READY Semantic Master")
@@ -80,6 +96,9 @@ class LocalizationService:
             for claim in export.claims
         ]
         effective = await StudioSettingsService(self.database).effective()
+        provider = self.provider or resolve_llm_provider(
+            role=AgentRole.NATIVE_RECONSTRUCTION, effective=effective
+        )
         wpm = speech_wpm(effective, language.value)
         target_seconds = 0
         for section in export.sections:
@@ -103,7 +122,7 @@ class LocalizationService:
             )
         result = cast(
             _RealizationBatch,
-            await self.provider.extract(
+            await provider.extract(
                 StructuredExtractionRequest(
                     task="semantic lecture localization",
                     prompt_version="phase-9.1-real-v1",
@@ -281,6 +300,9 @@ class LocalizationService:
                 else None
             )
         effective = await StudioSettingsService(self.database).effective()
+        provider = self.provider or resolve_llm_provider(
+            role=AgentRole.DURATION_ADJUSTMENT, effective=effective
+        )
         wpm = speech_wpm(effective, language.value)
         if not target_seconds:
             target_seconds = int(
@@ -312,7 +334,7 @@ class LocalizationService:
         ]
         result = cast(
             _RealizationBatch,
-            await self.provider.extract(
+            await provider.extract(
                 StructuredExtractionRequest(
                     task="localization duration adjustment",
                     prompt_version="phase-7-duration-v2",

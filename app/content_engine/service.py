@@ -32,8 +32,11 @@ from app.db.session import Database
 from app.editorial_channels.models import ChannelStrategyVersion
 from app.knowledge.llm.base import LLMProvider
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
+from app.knowledge.llm.telemetry import DatabaseLLMRecorder
 from app.knowledge.units.domain import KnowledgeUnitType
 from app.knowledge.units.models import KnowledgeUnit
+from app.ops.settings.service import StudioSettingsService
 from app.research.domain import EvidenceMatrixStatus
 from app.research.models import (
     EvidenceMatrix,
@@ -188,7 +191,15 @@ class ContentEngineService:
                 ).all()
             )
             stories = await _story_units(session, brief)
-            provider = self.provider or resolve_llm_provider()
+            provider = self.provider or resolve_llm_provider(
+                role=AgentRole.ARGUMENT_DRAFT,
+                effective=await StudioSettingsService(self.database).effective(),
+                recorder=DatabaseLLMRecorder(
+                    self.database,
+                    run_scope="production",
+                    content_brief_id=brief_id,
+                ),
+            )
             output, labels = await ArgumentArchitectAgent(
                 provider, model=self.model
             ).plan(
@@ -208,7 +219,15 @@ class ContentEngineService:
                 raise LookupError(f"Unknown content brief {brief_id}")
             argument = await _latest_argument(session, brief_id)
             stories = await _story_units(session, brief)
-            provider = self.provider or resolve_llm_provider()
+            provider = self.provider or resolve_llm_provider(
+                role=AgentRole.NARRATIVE_DRAFT,
+                effective=await StudioSettingsService(self.database).effective(),
+                recorder=DatabaseLLMRecorder(
+                    self.database,
+                    run_scope="production",
+                    content_brief_id=brief_id,
+                ),
+            )
             output, labels = await NarrativeArchitectAgent(
                 provider, model=self.model
             ).plan(

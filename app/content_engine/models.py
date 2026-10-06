@@ -201,6 +201,11 @@ class ScriptDraft(Base):
     editorial_project_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
     language: Mapped[str] = mapped_column(String(16), default="fa")
+    # 'primary' = the editorial master script the owner reviews/approves
+    # (Persian in production); 'localized' = a target-language script
+    # derived from an owner-approved primary via a semantic package.
+    # Production stage derivation only ever reads 'primary' drafts.
+    lineage: Mapped[str] = mapped_column(String(16), default="primary")
     version_number: Mapped[int] = mapped_column(Integer)
     variant_index: Mapped[int] = mapped_column(Integer, default=0)
     text: Mapped[str] = mapped_column(Text)
@@ -338,6 +343,9 @@ class ReviewFinding(Base):
     severity: Mapped[FindingSeverity] = mapped_column(
         _enum(FindingSeverity, "finding_severity")
     )
+    # Stable script section the finding lives in (patch-repair routing).
+    # Empty when the defect spans the whole script.
+    section_id: Mapped[str] = mapped_column(String(32), default="")
     location: Mapped[str] = mapped_column(Text)
     code: Mapped[str] = mapped_column(String(128))
     explanation: Mapped[str] = mapped_column(Text)

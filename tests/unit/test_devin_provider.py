@@ -469,15 +469,31 @@ async def test_devin_provider_cleanup_failure_preserves_original_error(
         await provider.extract(_request())
 
 
-def test_factory_resolves_devin() -> None:
+def test_factory_resolves_devin(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.knowledge.llm.factory as factory_module
+    from app.core.config import Settings
     from app.knowledge.llm.factory import resolve_llm_provider
 
+    monkeypatch.setattr(
+        factory_module,
+        "get_settings",
+        lambda: Settings.model_construct(allow_devin_runtime_fallback=True),
+    )
     assert isinstance(resolve_llm_provider(), DevinCloudProvider)
 
 
-def test_factory_ignores_legacy_default_arg() -> None:
+def test_factory_ignores_legacy_default_arg(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.knowledge.llm.factory as factory_module
+    from app.core.config import Settings
     from app.knowledge.llm.factory import resolve_llm_provider
 
+    monkeypatch.setattr(
+        factory_module,
+        "get_settings",
+        lambda: Settings.model_construct(allow_devin_runtime_fallback=True),
+    )
     assert isinstance(resolve_llm_provider("codex"), DevinCloudProvider)
 
 

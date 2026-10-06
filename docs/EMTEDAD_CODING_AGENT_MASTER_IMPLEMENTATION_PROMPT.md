@@ -682,10 +682,10 @@ class EditorialChannel(Base):
     __table_args__ = {"schema": CONTENT}
 
     id: UUID
-    slug: str               # unique
+    slug: str  # unique
     name: str
     description: str
-    status: str             # ACTIVE / INACTIVE
+    status: str  # ACTIVE / INACTIVE
     icon: str | None
     created_at: datetime
 ```

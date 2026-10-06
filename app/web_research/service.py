@@ -117,9 +117,11 @@ class WebResearchService:
         database: Database,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
+        effective_overrides: dict[str, object] | None = None,
     ) -> None:
         self.database = database
         self.transport = transport
+        self.effective_overrides = effective_overrides
 
     async def enabled(self) -> bool:
         return bool((await self._effective()).get("web_research_enabled"))
@@ -270,7 +272,12 @@ class WebResearchService:
                 transport=self.transport,
             ) as client:
                 response = await client.get(
-                    url, headers={"Accept": "text/html,application/xhtml+xml"}
+                    url,
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml",
+                        # Wikimedia and many sites reject default UAs.
+                        "User-Agent": "EmtedadApp/1.0 (research; httpx)",
+                    },
                 )
                 response.raise_for_status()
                 content_type = response.headers.get("content-type", "")
@@ -324,4 +331,7 @@ class WebResearchService:
         )
 
     async def _effective(self) -> dict[str, object]:
-        return await StudioSettingsService(self.database).effective()
+        effective = await StudioSettingsService(self.database).effective()
+        if self.effective_overrides:
+            effective.update(self.effective_overrides)
+        return effective

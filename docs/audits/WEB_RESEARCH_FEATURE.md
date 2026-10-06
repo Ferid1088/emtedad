@@ -1,5 +1,9 @@
 # Web Research + Duration-Gap Fill — Audit
 
+> HISTORICAL — written before the APIMaster migration (2026-10-05). The
+> `openrouter` provider described below was replaced by `apimaster`; the
+> text records the original design.
+
 Date: 2026-10-03
 Scope: owner-configurable internet research, 20–25-minute material rule.
 

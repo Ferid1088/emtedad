@@ -1,0 +1,37 @@
+[
+ {
+  "check": "missing_key",
+  "ok": true,
+  "detail": "OpenRouter API key is not configured"
+ },
+ {
+  "check": "malformed_response",
+  "ok": true,
+  "detail": "response is not JSON"
+ },
+ {
+  "check": "empty_choices",
+  "ok": true,
+  "detail": "empty or missing message content"
+ },
+ {
+  "check": "timeout",
+  "ok": true,
+  "detail": "transport error: TimeoutException"
+ },
+ {
+  "check": "429_bounded_retry",
+  "ok": true,
+  "detail": "3 attempts then raised: rate limited (429): rate limited"
+ },
+ {
+  "check": "invalid_model",
+  "ok": true,
+  "detail": "raised OpenRouterError: request failed: 400 {\"error\":{\"message\":\"qwen/definitely-not-a-real-model-xyz is not a valid model ID\",\"code\":400},\"user_id\":\"user_3Cxi9u86qmV0ig7uQiGnVEdHozC\"}"
+ },
+ {
+  "check": "key_absent_from_errors",
+  "ok": true,
+  "detail": "key not present in error chain"
+ }
+]

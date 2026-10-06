@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198623-pWMQ4PTHlvhXQCweGhR8",
+ "object": "chat.completion",
+ "created": 1791198624,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\n  \"findings\": [\n    {\n      \"location\": \"مردان به طور طبیعی منطقی‌ترند و زنان احساساتی‌تر\",\n      \"code\": \"gender_stereotype\",\n      \"severity\": \"BLOCKER\",\n      \"explanation\": \"تعمیم جنسیتی نادرست و تقویت کلیشه‌های جنسیتی بدون پشتوانه علمی معتبر.\"\n    },\n    {\n      \"location\": \"علم ثابت کرده که مغز مردانه برای تحلیل ساخته شده\",\n      \"code\": \"false_certainty\",\n      \"severity\": \"BLOCKER\",\n      \"explanation\": \"ادعای قطعی و بدون مدرک ('علم ثابت کرده') درباره تفاوت‌های شناختی جنسیتی که با شواهد علمی مدرن ناسازگار است.\"\n    },\n    {\n      \"location\": \"آلبرت اینشتین در کتاب معروفش «رابطهٔ نسبیت و روابط»\",\n      \"code\": \"fabricated_book_attribution\",\n      \"severity\": \"BLOCKER\",\n      \"explanation\": \"کتاب «رابطهٔ نسبیت و روابط» به اینشتین نسبت داده شده که هم از نظر عنوان و هم از نظر محتوا ساختگی است و وجود خارجی ندارد.\"\n    },\n    {\n      \"location\": \"«هر انسانی الگویی تکرارشونده است که نمی‌تواند از آن فرار کند.»\",\n      \"code\": \"invented_direct_quote\",\n      \"severity\": \"BLOCKER\",\n      \"explanation\": \"نقل‌قول مستقیم ساختگی از اینشتین بدون منبع معتبر یا وجود در آثار اصیل او.\"\n    },\n    {\n      \"location\": \"Semantic Master نشان می‌دهد که تغییر غیرممکن است\",\n      \"code\": \"scaffolding_leakage\",\n      \"severity\": \"WARNING\",\n      \"explanation\": \"استفاده از اصطلاح «Semantic Master» که احتمالاً نام ابزار یا مدل توسعه‌دهنده است و جایگاهی در متن گفتاری طبیعی ندارد.\"\n    }\n  ]\n}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 317,
+  "completion_tokens": 573,
+  "total_tokens": 890,
+  "cost": 0.00050278,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00050278,
+   "upstream_inference_prompt_cost": 4.438e-05,
+   "upstream_inference_completions_cost": 0.0004584
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

@@ -737,6 +737,40 @@
   {% else %}
   <p class="muted">Noch keine Sprachfassungen. „Übersetzen"-Aktion oben verwenden oder <a href="/studio/translations">Übersetzungen öffnen →</a></p>
   {% endif %}
+  {% if pipeline_runs %}
+  <h3>Native Pipeline</h3>
+  <table>
+    <thead><tr><th>Sprache</th><th>Stufe</th><th>Review-Loop</th><th>Fidelity</th><th>Native</th><th>Fehler</th></tr></thead>
+    <tbody>
+      {% for run in pipeline_runs %}
+      <tr>
+        <td>{{ run.language.value }}</td>
+        <td>{{ run.stage.value }}</td>
+        <td>{{ run.review_loop }}</td>
+        <td>{{ run.fidelity_status }}</td>
+        <td>{{ run.native_status }}</td>
+        <td class="muted">{{ (run.error or '')[:120] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% if llm_costs %}
+  <h3>Modellkosten (tatsächlich, provider-seitig)</h3>
+  <table>
+    <thead><tr><th>Sprache</th><th>Calls</th><th>Tokens</th><th>Kosten USD</th></tr></thead>
+    <tbody>
+      {% for row in llm_costs %}
+      <tr>
+        <td>{{ row.language }}</td>
+        <td>{{ row.calls }}</td>
+        <td>{{ row.tokens }}</td>
+        <td>{{ '%.4f' | format(row.cost_usd) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </section>
 {% else %}
 {{ not_built('Approved', 'Einen geprüften Entwurf freigeben, um diese Stufe zu erreichen.') }}

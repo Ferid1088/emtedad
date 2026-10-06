@@ -15,10 +15,10 @@ from app.web_research.service import html_to_text
 
 def _config(**overrides: object) -> ResearchConfig:
     base: dict[str, object] = {
-        "web_research_provider": "openrouter",
+        "web_research_provider": "tavily",
         "web_research_base_url": "https://api.test/v1",
         "web_research_api_key": "sk-test",
-        "web_research_model": "openai/gpt-4o-mini:online",
+        "web_research_model": "qwen3.8-flash",
         "web_research_max_results": 5,
         "web_research_timeout_seconds": 30,
         "web_research_max_page_bytes": 1_500_000,
@@ -35,13 +35,13 @@ class TestResearchConfig:
     def test_reads_all_fields_and_strips_trailing_slash(self) -> None:
         config = _config(web_research_base_url="https://api.test/v1/")
         assert config.base_url == "https://api.test/v1"
-        assert config.provider == "openrouter"
+        assert config.provider == "tavily"
         assert config.api_key == "sk-test"
         assert config.max_results == 5
 
     def test_falls_back_to_defaults(self) -> None:
         config = ResearchConfig({})
-        assert config.provider == "openrouter"
+        assert config.provider == "tavily"
         assert config.max_results == 5
         assert config.api_key == ""
 
@@ -51,68 +51,26 @@ class TestBuildProvider:
         with pytest.raises(WebResearchError):
             build_provider(_config(web_research_base_url=""))
 
+    def test_apimaster_is_not_a_retrieval_backend(self) -> None:
+        """LLM synthesis cannot provide verifiable source URLs — disabled."""
 
-class TestOpenRouterProvider:
-    async def test_parses_url_citation_annotations(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url.path == "/v1/chat/completions"
-            assert request.headers["authorization"] == "Bearer sk-test"
-            body = json.loads(request.content)
-            assert body["model"] == "openai/gpt-4o-mini:online"
-            return httpx.Response(
-                200,
-                json={
-                    "choices": [
-                        {
-                            "message": {
-                                "content": "The answer with sources.",
-                                "annotations": [
-                                    {
-                                        "type": "url_citation",
-                                        "url_citation": {
-                                            "url": "https://a.example/article",
-                                            "title": "Article A",
-                                            "content": "snippet a",
-                                        },
-                                    },
-                                    {
-                                        "type": "url_citation",
-                                        "url_citation": {
-                                            "url": "https://a.example/article#frag",
-                                            "title": "Duplicate",
-                                        },
-                                    },
-                                    {
-                                        "type": "url_citation",
-                                        "url_citation": {
-                                            "url": "https://b.example/page",
-                                            "title": "Page B",
-                                        },
-                                    },
-                                ],
-                            }
-                        }
-                    ]
-                },
-            )
+        with pytest.raises(WebResearchError, match="cannot retrieve"):
+            build_provider(_config(web_research_provider="apimaster"))
 
-        provider = build_provider(_config(), transport=_transport(handler))
-        report = await provider.research("what is x?", "context")
-        assert report.provider == "openrouter"
-        assert report.answer_text == "The answer with sources."
-        urls = [finding.url for finding in report.findings]
-        assert urls == ["https://a.example/article", "https://b.example/page"]
-
-    async def test_http_error_raises_web_research_error(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(401, json={"error": "bad key"})
-
-        provider = build_provider(_config(), transport=_transport(handler))
-        with pytest.raises(WebResearchError, match="openrouter"):
-            await provider.research("q", "")
+    def test_unknown_provider_raises(self) -> None:
+        with pytest.raises(WebResearchError, match="unknown web research"):
+            build_provider(_config(web_research_provider="mystery"))
 
 
 class TestTavilyProvider:
+    async def test_missing_key_fails_before_request(self) -> None:
+        provider = build_provider(
+            _config(web_research_api_key=""),
+            transport=_transport(lambda request: httpx.Response(200, json={})),
+        )
+        with pytest.raises(WebResearchError, match="web_research_api_key"):
+            await provider.research("q", "")
+
     async def test_parses_results_and_answer(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             assert request.url.path == "/search"

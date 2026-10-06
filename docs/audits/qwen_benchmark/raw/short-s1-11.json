@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197965-ZjhJkWFGcfaNTbRDSamJ",
+ "object": "chat.completion",
+ "created": 1791197965,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "StreamLake",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "ایدهٔ «تفاوت نقشه با سرزمین» می‌گوید که هر توصیف یا مدلی از واقعیت، خود واقعیت نیست. نقشه فقط نمایشی ساده‌شده و ناقص از سرزمین است، نه خود سرزمین. ما وقتی دربارهٔ چیزی فکر یا صحبت می‌کنیم، در واقع با نمادی سروکار داریم که ذهن یا زبان ساخته، نه با خود آن چیز. این تفاوت یادآور این است که درک ما از دنیا همیشه از طریق فیلترهای محدود — مثل کلمات، تجربیات و باورها — شکل می‌گیرد. بنابراین، گرفتار نشدن در این فرض که «توصیف» همان «واقعیت» است، می‌تواند به درک بهتری از دنیا و روابط بین انسان‌ها کمک کند.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 297,
+  "completion_tokens": 300,
+  "total_tokens": 597,
+  "cost": 0.00031437,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 3,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00031437,
+   "upstream_inference_prompt_cost": 6.237e-05,
+   "upstream_inference_completions_cost": 0.000252
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

@@ -1,0 +1,674 @@
+[
+  {
+    "case": "fidelity_critic_case_1",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Unlabeled target, paragraph beginning “In Browns Bericht lautet eine der ersten Antworten”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target adds specific numbing behaviors: compulsively using a phone, scrolling feeds, immersing oneself in work, and numbing the evening. The package supports emotional numbing as a response to vulnerability but supplies none of these behavioral examples. These additions extend the framework to particular everyday activities without source support."
+        },
+        {
+          "location": "Unlabeled target, “Der Schmerz verschwindet dadurch nicht”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "“Der Schmerz verschwindet dadurch nicht” adds a definite claim that numbing does not remove pain. The package describes reducing or dulling feeling and preserves limits on the proposed effects; it does not establish this additional claim about pain persisting."
+        },
+        {
+          "location": "Unlabeled target, paragraph beginning “Die Menschen in diesem Forschungsbericht”",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "“Ihr Mut erwuchs genau aus dieser Haltung” makes acceptance of imperfection the explicit cause of courage. The package presents acceptance of imperfection, courage, and wholehearted storytelling as characteristics in Brown's account, not as an established causal sequence."
+        },
+        {
+          "location": "Unlabeled target, paragraph beginning “Um zu verdeutlichen, wie weit verbreitet”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "“Sie verknüpft diese Phänomene mit dem kollektiven Versuch, Verletzlichkeit abzutöten” adds an explicit attribution that Brown links debt, obesity, addiction, and medication use to a collective attempt to eliminate vulnerability. The package authorizes the attributed comparison, not this causal explanation. The subsequent lack-of-evidence disclaimer does not supply a source basis for the added attribution."
+        },
+        {
+          "location": "Unlabeled target, “Allerdings liegen uns hier keine unabhängigen Belege vor, um einen solchen kausalen Zusammenhang wissenschaftlich zu bestätigen”",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The target qualifies only whether a causal connection can be scientifically confirmed. The package expressly withholds independent confirmation of the American-adult comparison itself. Preserve that limitation on the comparison, rather than narrowing it to its causal interpretation."
+        },
+        {
+          "location": "Unlabeled target, paragraph beginning “Anschließend übertragen wir genau diese Härte”",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "“Anschließend übertragen wir genau diese Härte auf unsere Kinder” states the transfer of perfectionistic demands to children categorically. The package requires a conditional illustrative context, not a general diagnosis of parenting. The earlier “womöglich” does not preserve the qualification at this later explicit claim."
+        },
+        {
+          "location": "Unlabeled target, final paragraph ending “Das is”",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The target ends mid-sentence after introducing Brown's numbing claim and omits the explicit qualification that this is not a definite mechanism applying to everyone. Attribution alone does not preserve that limit on certainty and scope."
+        },
+        {
+          "location": "Unlabeled target, missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The proposed cycle from distress to numbing, diminished joy or gratitude, possible further distress, searching for meaning, and a tentative return to numbing is absent. Its conditional and tentative framing must also be preserved."
+        },
+        {
+          "location": "Unlabeled target, missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The good-news vignette and room-volume analogy are absent. This removes both the felt experience of diminished joy and the important limitation that the vignette does not identify its cause and the analogy does not prove Brown's claim."
+        },
+        {
+          "location": "Unlabeled target, missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The first declaration of love and its unresolved interval before the other person's response are absent. The package requires the speaker's lack of control over the response, including the possibility of an unwanted answer or silence."
+        },
+        {
+          "location": "Unlabeled target, missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The mammography illustration is absent: the examination has already occurred, a silent phone remains nearby, and the listener waits for the doctor's call without any disclosed result."
+        },
+        {
+          "location": "Unlabeled target, missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The uncertain-relationship illustration is absent, including attending a meeting, listening, speaking about one's day, and offering time and attention while the relationship's future remains unknown. The accompanying invitation to take a step without possessing or guaranteeing the outcome is also missing."
+        },
+        {
+          "location": "Unlabeled target, missing conclusion",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The closing invitation is absent: pausing instead of interrupting, inviting the other person to say more, treating oneself gently after a harsh sentence, and considering how to restate it. The target also omits the qualified proposition that acting from “I am enough” may make room for more listening and kindness, the empty-chair image, and the standalone closing affirmation “Ich bin genug.”"
+        }
+      ]
+    },
+    "latency_s": 34.84,
+    "prompt_tokens": 10685,
+    "completion_tokens": 1253,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "fidelity_critic_case_1",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Absatz beginnend mit „In diesen Erzählungen“; keine Abschnittskennung geliefert.",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "Die Zielversion bezeichnet Scham als „universelle menschliche Erfahrung“. Das Paket beschreibt sie als verbreitete menschliche Erfahrung mit unterschiedlicher Intensität, ohne eine ausnahmslose Universalität festzustellen."
+        },
+        {
+          "location": "Absatz beginnend mit „Unter dieser Scham“; keine Abschnittskennung geliefert.",
+          "code": "SEMANTIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "„Nicht gut genug, um gewählt zu werden“ verschiebt die schambezogene Frage nach intrinsischer Würdigkeit für Liebe und Verbindung hin zum Ausgewähltwerden. Das Paket verlangt ausdrücklich, Würdigkeit nicht mit Auswahl oder sozialer Anerkennung gleichzusetzen."
+        },
+        {
+          "location": "Absatz beginnend mit „Unter dieser Scham“; keine Abschnittskennung geliefert.",
+          "code": "ATTRIBUTION_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "„Verbindung entsteht dort, wo wir uns zeigen. Doch die Scham drängt uns dazu, uns zu verstecken“ wird als unqualifizierte Erklärung des Problems formuliert. Das Paket bindet diesen Zusammenhang an Browns Darstellung und verlangt eine bedingte, nicht universell kausale Rahmung. Die später folgende Formulierung „in diesem Denkansatz“ qualifiziert diese vorherigen Aussagen nicht ausdrücklich."
+        },
+        {
+          "location": "Absatz beginnend mit „Die Menschen in diesem Forschungsbericht“; keine Abschnittskennung geliefert.",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "„Ihr Mut erwuchs genau aus dieser Haltung“ macht die Annahme von Unvollkommenheit zur eindeutigen Ursache des Mutes. Im Paket sind Annahme von Unvollkommenheit, Mut und Erzählen mit ganzem Herzen Merkmale der von Brown beschriebenen Menschen, kein nachgewiesener Ursache-Wirkungs-Zusammenhang."
+        },
+        {
+          "location": "Absatz beginnend mit „In Browns Bericht lautet eine der ersten Antworten“; keine Abschnittskennung geliefert.",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "Die Zielversion ergänzt konkrete Verhaltensbeispiele für emotionale Betäubung: zum Telefon greifen, durch endlose Feeds scrollen und sich in Arbeit vertiefen. Solche Beispiele sind im Paket nicht enthalten. Zudem ergänzt „Der Schmerz verschwindet dadurch nicht“ eine eigenständige Aussage über deren Wirkung. Diese Ergänzungen gehen über eine bloße sprachliche oder metaphorische Umformulierung hinaus."
+        },
+        {
+          "location": "Absatz beginnend mit „Um zu verdeutlichen“; keine Abschnittskennung geliefert.",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "„Sie verknüpft diese Phänomene mit dem kollektiven Versuch, Verletzlichkeit abzutöten“ schreibt Brown eine zusätzliche kausale Deutung von Verschuldung, Fettleibigkeit, Abhängigkeiten und Medikamentengebrauch zu. Das Paket erlaubt die zugeschriebene Vergleichsaussage, liefert aber keine Grundlage für diesen kollektiven Erklärungszusammenhang. Der anschließende Hinweis auf fehlende unabhängige Belege legitimiert die neu hinzugefügte Zuschreibung nicht."
+        },
+        {
+          "location": "Absatz beginnend mit „Anschließend übertragen wir“; keine Abschnittskennung geliefert.",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "„Anschließend übertragen wir genau diese Härte auf unsere Kinder“ stellt die Übertragung des Perfektionsideals auf Kinder als tatsächlichen, allgemeinen Folgeschritt dar. Im Paket dienen Erwartungen an Kinder als illustrativer Kontext; nicht jede Perfektionsneigung oder Elternhaltung wird als solche Übertragung diagnostiziert. Die frühere Formulierung „womöglich“ wird hier nicht beibehalten."
+        },
+        {
+          "location": "Letzter Absatz, „zugleich unsere Fähigkeit, echte Freude, Liebe und Dankbarkeit zu empfinden“; keine Abschnittskennung geliefert.",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "Die Zielversion erweitert Browns Aussage über die möglichen Kosten emotionaler Betäubung um eine verminderte Fähigkeit, „Liebe“ zu empfinden. Das Paket benennt Freude und Dankbarkeit als mitbetroffene positive Gefühle, nicht eine Einschränkung der Liebesfähigkeit."
+        },
+        {
+          "location": "Letzter Absatz und Abbruch der gelieferten Zielversion; keine Abschnittskennung geliefert.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "Es fehlt die ausdrückliche Einschränkung, dass Browns Aussage über das gemeinsame Dämpfen schwieriger und angenehmer Gefühle kein sicherer Mechanismus ist, der für alle Menschen gilt. Die bloße Zuschreibung „Ihrer Darstellung nach“ ersetzt diese im Paket ausdrücklich verlangte Begrenzung nicht. Der gelieferte Text bricht unmittelbar danach mit „Das is“ ab."
+        },
+        {
+          "location": "Fehlende Fortsetzung nach dem letzten Absatz; keine Abschnittskennung geliefert.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "Browns bedingt formulierter Kreislauf fehlt: Belastung kann zu Betäubung führen; verminderte Freude oder Dankbarkeit kann weitere Belastung und eine Suche nach Sinn begleiten; möglicherweise folgt erneute Betäubung. Die Bedingungen und die tentative Rückkehr zur Betäubung werden im gelieferten Text nicht dargestellt."
+        },
+        {
+          "location": "Fehlende Fortsetzung nach dem letzten Absatz; keine Abschnittskennung geliefert.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "Die hypothetische Szene mit guten Nachrichten am Tisch fehlt: Lächeln und verbale Anerkennung bei weniger innerer Freude als erwartet, ohne Feststellung der Ursache. Ebenso fehlen das Raumlautstärke-Bild als bloße Analogie und die ausdrückliche Begrenzung, dass geringe Freude allein emotionale Betäubung nicht beweist."
+        },
+        {
+          "location": "Fehlende Fortsetzung nach dem letzten Absatz; keine Abschnittskennung geliefert.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "Die drei eigenständigen Beispiele für Verletzlichkeit unter offenem Ausgang fehlen: die erste Liebeserklärung vor der unbekannten Antwort; das Warten nach einer abgeschlossenen Mammografie neben dem stillen Telefon auf den ärztlichen Anruf, ohne Ergebnis; und die Teilnahme an einer Beziehung mit unbekannter Zukunft durch Zuhören, Erzählen vom Alltag sowie Zeit und Aufmerksamkeit. Damit fehlen auch die konkreten Darstellungen, dass weder Erwiderung noch beruhigende Nachricht noch Beziehungsfortbestand garantiert sind."
+        },
+        {
+          "location": "Fehlender Schluss nach dem Abbruch „Das is“; keine Abschnittskennung geliefert.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "Die abschließende Einladung fehlt: einen Schritt ohne gesicherten Ausgang tun, vor einer Unterbrechung innehalten, die andere Person zum Weitererzählen einladen und einen zu scharf gesprochenen Satz mit Selbstfreundlichkeit möglicherweise neu formulieren. Ebenfalls fehlen der leere Stuhl, Raum für die Stimme des Gegenübers und die eigenständige Schlussaffirmation „Ich bin genug“. Damit entfällt auch Browns bedingter Vorschlag, dass diese Haltung mehr Zuhören und Freundlichkeit ermöglichen kann, ohne automatische Veränderung zu versprechen."
+        }
+      ]
+    },
+    "latency_s": 41.22,
+    "prompt_tokens": 6309,
+    "completion_tokens": 1663,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "fidelity_critic_case_2",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Final paragraph, ending with 'if we'",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The target stops mid-sentence before presenting Brown's claim that numbing difficult feelings can also diminish joy and gratitude. It consequently omits the required attribution and the qualification that this is not a definite mechanism applying to everyone."
+        },
+        {
+          "location": "Missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The hypothetical good-news scene and room-volume analogy are absent. The package requires news shared across a table, a smile and verbal acknowledgment, unexpectedly limited inner joy, and an explicit acknowledgment that the cause of that reaction is unknown."
+        },
+        {
+          "location": "Missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The target omits Brown's proposed cycle of distress, numbing, diminished joy or gratitude, possible further distress, searching for meaning, and a tentative return to numbing. The source's conditional and tentative framing is also absent."
+        },
+        {
+          "location": "Missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The first declaration of love is missing, including the unresolved interval before the other person's response and the speaker's inability to know the forthcoming expression, answer, or duration of silence."
+        },
+        {
+          "location": "Missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The mammography illustration is missing: the examination has already occurred, the listener waits beside a silent phone for the doctor's call, and no result is disclosed."
+        },
+        {
+          "location": "Missing continuation after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The uncertain-relationship illustration is missing, including attending a meeting, listening, sharing an ordinary day, and offering time and attention without knowing the relationship's future."
+        },
+        {
+          "location": "Missing ending after the final paragraph",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The closing invitation is absent: participating wholeheartedly without a guaranteed outcome, pausing instead of interrupting, inviting another person to say more, and responding kindly to oneself while considering how to restate a harsh sentence. The empty-chair image and standalone closing affirmation 'Ich bin genug' are also missing."
+        },
+        {
+          "location": "Paragraph beginning 'Within this framework, one common reflex'",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target adds specific behavioral examples of numbing, including endless scrolling, busy routines, and quick comforts. It also asserts that 'The underlying ache does not disappear.' The package does not supply these examples or establish this persistence-of-distress claim."
+        },
+        {
+          "location": "Paragraph beginning 'To illustrate how widespread this numbing impulse can be'",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target asserts that Brown's American-adult comparison ties debt, obesity, addiction, and medication use to efforts to numb vulnerability. The package permits reporting the comparison but expressly prohibits adding a demonstrated causal link to vulnerability. The subsequent disclaimer about independent evidence does not establish a source basis for attributing this specific causal interpretation to Brown."
+        },
+        {
+          "location": "Paragraph beginning 'The second strategy is converting uncertain things'",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The statement 'Blame serves as a discharge of pain' adds a psychological causal explanation. The package supports political blame as an illustration of replacing inquiry or dialogue with certainty, but does not supply this discharge-of-pain claim."
+        },
+        {
+          "location": "Paragraph beginning 'Inevitably, we pass that same crushing expectation'",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target adds an asserted consequence of perfectionistic parenting: 'we risk teaching them that love is conditional on performance.' The package critiques an image of children that leaves no room for life's struggles, but does not make this additional learning-outcome claim."
+        },
+        {
+          "location": "Paragraph beginning 'Embracing vulnerability was central to this stance'",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The account adds that participants viewed 'what made them vulnerable as inseparable from what made them human.' The package describes acceptance of vulnerability as necessary for connection, without supplying this additional belief about the basis of humanity."
+        },
+        {
+          "location": "Paragraph beginning 'Inevitably, we pass that same crushing expectation'",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "'Inevitably, we pass that same crushing expectation onto our children' turns an illustrative tendency into an unavoidable general outcome. The package requires conditional examples and cautions against treating parenting generally as avoidance."
+        },
+        {
+          "location": "Paragraph beginning 'At the core of this shame'",
+          "code": "SEMANTIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The elaboration 'Not good enough to be chosen' and 'Not good enough to make someone stay' reframes intrinsic worthiness of love and belonging as being selected or securing another person's continued presence. The package explicitly distinguishes worthiness from selection or social approval and leaves the other person's response outside the speaker's control."
+        },
+        {
+          "location": "Paragraph beginning 'Here, the central difficulty of this perspective'",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The claims 'Connection inherently requires allowing oneself to be seen' and 'To draw close to another human being, we have to let ourselves be witnessed' are presented as categorical narrator assertions. The package requires this relationship to remain situated within Brown's account rather than becoming a universally established mechanism; the vague phrase 'this perspective' does not retain that explicit qualification."
+        }
+      ]
+    },
+    "latency_s": 38.08,
+    "prompt_tokens": 10339,
+    "completion_tokens": 1591,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "fidelity_critic_case_2",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Unlabeled paragraph beginning “Within this framework, one common reflex”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The script adds specific avoidance behaviors—endless scrolling, immersion in busy routines, and quick comforts—and asserts that the underlying ache persists while people look away. The package does not supply these behavioral examples or this account of their effects."
+        },
+        {
+          "location": "Unlabeled paragraph beginning “To illustrate how widespread this numbing impulse can be”",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "ERROR",
+          "explanation": "The American-adult comparison is recast as Brown's claim that debt, obesity, addiction, and medication use are tied to efforts to numb vulnerability. The package supplies an attributed comparison, not an established causal relationship. Saying that independent evidence does not confirm “that specific causal link” does not justify adding the link to Brown's account."
+        },
+        {
+          "location": "Unlabeled paragraph beginning “The second strategy is converting uncertain things”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The assertion that blame serves as a discharge of pain adds a psychological mechanism not supplied in the package. The source-supported political example concerns replacing dialogue or inquiry with blame."
+        },
+        {
+          "location": "Unlabeled paragraph beginning “The third way we shield ourselves”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The script expands the perfection example into claims that bodies, homes, careers, relationships, and public image become endless construction projects, and that further achievement is treated as earning peace and belonging. These substantive examples and motives are not supplied by the package's critique of flawlessness."
+        },
+        {
+          "location": "Unlabeled paragraph beginning “Inevitably, we pass that same crushing expectation”",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "ERROR",
+          "explanation": "“Inevitably, we pass that same crushing expectation onto our children” turns an illustrative tendency into an unavoidable, general outcome. The package expressly limits the parenting example to expectations that leave no room for life's struggles."
+        },
+        {
+          "location": "Unlabeled paragraph beginning “Inevitably, we pass that same crushing expectation”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The claim that molding children into immaculate reflections of parental hopes risks teaching them that love is conditional on performance adds a developmental consequence absent from the package. The approved critique concerns leaving room for difficulty, not predicting what children learn about love."
+        },
+        {
+          "location": "End of supplied script, after “if we”",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The target ends mid-sentence before presenting Brown's claim that numbing difficult feelings can also diminish joy and gratitude. The introductory disclaimer does not preserve the missing proposition, its attribution, or the room-volume analogy used to explain it."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "Brown's proposed cycle is missing: distress may lead to numbing; diminished joy or gratitude may produce further distress and a search for meaning; the person may return to numbing. Its conditional and tentative framing is also absent."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The good-news vignette is missing, including news shared across a table, a smile and verbal acknowledgment, unexpectedly muted inner joy, and the explicit limitation that the cause of that reaction is unknown. The associated recognition of missing a good moment while it remains available is absent."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The first declaration-of-love scene is missing. The package requires the unresolved interval after saying “I love you,” without knowing the other person's expression, answer, or duration of silence, and without guaranteeing reciprocation."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The mammography scene is missing: the examination has already occurred, the person waits beside a silent telephone for the doctor's call, and no result is disclosed."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The uncertain-relationship illustration is missing, including attending a meeting, listening, speaking about an ordinary day, and offering time and attention while the relationship's future remains unknown."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The concluding invitation to participate wholeheartedly and take a step without possessing or guaranteeing the final outcome is absent. The unfinished discussion of protective strategies does not supply this conclusion."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The closing interpersonal practices are missing: pausing rather than interrupting, inviting the other person to say more, and considering how to restate a sentence spoken too sharply. Their connection to self-kindness and the possibility—not a promise—of listening more and shouting less is also absent."
+        },
+        {
+          "location": "End of supplied script",
+          "code": "SOURCE_ONLY",
+          "severity": "ERROR",
+          "explanation": "The closing empty-chair image, room for another person's voice, and standalone affirmation “Ich bin genug” are missing. The earlier discussion of being worthy of love and belonging does not substitute for this distinct closing affirmation."
+        }
+      ]
+    },
+    "latency_s": 31.0,
+    "prompt_tokens": 5963,
+    "completion_tokens": 1219,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "fidelity_critic_case_3",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Paragraph beginning “Hier gewinnt Authentizität Gestalt”, sentence “Selbst das, was sie verwundbar machte, empfanden sie als Teil ihrer menschlichen Schönheit.”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target adds the substantive claim that the people in Brown's account regarded what made them vulnerable as part of their human beauty. The package describes accepting vulnerability as necessary for connection, without supplying this additional belief or aesthetic judgment."
+        },
+        {
+          "location": "Paragraph beginning “In Browns Darstellung lautet eine der drei Antworten”, sentence “Die Anspannung verschwindet dadurch nicht”.",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target asserts that tension does not disappear through distraction. The package permits discussion of numbing as distancing oneself from vulnerability, but does not establish this categorical claim about the persistence of tension."
+        },
+        {
+          "location": "Paragraph beginning “Und fast unbemerkt übertragen wir diesen Anspruch auf unsere Kinder”, phrase “Fehler machen und an ihnen wachsen darf”.",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target introduces a parenting prescription that children should be allowed to make mistakes and grow through them. The package supports acknowledging life's struggles and rejecting a flawless image of a child, but explicitly cautions against adding parenting prescriptions. Growth through mistakes is an additional substantive proposition."
+        },
+        {
+          "location": "Paragraph beginning “Die Menschen, von denen Brown berichtet”.",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "“Ihr Mut erwuchs genau aus diesem Einverständnis” makes acceptance of imperfection the definite cause of courage. The package presents courage and acceptance of imperfection as characteristics in Brown's account, not an established causal sequence."
+        },
+        {
+          "location": "Paragraph beginning “Damit liegt der eigentliche Konflikt offen vor uns”, phrase “eine tiefe, tragfähige Verbindung zu anderen erleben”.",
+          "code": "SEMANTIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The comparison is initially recast as people experiencing deep, durable connections versus people struggling with self-worth. The package's comparison concerns a strong sense of belonging, not demonstrated depth or durability of relationships. The later, more faithful description of belonging does not eliminate this earlier change in the comparison's outcome."
+        },
+        {
+          "location": "Paragraph beginning “Um die gesellschaftliche Dimension dieses Abstumpfens zu veranschaulichen”.",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The independent-evidence disclaimer is narrowed to the absence of scientific support for a direct causal connection with vulnerability. The package expressly withholds independent confirmation of the American-adult comparison itself. The target therefore leaves the underlying comparison less qualified than required."
+        },
+        {
+          "location": "Final paragraph, phrase “Wenn aber die Möglichkeit echter Verbindung untrennbar an unsere Offenheit gekoppelt ist”.",
+          "code": "EPISTEMIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The concluding fragment calls the possibility of genuine connection inseparably linked to openness. Although introduced with “Wenn”, “untrennbar” strengthens the relationship into a necessary dependency without local attribution to Brown's framework. The package requires attributed, conditional framing rather than a universally established mechanism."
+        },
+        {
+          "location": "Missing continuation after the final fragment “welchen Prei”.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The supplied target ends mid-word before the account of numbing's possible emotional cost. It omits Brown's attributed claim that dulling fear and shame can also dull joy and gratitude, the explicit rejection of a definite mechanism applying to everyone, and the conditional, tentative cycle of distress, numbing, reduced positive feeling, renewed distress, searching for meaning, and possible renewed numbing."
+        },
+        {
+          "location": "Missing continuation after the final fragment “welchen Prei”.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The good-news vignette and room-volume analogy are absent. The missing material includes someone sharing news across a table, an outward smile and acknowledgment with less inner joy than expected, the pain of not fully feeling an available good moment, and the explicit limitation that the cause of the muted response remains unidentified."
+        },
+        {
+          "location": "Missing continuation after the final fragment “welchen Prei”.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "All three distinct illustrations of participation under uncertainty are missing: saying “I love you” before any response is known; waiting beside a silent phone for the doctor's call after a completed mammography examination, without a disclosed result; and investing time, attention, listening, and ordinary conversation in a relationship whose future remains unknown."
+        },
+        {
+          "location": "Missing continuation after the final fragment “welchen Prei”.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The closing invitation is absent: taking a step without a guaranteed outcome, loving or participating wholeheartedly, pausing rather than interrupting, inviting the other person to say more, and responding gently to oneself while considering how to restate a sentence spoken too sharply. Also missing is Brown's qualified proposal that acting from “I am enough” may make room for less shouting, more listening, and kindness."
+        },
+        {
+          "location": "Missing ending after the final fragment “welchen Prei”.",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The quiet closing image of an empty chair and room for another person's voice, together with the standalone affirmation “Ich bin genug”, is missing. The earlier affirmation about worthiness of love and belonging serves a different role and does not substitute for this ending."
+        }
+      ]
+    },
+    "latency_s": 34.79,
+    "prompt_tokens": 10637,
+    "completion_tokens": 1421,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "fidelity_critic_case_3",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "findings": [
+        {
+          "location": "Unlabeled script: “der US-amerikanischen Forscherin Brené Brown”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "Brené Brown is introduced as a US-American researcher. The package supplies her name and attributed research account but expressly disallows adding credentials; it does not supply her nationality or this professional designation."
+        },
+        {
+          "location": "Unlabeled script: paragraph beginning “Die Menschen, von denen Brown berichtet”",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "“Ihr Mut erwuchs genau aus diesem Einverständnis” makes acceptance of imperfection the definite cause of courage. The package presents courage and acceptance of imperfection as characteristics in Brown’s account, not an established causal sequence."
+        },
+        {
+          "location": "Unlabeled script: paragraph beginning “Hier gewinnt Authentizität Gestalt”",
+          "code": "SEMANTIC_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The people in Brown’s account accepted vulnerability as necessary for connection. The target instead says they regarded it as a possibility for creating closeness, weakening the reported necessity to a potential benefit."
+        },
+        {
+          "location": "Unlabeled script: “Selbst das, was sie verwundbar machte, empfanden sie als Teil ihrer menschlichen Schönheit”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The statement that these people experienced what made them vulnerable as part of their human beauty adds a substantive attitude not supplied by the package. Acceptance of vulnerability, including its unpleasantness, does not establish this aesthetic judgment."
+        },
+        {
+          "location": "Unlabeled script: “Die Anspannung verschwindet dadurch nicht, aber wir weigern uns für eine Weile, direkt hinzusehen”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The target adds the definite claim that tension does not disappear through the described distraction and that people merely refuse to look at it for a while. The package supplies emotional numbing as a response within Brown’s framework, but no such claim about the persistence of tension or this mechanism of distraction."
+        },
+        {
+          "location": "Unlabeled script: paragraph beginning “Um die gesellschaftliche Dimension dieses Abstumpfens zu veranschaulichen”",
+          "code": "CAUSALITY_DRIFT",
+          "severity": "MAJOR",
+          "explanation": "The target says Brown’s American-adult comparison is closely linked to attempts to numb vulnerability and frames the evidence limitation specifically as a lack of scientific support for a direct causal relationship. The package requires withholding independent confirmation of the comparison itself and prohibits adding a causal link to vulnerability. The target’s narrower disclaimer does not preserve that distinction."
+        },
+        {
+          "location": "Unlabeled script: “Fehler machen und an ihnen wachsen darf”",
+          "code": "TARGET_ONLY",
+          "severity": "BLOCKER",
+          "explanation": "The assertion that children must be allowed to make mistakes and grow through them adds a developmental claim and parenting prescription. The package supports leaving room for children’s struggles rather than demanding perfection, but expressly warns against adding parenting prescriptions."
+        },
+        {
+          "location": "Unlabeled script: truncated ending after “welchen Prei”",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The target stops mid-sentence before Brown’s claim that numbing difficult feelings can also diminish joy and gratitude. It consequently omits the required attribution, the rejection of a definite mechanism applying to everyone, and the conditional, tentative cycle from distress through numbing and diminished positive feeling back toward renewed numbing."
+        },
+        {
+          "location": "Unlabeled script: missing continuation after the truncated ending",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The hypothetical good-news scene and room-volume analogy are absent. This omits both the experience of acknowledging good news without the expected inner joy and the crucial limitation that the scene does not identify numbing, or any other factor, as its cause."
+        },
+        {
+          "location": "Unlabeled script: missing continuation after the truncated ending",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The distinct illustrations of declaring love before an unknown response, waiting beside a silent phone after mammography for the doctor’s call, and investing time and attention in a relationship with an unknown future are absent. Their unresolved outcomes and lack of guaranteed reciprocation, reassuring results, or continuity are therefore also missing."
+        },
+        {
+          "location": "Unlabeled script: missing conclusion after the truncated ending",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The concluding invitation to take a step without a guaranteed outcome is absent, along with the ordinary listening and self-kindness scenes: pausing rather than interrupting, inviting the other person to say more, and considering how to restate a harsh sentence. The target also omits Brown’s conditional account that acting from worthiness may create room for more listening and kindness."
+        },
+        {
+          "location": "Unlabeled script: missing final passage",
+          "code": "SOURCE_ONLY",
+          "severity": "MAJOR",
+          "explanation": "The quiet closing image of an empty chair with room for another person’s voice and the standalone affirmation “Ich bin genug” are missing. This removes the package’s final affirmation and its distinct role from the earlier belief in worthiness of love and belonging."
+        }
+      ]
+    },
+    "latency_s": 28.3,
+    "prompt_tokens": 6261,
+    "completion_tokens": 1150,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_1",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "supported": false,
+      "claim_id": "claim",
+      "evidence_level": "insufficient evidence",
+      "rationale": "No evidence summary was supplied. The claim may accurately preserve Brown's attribution and conditional framing, but the provided material does not establish that this sequence reflects Brown's account."
+    },
+    "latency_s": 5.89,
+    "prompt_tokens": 4623,
+    "completion_tokens": 128,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_1",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "supported": true,
+      "claim_id": "claim_1",
+      "evidence_level": "پشتیبانی متنی و تفسیری، نه اثبات تجربی علیت",
+      "rationale": "خلاصهٔ ارائه‌شده، در چارچوب روایت برنه براون، میل به ارتباط را در مواجهه با شرم و ترس از دیده‌شدن قرار می‌دهد و باور به شایستگیِ عشق و تعلق را عاملی می‌داند که می‌تواند برای شجاعت، اصالت و آسیب‌پذیری فضا ایجاد کند. بنابراین، برداشتِ امکانِ پنهان‌کاری در اثر شرم و گشودگی به دیده‌شدن در ارتباط با این متن سازگار است. این پشتیبانی مشروط به حفظ انتساب به براون و بیان احتمالی است؛ متن یک سازوکار علّیِ جهان‌شمول و اثبات‌شده را نشان نمی‌دهد."
+    },
+    "latency_s": 9.73,
+    "prompt_tokens": 247,
+    "completion_tokens": 250,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_2",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "supported": false,
+      "claim_id": "unspecified",
+      "evidence_level": "insufficient",
+      "rationale": "هیچ خلاصهٔ شواهد یا نقل‌قولی از روایت ارائه نشده است. تز کلی به شرم و ترس از دیده‌شدن اشاره دارد، اما نشان نمی‌دهد که گذار از ترسِ درد به ترسِ طردشدن شامل دو بار «شاید» است یا احتمالِ ترک‌شدن صریحاً به‌صورت فرضی بیان شده است. بنابراین این ادعای مشخص با اطلاعات موجود قابل تأیید نیست."
+    },
+    "latency_s": 8.58,
+    "prompt_tokens": 4611,
+    "completion_tokens": 176,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_2",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "supported": false,
+      "claim_id": "sol_protocol_probe",
+      "evidence_level": "insufficient",
+      "rationale": "The supplied thesis summary discusses shame, fear of being seen, connection, and vulnerability, but it does not mention the tentative suggestion that fear of being seen may involve another person leaving, nor does it document two instances of “perhaps” in a transition from fear of pain to fear of rejection. Therefore, the claim is not supported by the supplied evidence."
+    },
+    "latency_s": 5.94,
+    "prompt_tokens": 235,
+    "completion_tokens": 193,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_3",
+    "protocol": "chat",
+    "ok": true,
+    "output": {
+      "supported": false,
+      "claim_id": "claim_1",
+      "evidence_level": "insufficient",
+      "rationale": "هیچ خلاصهٔ شواهد، نقل‌قول یا متن منبعی از گزارش براون ارائه نشده است تا تأیید کند که باور به شایستگیِ عشق و تعلق تنها تفاوتی بوده که او در آن مقایسه مشاهده کرده است. تز ارائه‌شده با مضمون ادعا سازگار است، اما شاهد مستقلی برای آن نیست. تفکیک مشاهدهٔ گزارش‌شده از اثبات علیت یا انحصار عوامل، محتاطانه است؛ با این حال، انتساب این مشاهده به براون با اطلاعات موجود قابل تأیید نیست."
+    },
+    "latency_s": 9.44,
+    "prompt_tokens": 4622,
+    "completion_tokens": 189,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  },
+  {
+    "case": "claim_check_case_3",
+    "protocol": "responses",
+    "ok": true,
+    "output": {
+      "supported": false,
+      "claim_id": "sol_protocol_probe",
+      "evidence_level": "insufficient",
+      "rationale": "No evidence summary was supplied to verify that Brown reported this comparison or that belief in worthiness was the only observed difference. The claim is appropriately cautious about not inferring causation, but its factual premise cannot be assessed from the provided material."
+    },
+    "latency_s": 12.6,
+    "prompt_tokens": 246,
+    "completion_tokens": 139,
+    "schema_repairs": 0,
+    "fallback_used": false,
+    "error_kind": null
+  }
+]

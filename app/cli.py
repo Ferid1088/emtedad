@@ -32,6 +32,7 @@ from app.dialogue.service import DialogueService
 from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.media import MediaService
 from app.knowledge.resolution import (
     CrossrefResolver,
@@ -536,7 +537,9 @@ async def _run_dialogue(
     service = DialogueService(
         database,
         SentenceTransformerEmbeddingProvider(cache_folder=storage_root / "models"),
-        EvidenceRoleClassifier(resolve_llm_provider(), model=model),
+        EvidenceRoleClassifier(
+            resolve_llm_provider(role=AgentRole.EVIDENCE_VALIDATOR), model=model
+        ),
     )
     if args.command == "propose":
         kind, identifier = _dialogue_target(args)
@@ -648,7 +651,7 @@ async def _run_knowledge(
         result = await ExternalKnowledgeImporter(
             database,
             resolve_youtube_adapter(),
-            resolve_llm_provider(),
+            resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT),
             model=args.model,
             window_size=args.window_size,
             overlap=args.overlap,

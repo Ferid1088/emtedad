@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import Database
 from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import ExternalConcept
 from app.knowledge.units.concepts import (
     CONCEPT_INSTRUCTIONS,
@@ -47,7 +48,7 @@ class ConceptMappingService:
         batch_size: int = 10,
     ) -> None:
         self.database = database
-        self.provider = provider or resolve_llm_provider()
+        self.provider = provider or resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT)
         self.model = model
         self.batch_size = batch_size
 

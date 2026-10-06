@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198203-NltehFKUduqAZglZ1s51",
+ "object": "chat.completion",
+ "created": 1791198203,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "خب، تا اینجا دربارهٔ اینکه چرا می‌خوابیم و چطور مغزمون تو خواب داره کار می‌کنه صحبت کردیم.  \nاما یه چیز دیگه هم هست که همه‌مون سرِ خواب بهش فکر می‌کنیم: اون تصاویر عجیب، داستان‌های پیچیده، بعضی وقتا وحشت‌های ناگهانی... یعنی همون رؤیاها.\n\nحالا که داریم دربارهٔ رؤیا فکر می‌کنیم، یه سوال دیگه هم پیش میاد: این چیزایی که می‌بینیم، معنی دارن؟  \nمن خودم یادمه بچه‌ی داییم می‌گفت \"دیروز حضرت علی رو دیدم، یعنی کارم راه میفته!\" — ما که بزرگ شدیم با این حرف‌ها. پس شاید بد نباشه یه کم هم بریم سراغ اینکه تو فرهنگ ما، رؤیا چه جایی داره.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 286,
+  "completion_tokens": 336,
+  "total_tokens": 622,
+  "cost": 0.00022062,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00022062,
+   "upstream_inference_prompt_cost": 2.574e-05,
+   "upstream_inference_completions_cost": 0.00019488
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

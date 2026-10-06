@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197918-kyVZYoVWjRhOgBXuZE73",
+ "object": "chat.completion",
+ "created": 1791197918,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "گاهی در رابطه‌ها ارتباط کلامی خراب میشه، نه به خاطر جنسیت یا شخصیت ذاتی کسی، بلکه چون دو نفر با تجربه‌ها، انتظارات و نحوهٔ بیان متفاوت سعی می‌کنن از یک راه یکدیگر رو درک کنن. بعضی وقت‌ها یک طرف فکر می‌کنه ساکت بودنش آرامش میده، درحالی که طرف دیگه این سکوت رو بی‌تفاوتی می‌دونه. یا وقتی کسی با قصد حل مشکل حرف می‌زنه، طرف مقابل احساس تهدید می‌کنه و دفاع می‌کنه. \n\nاین شکست‌ها ریشه در ترس، خستگی، عدم اعتماد یا حتی عادت‌های گفتاری یادگرفته از خانواده داره. همه ما یاد می‌گیریم با صدای بلند اعتراض کنیم، فرار کنیم، سکوت کنیم یا تعریف کنیم — بدون اینکه بخواهیم آسیب بزنیم. \n\nدرک اینکه گاهی «چطور» حرف می‌زنیم مهم‌تر از «چه» می‌گیم، می‌تونه کمک کنه. ارتباط خوب نیازمند تمرین است، نه فقط صداقت. اینجا قهرمان یا متهم نیست؛ فقط دو انسانِ ناقص هستن که دارن سعی می‌کنن به هم گوش بدن.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 298,
+  "completion_tokens": 469,
+  "total_tokens": 767,
+  "cost": 0.00029884,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00029884,
+   "upstream_inference_prompt_cost": 2.682e-05,
+   "upstream_inference_completions_cost": 0.00027202
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

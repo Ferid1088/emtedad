@@ -15,8 +15,12 @@ def upgrade() -> None:
     op.create_table(
         "editorial_language_tracks",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("editorial_project_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("source_persian_draft_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column(
+            "editorial_project_id", postgresql.UUID(as_uuid=True), nullable=False
+        ),
+        sa.Column(
+            "source_persian_draft_id", postgresql.UUID(as_uuid=True), nullable=False
+        ),
         sa.Column("semantic_master_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("language", sa.String(length=8), nullable=False),
         sa.Column("version_number", sa.Integer(), nullable=False),
@@ -28,10 +32,23 @@ def upgrade() -> None:
         sa.Column("estimated_duration_seconds", sa.Integer(), nullable=False),
         sa.Column("provenance", postgresql.JSONB(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["editorial_project_id"], ["content.editorial_projects.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["source_persian_draft_id"], ["content.persian_drafts.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["semantic_master_id"], ["content.lecture_master_versions.id"], ondelete="RESTRICT"),
-        sa.PrimaryKeyConstraint("id"), schema="content",
+        sa.ForeignKeyConstraint(
+            ["editorial_project_id"],
+            ["content.editorial_projects.id"],
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["source_persian_draft_id"],
+            ["content.persian_drafts.id"],
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["semantic_master_id"],
+            ["content.lecture_master_versions.id"],
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        schema="content",
     )
 
 

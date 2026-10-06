@@ -31,6 +31,12 @@ EDITABLE_KEYS: tuple[str, ...] = (
     "speech_wpm_de",
     "speech_wpm_ar",
     "background_processing_paused",
+    "llm_routing_enabled",
+    "allow_devin_runtime_fallback",
+    "model_role_high_volume",
+    "model_role_reasoning",
+    "model_role_editorial",
+    "model_role_premium",
 )
 
 
@@ -119,6 +125,12 @@ _KEY_TYPES: dict[str, type] = {
     "speech_wpm_de": int,
     "speech_wpm_ar": int,
     "background_processing_paused": bool,
+    "llm_routing_enabled": bool,
+    "allow_devin_runtime_fallback": bool,
+    "model_role_high_volume": str,
+    "model_role_reasoning": str,
+    "model_role_editorial": str,
+    "model_role_premium": str,
 }
 
 

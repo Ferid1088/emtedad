@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198493-bXm4cVNP6VQtJBciZXRv",
+ "object": "chat.completion",
+ "created": 1791198493,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Google",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{  \n  \"counterarguments\": [  \n    {  \n      \"claim\": \"آسیب‌پذیری بدون قضاوت شرایط مناسب می‌تواند منجر به سوءاستفاده عاطفی شود، زیرا نه همه افراد آمادهٔ پذیرش یا پاسخگویی مسئولانه به احساسات عمیق دیگران هستند.\",  \n      \"severity\": \"high\",  \n      \"kind\": \"contextual limitation\"  \n    },  \n    {  \n      \"claim\": \"در فرهنگ‌ها یا زمینه‌های اجتماعی خاص، آسیب‌پذیری اغلب به عنوان نشانه‌ای از ناامنی یا نابالغی تفسیر می‌شود، که می‌تواند منجر به کاهش احترام یا قدرت رابطه‌ای شود.\",  \n      \"severity\": \"medium\",  \n      \"kind\": \"cultural relativism\"  \n    },  \n    {  \n      \"claim\": \"شجاعت باید با خرد همراه باشد؛ آسیب‌پذیری بی‌ملاحظه — مثلاً در مراحل اولیه رابطه یا در حضور افراد ناپایدار از نظر عاطفی — ممکن است بیشتر نشانهٔ بی‌پروایی باشد تا شجاعت واقعی.\",  \n      \"severity\": \"high\",  \n      \"kind\": \"epistemic caution\"  \n    },  \n    {  \n      \"claim\": \"در برخی روابط، مانند روابط کاری یا سلسله‌مراتبی، آسیب‌پذیری مفرط می‌تواند مرزهای حرفه‌ای را تضعیف کند و عملکرد یا اعتماد را به جای تقویت، تضعیف کند.\",  \n      \"severity\": \"medium\",  \n      \"kind\": \"domain incompatibility\"  \n    }  \n  ]  \n}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 111,
+  "completion_tokens": 525,
+  "total_tokens": 636,
+  "cost": 0.00048642,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 2,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00048642,
+   "upstream_inference_prompt_cost": 2.442e-05,
+   "upstream_inference_completions_cost": 0.000462
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

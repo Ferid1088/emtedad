@@ -126,11 +126,24 @@ class _DroppingProvider(_LocalizationProvider):
 async def _localized_version(
     database: Database, provider: _LocalizationProvider
 ) -> tuple[LocalizationService, UUID]:
-    """Real master → real create() with the stub provider → version id."""
+    """Real master → owner-approved Persian draft → real create()."""
 
     brief, _scripts, _draft = await _draft_pipeline(database, provider)
     master = await GenericMasterService(database).latest_ready_for_brief(brief.id)
     assert master is not None
+    # Localization is gated on an owner-approved Persian primary draft.
+    from tests.integration.test_final_duration_gate import (
+        _draft_with_completed_review,
+    )
+
+    fa_draft = await _draft_with_completed_review(
+        database, brief, language="fa", words=2992, version=2, chain=2
+    )
+    from app.content_engine.review import ScriptService
+
+    await ScriptService(database, provider=provider).approve_draft(
+        fa_draft.id, approved_by="owner"
+    )
     service = LocalizationService(database)
     service.provider = provider
     version_id = await service.create(master.id, PublicationLanguage.EN)

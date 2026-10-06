@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197643-AjhE0FEXoiMLPIm1MH3Z",
+ "object": "chat.completion",
+ "created": 1791197643,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Venice",
+ "system_fingerprint": null,
+ "service_tier": "default",
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{ \"classification\": \"SPECULATION\", \"reason_fa\": \"این گزاره یک ادعای تجربی درباره دقت و موفقیت مکانیک کوانتومی در پیش‌بینی‌های آزمایشی است که با شواهد تجربی تأیید شده است. با این حال، به دلیل اشاره به «بارها آزمون و تأیید شده است»، نشان‌دهنده یک نتیجه علمی پذیرفته‌شده است، نه یک حدس یا احتمال. بنابراین طبقه‌بندی صحیح‌تر آن باید 'FACT' باشد.\" }",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 79,
+  "completion_tokens": 187,
+  "total_tokens": 266,
+  "cost": 0.0001521,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0001521,
+   "upstream_inference_prompt_cost": 1.185e-05,
+   "upstream_inference_completions_cost": 0.00014025
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

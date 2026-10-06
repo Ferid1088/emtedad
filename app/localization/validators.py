@@ -1,9 +1,14 @@
 """Deterministic semantic and pronunciation quality gates."""
 
+import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 
-from app.core.terminology.canonical import CANONICAL_AYIN_TERMS
+from app.core.terminology.canonical import (
+    CANONICAL_AYIN_TERMS,
+    CanonicalAyinTerm,
+)
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import PronunciationCriticality
 from app.localization.pronunciation import pronunciation_preserves_text
@@ -205,6 +210,29 @@ class LocalizationQualityGate:
         ) + PronunciationValidator().validate(language, statements, critical_terms)
 
 
+_DIACRITICS = "ًٌٍَُِّْ"
+# Arabic/Persian letters, ZWNJ, and tatweel — a canonical term counts only
+# as a standalone word, never as a substring of an unrelated word
+# («بن» inside «مبنا», «جان» inside «جانیه» are not the terms BON/JAN).
+_WORD_CHAR = r"[\u0621-\u06D3\u06FA-\u06FF\u200C\u0640]"
+
+
+def _strip_marks(text: str) -> str:
+    return "".join(char for char in text if char not in _DIACRITICS)
+
+
+def _present_as_word(source: str, term: str) -> bool:
+    if not term:
+        return False
+    return (
+        re.search(
+            rf"(?<!{_WORD_CHAR}){re.escape(term)}(?!{_WORD_CHAR})",
+            source,
+        )
+        is not None
+    )
+
+
 class ProtectedTerminologyValidator:
     """Ensure protected Ayin terms are retained in native realizations."""
 
@@ -213,18 +241,35 @@ class ProtectedTerminologyValidator:
         language: PublicationLanguage,
         source_persian: str,
         localized_text: str,
+        flagged_terms: Iterable[str] | None = None,
     ) -> list[LocalizationFinding]:
+        """Find missing canonical renderings in the localized text.
+
+        ``flagged_terms`` scopes enforcement to terms the semantic package
+        actually flags as protected (its ``protected_terms`` /
+        ``terminology_references`` / ``localization_notes``). Ordinary
+        Persian words sharing a canonical form — میان «between», بن inside
+        مبنا — must not force canonical transliterations into a
+        non-doctrinal script. Without the flag list the validator keeps
+        its conservative default: every canonically-formed standalone
+        word is enforced.
+        """
+
         findings: list[LocalizationFinding] = []
+        source_without_marks = _strip_marks(source_persian)
+        flagged_text = (
+            " ".join(str(item) for item in flagged_terms)
+            if flagged_terms is not None
+            else None
+        )
         for term in CANONICAL_AYIN_TERMS:
-            source_without_marks = "".join(
-                char for char in source_persian if char not in "ًٌٍَُِّْ"
-            )
-            term_without_marks = "".join(
-                char for char in term.persian_form if char not in "ًٌٍَُِّْ"
-            )
-            if (
-                term.persian_form not in source_persian
-                and term_without_marks not in source_without_marks
+            term_without_marks = _strip_marks(term.persian_form)
+            if not _present_as_word(
+                source_without_marks, term_without_marks
+            ):
+                continue
+            if flagged_text is not None and not _term_flagged(
+                term, flagged_text
             ):
                 continue
             expected = term.language_rendering.get(language.value)
@@ -246,3 +291,13 @@ class ProtectedTerminologyValidator:
                     )
                 )
         return findings
+
+
+def _term_flagged(term: CanonicalAyinTerm, flagged_text: str) -> bool:
+    markers = {
+        term.canonical_id,
+        term.canonical_transliteration,
+        *term.language_rendering.values(),
+        _strip_marks(term.persian_form),
+    }
+    return any(marker and marker in flagged_text for marker in markers)

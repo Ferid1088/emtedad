@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197875-73FV6Pp0Tu3izxxgipOe",
+ "object": "chat.completion",
+ "created": 1791197875,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "GMICloud",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "در روان‌شناسی، «هیجان» حالتی کوتاه‌مدت و قوی است که معمولاً به‌خاطر یک موقعیت خاص ایجاد می‌شود — مثل ترس از یک حادثه یا شادی از یک خبر خوب. این حالت‌ها سریع می‌آیند و زود هم می‌گذرند. اما «خلق» (یا حال عمومی روحی) حالتی پایدارتر و عمیق‌تر است؛ مثل اینکه طولانی‌مدت احساس بی‌قراری، ناراحتی یا آرامش داشته باشیم.\n\nتفاوت این دو مهم است چون ما گاهی فکر می‌کنیم یک هیجان لحظه‌ای — مثلاً عصبانیت بعد از ترافیک — نشانهٔ مشکل بزرگی در وجود ماست. درحالی که شاید فقط یک واکنش طبیعی به موقعیت بوده. ازطرفی، اگر خلق ما منفی باشد — مثلاً دائماً احساس خستگی یا بی‌معنایی کنیم — این می‌تونه نشانهٔ چیزی عمیق‌تر مثل افسردگی باشه.\n\nفهم این تفاوت به ما کمک می‌کنه هم نسبت به خودمان مهربون‌تر باشیم، هم تشخیص بدیم چه زمانی واقعاً نیاز به کمک داریم.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 391,
+  "completion_tokens": 617,
+  "total_tokens": 1008,
+  "cost": 0.0002501625,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0002501625,
+   "upstream_inference_prompt_cost": 3.42125e-05,
+   "upstream_inference_completions_cost": 0.00021595
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

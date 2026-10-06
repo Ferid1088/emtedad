@@ -1,0 +1,144 @@
+{
+  "provider": "wikipedia",
+  "loops": [
+    {
+      "loop": 1,
+      "query": "shame vulnerability Brené Brown research",
+      "error": "",
+      "findings": [
+        {
+          "title": "Brené Brown",
+          "url": "https://en.wikipedia.org/wiki/Brené_Brown",
+          "snippet": "Casandra Brené Brown (born November 18, 1965) is an American academic, author and podcaster. Brown is known for her work on shame, vulnerability, and leadership"
+        },
+        {
+          "title": "Vulnerability",
+          "url": "https://en.wikipedia.org/wiki/Vulnerability",
+          "snippet": "we are vulnerable. Brené Brown teaches her followers that vulnerability is typically thought of as the center of emotions, such as grief, shame, fear,"
+        },
+        {
+          "title": "Brené Brown: The Call to Courage",
+          "url": "https://en.wikipedia.org/wiki/Brené_Brown:_The_Call_to_Courage",
+          "snippet": "April 19, 2019. Brené Brown: The Call to Courage is about how bravery can arise from engaging with our deepest vulnerabilities. Brené Brown has published"
+        },
+        {
+          "title": "Prentis Hemphill",
+          "url": "https://en.wikipedia.org/wiki/Prentis_Hemphill",
+          "snippet": "Are Your Best Thing: Vulnerability, Shame Resilience, and the Black Experience anthology edited by Tarana Burke and Brené Brown. In 2024, they published"
+        },
+        {
+          "title": "Shame",
+          "url": "https://en.wikipedia.org/wiki/Shame",
+          "snippet": "related to Shame. Wikiquote has quotations related to Shame. Look up shame in Wiktionary, the free dictionary. Brene Brown Listening to Shame, TED Talk"
+        }
+      ],
+      "answer_text": "",
+      "ingested": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Brené_Brown",
+          "source_id": "3111221b-4582-484c-a80a-cd35120f3d39",
+          "status": "existing",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Vulnerability",
+          "source_id": "5ed68a5a-140d-4324-9634-dfd5c12cd18a",
+          "status": "existing",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Brené_Brown:_The_Call_to_Courage",
+          "source_id": "f6f15d5e-5c00-48ff-882b-1add0ec02674",
+          "status": "existing",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Prentis_Hemphill",
+          "source_id": "d022267e-43b5-4916-a779-df45dce5418d",
+          "status": "existing",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Shame",
+          "source_id": "28d55e96-a82f-43ad-979e-dddecb2b622c",
+          "status": "existing",
+          "detail": ""
+        }
+      ],
+      "new_source_ids": []
+    },
+    {
+      "loop": 2,
+      "query": "alcohol dependence craving cue exposure",
+      "error": "",
+      "findings": [
+        {
+          "title": "Cue reactivity",
+          "url": "https://en.wikipedia.org/wiki/Cue_reactivity",
+          "snippet": "2015). &quot;Does laboratory cue reactivity correlate with real-world craving and smoking responses to cues?&quot;. Drug and Alcohol Dependence. 155: 163–169. doi:10"
+        },
+        {
+          "title": "Substance dependence",
+          "url": "https://en.wikipedia.org/wiki/Substance_dependence",
+          "snippet": "or without physiological dependence. DSM-IV substance dependencies include: 303.90 Alcohol dependence 304.00 Opioid dependence 304.10 Sedative, hypnotic"
+        },
+        {
+          "title": "Relapse",
+          "url": "https://en.wikipedia.org/wiki/Relapse",
+          "snippet": "hallmark of substance dependence. Stress is one of the most powerful stimuli for reinstating drug use because stress cues stimulate craving and drug-seeking"
+        },
+        {
+          "title": "Opioid use disorder",
+          "url": "https://en.wikipedia.org/wiki/Opioid_use_disorder",
+          "snippet": "Opioid use disorder (OUD) is a substance use disorder characterized by cravings for opioids, continued use despite physical or psychological deterioration"
+        },
+        {
+          "title": "Long-term impact of alcohol on the brain",
+          "url": "https://en.wikipedia.org/wiki/Long-term_impact_of_alcohol_on_the_brain",
+          "snippet": "Soyka M (2004). &quot;Impact of craving on alcohol relapse during, and 12 months following, outpatient treatment&quot;. Alcohol Alcohol. 39 (4): 357–61. doi:10.1093/alcalc/agh073"
+        }
+      ],
+      "answer_text": "",
+      "ingested": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Cue_reactivity",
+          "source_id": "071d97ba-1720-400a-b037-cca7a9743b34",
+          "status": "ingested",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Substance_dependence",
+          "source_id": "7b8614c9-ce55-48b5-9e1e-af2baf9a54ae",
+          "status": "ingested",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Relapse",
+          "source_id": "8ae7282c-e2bd-4b39-8221-b420da387601",
+          "status": "ingested",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Opioid_use_disorder",
+          "source_id": "5d206905-d664-498b-b837-620f86c90cd6",
+          "status": "ingested",
+          "detail": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Long-term_impact_of_alcohol_on_the_brain",
+          "source_id": "1498e379-a3b4-47ed-bc17-e1c4ed93a573",
+          "status": "ingested",
+          "detail": ""
+        }
+      ],
+      "new_source_ids": [
+        "071d97ba-1720-400a-b037-cca7a9743b34",
+        "7b8614c9-ce55-48b5-9e1e-af2baf9a54ae",
+        "8ae7282c-e2bd-4b39-8221-b420da387601",
+        "5d206905-d664-498b-b837-620f86c90cd6",
+        "1498e379-a3b4-47ed-bc17-e1c4ed93a573"
+      ]
+    }
+  ],
+  "timestamp": 1791243315.46079
+}

@@ -9,8 +9,9 @@ from sqlalchemy import select
 
 from app.content_strategy.models import EditorialLanguageTrack, PersianDraft
 from app.db.session import Database
-from app.knowledge.llm.base import StructuredExtractionRequest
+from app.knowledge.llm.base import LLMProvider, StructuredExtractionRequest
 from app.knowledge.llm.factory import resolve_llm_provider
+from app.knowledge.llm.roles import AgentRole
 from app.lecture.domain import PublicationLanguage
 from app.localization.lexicon import (
     DEFAULT_PROVIDER_PROFILE,
@@ -44,7 +45,8 @@ class MultilingualEditorialService:
 
     def __init__(self, database: Database) -> None:
         self.database = database
-        self.provider = resolve_llm_provider()
+        # Lazy: construction must not hide an LLM side effect.
+        self.provider: LLMProvider | None = None
 
     async def create(
         self,
@@ -69,9 +71,12 @@ class MultilingualEditorialService:
             if language == "fa":
                 text = source_text
             else:
+                provider = self.provider or resolve_llm_provider(
+                    role=AgentRole.NATIVE_RECONSTRUCTION
+                )
                 result = cast(
                     _Translation,
-                    await self.provider.extract(
+                    await provider.extract(
                         StructuredExtractionRequest(
                             task="approved Persian editorial translation",
                             prompt_version="phase-12-fa-source-v1",

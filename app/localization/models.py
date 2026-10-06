@@ -3,7 +3,15 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +21,7 @@ from app.core.terminology.models import Term  # noqa: F401  # register FK target
 from app.db.base import Base, PostgresSchema
 from app.lecture.domain import PublicationLanguage
 from app.localization.domain import (
+    LocalizationPipelineStage,
     LocalizationStatus,
     PronunciationCriticality,
     PronunciationLexiconStatus,
@@ -169,3 +178,86 @@ class LocalizationValidationFinding(Base):
     code: Mapped[str] = mapped_column(String(128))
     message: Mapped[str] = mapped_column(Text)
     blocking: Mapped[bool] = mapped_column()
+
+
+class LocalizationSemanticPackage(Base):
+    """One shared semantic handoff for all target-language productions.
+
+    Built once from the owner-approved Persian script draft and the
+    exported Semantic Master; DE/EN/AR all derive from the same package
+    and the same locked source hash. If the Persian draft changes, the
+    hash no longer matches and dependent runs become STALE_SOURCE.
+    """
+
+    __tablename__ = "localization_semantic_packages"
+    __table_args__ = (
+        UniqueConstraint(
+            "script_draft_id", "version_number", name="uq_semantic_package_version"
+        ),
+        CheckConstraint("version_number > 0", name="positive_package_version"),
+        CheckConstraint("content_hash ~ '^[0-9a-f]{64}$'", name="valid_package_hash"),
+        {"schema": CONTENT},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    script_draft_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.script_drafts.id", ondelete="RESTRICT")
+    )
+    content_brief_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.content_briefs.id", ondelete="RESTRICT")
+    )
+    lecture_master_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.lecture_master_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    source_draft_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, object]] = mapped_column(JSONB)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    provenance_json: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    created_by: Mapped[str] = mapped_column(String(255), default="pipeline")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class LocalizationPipelineRun(Base):
+    """Truthful stage record for one native target-language production."""
+
+    __tablename__ = "localization_pipeline_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "semantic_package_id", "language", name="uq_pipeline_run_language"
+        ),
+        {"schema": CONTENT},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    semantic_package_id: Mapped[UUID] = mapped_column(
+        ForeignKey(f"{CONTENT}.localization_semantic_packages.id", ondelete="RESTRICT")
+    )
+    language: Mapped[PublicationLanguage] = mapped_column(
+        _local_enum(PublicationLanguage, "publication_language")
+    )
+    stage: Mapped[LocalizationPipelineStage] = mapped_column(
+        _local_enum(LocalizationPipelineStage, "localization_pipeline_stage"),
+        default=LocalizationPipelineStage.PENDING,
+    )
+    # The target-language ScriptDraft produced by this run, once created.
+    script_draft_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(f"{CONTENT}.script_drafts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    fidelity_status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    native_status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    review_loop: Mapped[int] = mapped_column(Integer, default=0)
+    # Intermediate artifacts that are never publishable content: coverage
+    # translation, native draft text, critic/fidelity finding payloads.
+    work_json: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )

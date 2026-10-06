@@ -68,6 +68,7 @@ from app.editorial_channels.service import (
 from app.knowledge.domain import SourceType
 from app.knowledge.file_import import FileImportError, import_file_resource
 from app.knowledge.llm.capacity import get_capacity
+from app.knowledge.llm.models import LLMCallEvent
 from app.knowledge.models import (
     EntityLabel,
     ExternalConcept,
@@ -103,7 +104,9 @@ from app.lecture.models import (
 )
 from app.localization.domain import LocalizationStatus
 from app.localization.models import (
+    LocalizationPipelineRun,
     LocalizationProject,
+    LocalizationSemanticPackage,
     LocalizationStatement,
     LocalizationVersion,
 )
@@ -1889,6 +1892,43 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
             if master is not None
             else []
         )
+        # Native-pipeline truth: every per-language run derives from the
+        # shared semantic package anchored to this brief's approved
+        # Persian draft — no separate progress bookkeeping.
+        pipeline_runs = list(
+            await session.scalars(
+                select(LocalizationPipelineRun)
+                .join(
+                    LocalizationSemanticPackage,
+                    LocalizationPipelineRun.semantic_package_id
+                    == LocalizationSemanticPackage.id,
+                )
+                .where(LocalizationSemanticPackage.content_brief_id == brief_id)
+                .order_by(LocalizationPipelineRun.updated_at.desc())
+            )
+        )
+        cost_rows = (
+            await session.execute(
+                select(
+                    LLMCallEvent.language,
+                    func.count(LLMCallEvent.id),
+                    func.coalesce(func.sum(LLMCallEvent.cost_usd), 0.0),
+                    func.coalesce(func.sum(LLMCallEvent.prompt_tokens), 0),
+                    func.coalesce(func.sum(LLMCallEvent.completion_tokens), 0),
+                )
+                .where(LLMCallEvent.content_brief_id == brief_id)
+                .group_by(LLMCallEvent.language)
+            )
+        ).all()
+        llm_costs = [
+            {
+                "language": language or "—",
+                "calls": int(calls),
+                "cost_usd": round(float(cost), 6),
+                "tokens": int(tokens_in) + int(tokens_out),
+            }
+            for language, calls, cost, tokens_in, tokens_out in cost_rows
+        ]
         research_runs = list(
             await session.scalars(
                 select(WebResearchRun)
@@ -2035,6 +2075,8 @@ async def _production_detail(request: Request, brief_id: UUID) -> dict[str, Any]
         "historical_findings": historical_findings,
         "signature": signature,
         "localizations": localizations,
+        "pipeline_runs": pipeline_runs,
+        "llm_costs": llm_costs,
         "research_runs": research_runs,
         "unit_map": unit_map,
         "item_map": item_map,
@@ -3131,7 +3173,20 @@ async def settings_page(request: Request) -> HTMLResponse:
         title="Settings",
         environment=settings.environment.value,
         storage_root=str(settings.storage_root),
-        llm_provider=settings.llm_provider,
+        llm_provider=(
+            "apimaster (rollenbasiert)"
+            + (
+                " + devin (Opt-in)"
+                if web_research.get("allow_devin_runtime_fallback")
+                else " — fail-closed"
+            )
+            if web_research.get("llm_routing_enabled")
+            else (
+                "devin (Opt-in)"
+                if web_research.get("allow_devin_runtime_fallback")
+                else "unconfigured — routing aus, kein Devin-Fallback"
+            )
+        ),
         youtube_mcp_enabled=settings.youtube_mcp_enabled,
         youtube_mcp_url=settings.youtube_mcp_url,
         web_research=web_research,
@@ -3157,7 +3212,7 @@ async def settings_save(request: Request) -> Response:
     form = await request.form()
     values: dict[str, Any] = {
         "web_research_enabled": form.get("web_research_enabled") == "on",
-        "web_research_provider": str(form.get("web_research_provider") or "openrouter"),
+        "web_research_provider": str(form.get("web_research_provider") or "tavily"),
         "web_research_base_url": str(form.get("web_research_base_url") or "").strip()
         or None,
         "web_research_model": str(form.get("web_research_model") or "").strip() or None,

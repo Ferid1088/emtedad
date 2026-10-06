@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197558-dltns2mUIomSnH4Vng77",
+ "object": "chat.completion",
+ "created": 1791197558,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Novita",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "همبستگی تنها نشان می‌دهد که دو متغیر به طور همزمان تغییر می‌کنند، اما مشخص نمی‌کند که آیا یکی باعث تغییر دیگری شده است. ممکن است عامل سومی (متغیر مخرب) هر دو را تحت تأثیر قرار دهد یا رابطه صرفاً تصادفی باشد، بنابراین همبستگی بالا لزوماً به معنی رابطهٔ علت و معلولی نیست.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 43,
+  "completion_tokens": 162,
+  "total_tokens": 205,
+  "cost": 9.783e-05,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 9.783e-05,
+   "upstream_inference_prompt_cost": 3.87e-06,
+   "upstream_inference_completions_cost": 9.396e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

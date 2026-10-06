@@ -32,18 +32,22 @@
   <div class="form-grid">
     <label>Anbieter
       <select name="web_research_provider">
-        {% for option in [('openrouter', 'OpenRouter / Chat-API mit Websuche'), ('tavily', 'Tavily / Such-API'), ('custom', 'Eigener Endpunkt (JSON)')] %}
+        {% for option in [('tavily', 'Tavily / Such-API'), ('custom', 'Eigener Endpunkt (JSON)'), ('wikipedia', 'Wikipedia (schlüssellos)')] %}
         <option value="{{ option[0] }}" {% if web_research.web_research_provider == option[0] %}selected{% endif %}>{{ option[1] }}</option>
         {% endfor %}
       </select>
     </label>
+    <p class="muted" style="margin:0 0 8px">Nur Backends mit echten Quell-URLs sind
+    erlaubt — ein LLM-Chat-Endpoint kann keine prüfbaren URLs liefern und ist
+    als Retrieval-Anbieter deaktiviert (APIMaster plant/beurteilt weiterhin
+    über das Modell-Routing).</p>
     <label>Base-URL
       <input type="url" name="web_research_base_url" value="{{ web_research.web_research_base_url }}"
-        placeholder="https://openrouter.ai/api/v1">
+        placeholder="https://api.tavily.com">
     </label>
-    <label>Modell (nur Chat-API)
+    <label>Modell (nur Custom-Endpoint)
       <input type="text" name="web_research_model" value="{{ web_research.web_research_model }}"
-        placeholder="openai/gpt-4o-mini:online">
+        placeholder="optional">
     </label>
     <label>API-Key
       <input type="password" name="web_research_api_key" value="{{ web_research.web_research_api_key }}"

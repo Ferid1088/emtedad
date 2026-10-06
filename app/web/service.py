@@ -558,12 +558,15 @@ async def import_youtube_resource(database: Database, locator: str) -> UUID:
     from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
     from app.knowledge.importer import ExternalKnowledgeImporter
     from app.knowledge.llm.factory import resolve_llm_provider
+    from app.knowledge.llm.roles import AgentRole
     from app.knowledge.structure.scheduler import schedule_structure_analysis
     from app.knowledge.structure.service import SourceStructureService
 
     video_id = validate_youtube_url(locator)
     importer = ExternalKnowledgeImporter(
-        database, resolve_youtube_adapter(), resolve_llm_provider()
+        database,
+        resolve_youtube_adapter(),
+        resolve_llm_provider(role=AgentRole.LEGACY_DEFAULT),
     )
     imported = await importer.ingest(video_id)
     await SourceStructureService(database).mark_ingested(imported.source_id)

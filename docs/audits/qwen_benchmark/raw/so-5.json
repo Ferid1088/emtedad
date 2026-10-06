@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197698-3F8mLyNJCUfSxZPluj5g",
+ "object": "chat.completion",
+ "created": 1791197698,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "{\"classification\": \"ESTABLISHED_SCIENCE\", \"reason_fa\": \"این گزاره به موضوعی می‌پردازد که به‌خوبی در علم تأیید شده است: DNA به‌عنوان مادهٔ وراثتی و داشتن ساختار مارپیچ دوتایی، یکی از پایه‌های اصلی زیست‌شناسی مولکولی است که با شواهد متعدد و روش‌های مستقل (مانند پراش پرتو ایکس و آزمایش‌های ژنتیکی) تأیید شده است.\"}",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 82,
+  "completion_tokens": 165,
+  "total_tokens": 247,
+  "cost": 0.00014348,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00014348,
+   "upstream_inference_prompt_cost": 1.148e-05,
+   "upstream_inference_completions_cost": 0.000132
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

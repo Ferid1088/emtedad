@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791198045-W7lcQ32OqsFYgF1cMfs9",
+ "object": "chat.completion",
+ "created": 1791198045,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Parasail",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "مطالعات زیادی دربارهٔ تأثیر کافئین بر حافظه انجام شده، اما نتایجشان یکدست نیست. بعضی پژوهش‌ها نشان می‌دهند که کافئین می‌تونه به حافظه کمک کنه، مخصوصاً وقتی بعد از یادگیری مصرف بشه. مثلاً چند تحقیق گزارش کردن که افرادی که بعد از مطالعه کافئین می‌خورن، بهتر مطالب رو به یاد میارن، گویی کافئین فرآیند تثبیت خاطرات رو تقویت می‌کنه. از طرف دیگه، بعضی مطالعات تفاوت معناداری بین گروه‌هایی که کافئین مصرف کردن و گروه کنترل نمی‌بینن، یا حتی گاهی اثر منفی کافئین رو گزارش می‌کنن، مخصوصاً در شرایط استرس بالا یا وقتی مقدارش زیاد باشه. بعضی آزمایش‌ها هم نشون دادن که کافئین ممکنه روی حافظه کاری تأثیر محدودی داشته باشه، یا فقط در گروه‌های خاصی — مثل جوان‌های سالم — موثر باشه. همچنین، زمان مصرف، دوز، و تفاوت‌های فردی مثل عادت به کافئین، همه نقش دارن. پس هرچند شواهدی از بهبود حافظه وجود داره، ولی نه به‌صورت قطعی و کلی. هنوز مشخص نیست کی و چه‌طور می‌تونه از کافئین برای تقویت حافظه بهره ببره، و پژوهش‌های بیشتری لازمه تا تصویر روشن‌تری به دست بیاد.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 300,
+  "completion_tokens": 550,
+  "total_tokens": 850,
+  "cost": 0.000482,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.000482,
+   "upstream_inference_prompt_cost": 4.2e-05,
+   "upstream_inference_completions_cost": 0.00044
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

@@ -1,5 +1,8 @@
 # Full Process Optimization — Audit Table
 
+> HISTORICAL — OpenRouter-era references inside are provenance only;
+> APIMaster is the canonical gateway since 2026-10-05.
+
 Date: 2025-10-03
 Spec: `docs/EMTEDAD_MASTER_PROCESS_AUDIT_OPTIMIZATION_LOOP.md`
 Loop log: `docs/audits/PROCESS_OPTIMIZATION_LOOP.md`

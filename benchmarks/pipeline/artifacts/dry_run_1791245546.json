@@ -1,0 +1,711 @@
+{
+  "topic_brief_id": "61d3f6eb-d81b-44ec-9c09-9988a479cd8e",
+  "source_draft_id": "07e80bb8-9e46-4ec4-90a0-78bbf18169be",
+  "source_draft_hash": "02aa76f455231abd697def6806afe8b26f68aebfc5653079bd313de592695b99",
+  "package_id": "eba81c94-f335-49f1-85c4-4be172f89edc",
+  "wall_clock_s": 2435.3,
+  "languages": [
+    {
+      "language": "de",
+      "run_id": "33125576-5ea8-4262-8452-679ab1a94ff3",
+      "stages": [
+        "COVERAGE_TRANSLATED",
+        "NATIVE_DRAFTED"
+      ],
+      "loops": [
+        {
+          "loop": 1,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 2,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "FAILED"
+        },
+        {
+          "loop": 3,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 4,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        }
+      ],
+      "outcome": "BLOCKED",
+      "error": "review loop budget exhausted"
+    },
+    {
+      "language": "en",
+      "run_id": "c3e36f59-2aca-44cb-9862-c3ec48d8c7c2",
+      "stages": [
+        "COVERAGE_TRANSLATED",
+        "NATIVE_DRAFTED",
+        "FINAL_FIDELITY",
+        "BLOCKED"
+      ],
+      "loops": [
+        {
+          "loop": 1,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 2,
+          "stage": "FIDELITY_REVIEW",
+          "fidelity": "PASSED",
+          "native": "PASSED"
+        }
+      ],
+      "outcome": "BLOCKED",
+      "error": "deterministic gates failed: DURATION_TOO_SHORT"
+    },
+    {
+      "language": "ar",
+      "run_id": "6c91f0e9-b237-422c-a87a-6ae0d635d130",
+      "stages": [
+        "COVERAGE_TRANSLATED",
+        "NATIVE_DRAFTED"
+      ],
+      "loops": [
+        {
+          "loop": 1,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 2,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 3,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        },
+        {
+          "loop": 4,
+          "stage": "NATIVE_REVIEW",
+          "fidelity": "FAILED",
+          "native": "PASSED"
+        }
+      ],
+      "outcome": "BLOCKED",
+      "error": "review loop budget exhausted"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_coverage_translation",
+      "prompt_tokens": 9054,
+      "completion_tokens": 6516,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 60518,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_native_reconstruction",
+      "prompt_tokens": 9690,
+      "completion_tokens": 9707,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 99291,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_narrative_edit",
+      "prompt_tokens": 11357,
+      "completion_tokens": 8960,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 59122,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_native_critic",
+      "prompt_tokens": 8483,
+      "completion_tokens": 2278,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 17178,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 8424,
+      "completion_tokens": 2700,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 10313,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "de",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 15215,
+      "completion_tokens": 1914,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 40919,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 14426,
+      "completion_tokens": 10032,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 76264,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_native_critic",
+      "prompt_tokens": 7916,
+      "completion_tokens": 2918,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 27455,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 7857,
+      "completion_tokens": 2804,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 26023,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "de",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 14682,
+      "completion_tokens": 1226,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 33597,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 13374,
+      "completion_tokens": 7505,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 18189,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_native_critic",
+      "prompt_tokens": 6764,
+      "completion_tokens": 4110,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 33350,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 6705,
+      "completion_tokens": 2418,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 28277,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "de",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 13628,
+      "completion_tokens": 912,
+      "cached_tokens": 4608,
+      "cost_usd": null,
+      "latency_ms": 25077,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 11538,
+      "completion_tokens": 14077,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 87529,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_native_critic",
+      "prompt_tokens": 6710,
+      "completion_tokens": 2184,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 19922,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "de",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 6651,
+      "completion_tokens": 2096,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 16832,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "de",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 13578,
+      "completion_tokens": 1009,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 25235,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_coverage_translation",
+      "prompt_tokens": 9025,
+      "completion_tokens": 13929,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 88432,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_native_reconstruction",
+      "prompt_tokens": 8307,
+      "completion_tokens": 7060,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 75198,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_narrative_edit",
+      "prompt_tokens": 10063,
+      "completion_tokens": 6829,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 44842,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_native_critic",
+      "prompt_tokens": 6841,
+      "completion_tokens": 2266,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 20082,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 6782,
+      "completion_tokens": 915,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 11066,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "en",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 13876,
+      "completion_tokens": 2177,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 46048,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 12837,
+      "completion_tokens": 17628,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 100835,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_native_critic",
+      "prompt_tokens": 6446,
+      "completion_tokens": 2038,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 18818,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "en",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 6387,
+      "completion_tokens": 1568,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 15441,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "en",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 13497,
+      "completion_tokens": 787,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 23629,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6-astra",
+      "language": "en",
+      "task": "localization_final_edit",
+      "prompt_tokens": 13853,
+      "completion_tokens": 3858,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 206363,
+      "retries": 1
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "en",
+      "task": "localization_final_fidelity",
+      "prompt_tokens": 11745,
+      "completion_tokens": 1569,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 34967,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_coverage_translation",
+      "prompt_tokens": 9017,
+      "completion_tokens": 18709,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 150024,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_native_reconstruction",
+      "prompt_tokens": 9861,
+      "completion_tokens": 9237,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 84671,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 11877,
+      "completion_tokens": 1922,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 19482,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 17961,
+      "completion_tokens": 17017,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 104055,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_native_critic",
+      "prompt_tokens": 10836,
+      "completion_tokens": 4908,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 41025,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "ar",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 17137,
+      "completion_tokens": 1096,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 32258,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 10234,
+      "completion_tokens": 2819,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 28599,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 15792,
+      "completion_tokens": 15518,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 102721,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_narrative_edit",
+      "prompt_tokens": 12535,
+      "completion_tokens": 12373,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 93970,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_native_critic",
+      "prompt_tokens": 11937,
+      "completion_tokens": 4419,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 39329,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "ar",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 18115,
+      "completion_tokens": 2039,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 43526,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 10775,
+      "completion_tokens": 1855,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 18405,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_targeted_correction",
+      "prompt_tokens": 15926,
+      "completion_tokens": 20456,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 45363,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_native_critic",
+      "prompt_tokens": 10295,
+      "completion_tokens": 2705,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 26367,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "ar",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 16659,
+      "completion_tokens": 3352,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 69972,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_native_critic",
+      "prompt_tokens": 10295,
+      "completion_tokens": 5994,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 58108,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gemini-3.8-flash",
+      "language": "ar",
+      "task": "localization_audience_critic",
+      "prompt_tokens": 10234,
+      "completion_tokens": 2356,
+      "cached_tokens": 0,
+      "cost_usd": null,
+      "latency_ms": 23143,
+      "retries": 0
+    },
+    {
+      "provider": "apimaster",
+      "model": "gpt-6.1-sol",
+      "language": "ar",
+      "task": "localization_fidelity_critic",
+      "prompt_tokens": 16664,
+      "completion_tokens": 987,
+      "cached_tokens": null,
+      "cost_usd": null,
+      "latency_ms": 29648,
+      "retries": 0
+    }
+  ],
+  "actual_provider_cost_usd": 0.0,
+  "cost_missing_for_calls": 48,
+  "market_estimate": {
+    "status": "ok",
+    "snapshot_at": "2026-10-06T00:12:25+00:00",
+    "pricing_version": "a42d372ccf0b5dd13ecf71203521f9d2",
+    "group": "default",
+    "source": "https://apimaster.ai/api/pricing",
+    "low_usd": 3.078204,
+    "high_usd": 3.411406,
+    "per_model": {
+      "gemini-3.8-flash": {
+        "low": 2.547312,
+        "high": 2.547312
+      },
+      "gpt-6-astra": {
+        "low": 0.0148,
+        "high": 0.348002
+      },
+      "gpt-6.1-sol": {
+        "low": 0.516092,
+        "high": 0.516092
+      }
+    }
+  },
+  "call_count": 48
+}

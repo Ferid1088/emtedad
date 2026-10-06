@@ -1,0 +1,53 @@
+{
+  "model": "gpt-6.1-sol",
+  "tasks": {
+    "counterargument_steelman": {
+      "chat": {
+        "status": 200,
+        "latency_s": 31.0,
+        "prompt_tokens": 4581,
+        "completion_tokens": 934,
+        "cost": null,
+        "raw_text_len": 4851,
+        "schema_ok": true,
+        "objection_count": 3,
+        "error": null
+      },
+      "responses": {
+        "status": 200,
+        "latency_s": 34.6,
+        "prompt_tokens": 204,
+        "completion_tokens": 1028,
+        "cost": null,
+        "raw_text_len": 5378,
+        "schema_ok": true,
+        "objection_count": 3,
+        "error": null
+      }
+    },
+    "epistemic_drift_audit": {
+      "chat": {
+        "status": 200,
+        "latency_s": 21.5,
+        "prompt_tokens": 4611,
+        "completion_tokens": 944,
+        "cost": null,
+        "raw_text_len": 4871,
+        "schema_ok": true,
+        "objection_count": 9,
+        "error": null
+      },
+      "responses": {
+        "status": 200,
+        "latency_s": 27.1,
+        "prompt_tokens": 234,
+        "completion_tokens": 1095,
+        "cost": null,
+        "raw_text_len": 4639,
+        "schema_ok": true,
+        "objection_count": 7,
+        "error": null
+      }
+    }
+  }
+}

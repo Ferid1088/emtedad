@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197884-zeoIjDgBW6WNHuPA4UKq",
+ "object": "chat.completion",
+ "created": 1791197884,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "GMICloud",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "وقتی دو چیز با هم تغییر می‌کنند — مثلاً وقتی یکی زیاد می‌شه، اون یکی هم زیاد می‌شه — می‌گیم بینشون «همبستگی» هست. ولی این نمی‌گه کدوم یکی باعث اون دیگری شده. یعنی همبستگی، علّیت رو ثابت نمی‌کنه.  \n\nمثلاً فرض کنید ببینیم تعداد فروش آبمیوه‌های یخی با تعداد حوادث غرق‌شدگی در استخرها رابطه داره: هرچی آبمیوه بیشتر فروخته می‌شه، حوادث غرق‌شدگی هم بیشتر می‌شه. طبیعی به نظر میاد بگیم آبمیوه باعث غرق‌شدنه! ولی واقعیت اینه که یه عامل سوم — هوای گرم — هر دو رو افزایش می‌ده: موقع گرما، مردم هم آبمیوه می‌خورن، هم بیشتر میرن استخر. پس هوای گرم علت مشترکه، نه آبمیوه.  \n\nاینطوری می‌بینیم که بدون بررسی دقیق، نباید از همبستگی مستقیم به علّیت برسیم.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 428,
+  "completion_tokens": 539,
+  "total_tokens": 967,
+  "cost": 0.0002261,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0002261,
+   "upstream_inference_prompt_cost": 3.745e-05,
+   "upstream_inference_completions_cost": 0.00018865
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}

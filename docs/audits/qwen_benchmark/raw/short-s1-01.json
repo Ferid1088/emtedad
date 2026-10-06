@@ -1,0 +1,46 @@
+{
+ "id": "gen-1791197861-iINQtFj73LuQVxaDVdoZ",
+ "object": "chat.completion",
+ "created": 1791197861,
+ "model": "qwen/qwen3-235b-a22b-2507",
+ "provider": "Alibaba",
+ "system_fingerprint": null,
+ "service_tier": null,
+ "choices": [
+  {
+   "index": 0,
+   "logprobs": null,
+   "finish_reason": "stop",
+   "native_finish_reason": "stop",
+   "message": {
+    "role": "assistant",
+    "content": "خب، دوست عزیزم، وقتی آدم خسته یا مضطرب میشه، مغزش مثل یه لپ‌تاپ قدیمی میشه که همه برنامه‌ها بازه و دیگه جواب نمیده! سیستم اجرایی مغز — همون بخشی که تصمیم می‌گیره، تمرکز داره و خودداری می‌کنه — زیر فشار قرار می‌گیره. حالا تصور کن استرس داری یا شب‌ها کم خوابیدی؛ مغزت انرژی کم داره و راحت‌تر به وسوسه‌ها دست می‌زنه: یه چیز شیرین بخوری، یه کار مهم رو به تعویق بندازی، یا یه حرف بد بزنی.  \nهمین‌طور استرس، هورمون‌هایی مثل کورتیزول ترش می‌کنه که منطق رو کم‌کم «خاموش» می‌کنه و هیجان‌ها جلو می‌زنن. پس طبیعیه که تو این حالت، کمتر فکر می‌کنی، بیشتر عکس‌العمل نشون می‌دی.  \nدر واقع، مغز تو داره از خودش دفاع می‌کنه، فقط گاهی این «دفاع» یعنی تصمیم بد گرفتن. به همین سادگی.",
+    "refusal": null,
+    "reasoning": null
+   }
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 300,
+  "completion_tokens": 403,
+  "total_tokens": 703,
+  "cost": 0.000285844,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.000285844,
+   "upstream_inference_prompt_cost": 4.485e-05,
+   "upstream_inference_completions_cost": 0.000240994
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ }
+}
