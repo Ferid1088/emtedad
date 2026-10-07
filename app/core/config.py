@@ -65,13 +65,13 @@ class Settings(BaseSettings):
     # GET /v1/models). Models live in configuration, never in domain code;
     # these fields are the single source of truth for the routing matrix
     # and may be overridden via EMTEDAD_* environment variables or owner
-    # settings. Namespaced IDs (``openai/…``, ``google/…``) are the
-    # defaults because APIMaster only reports per-call cost for them;
-    # Qwen stays bare until a namespaced ID is verified live.
+    # settings. Bare IDs: APIMaster answers provider-namespaced IDs
+    # (``openai/gpt-6.1-sol``) with 503 model_not_found (seen 2026-10-07),
+    # even though they report cost; bare IDs work but report no cost.
     model_role_high_volume: str = "qwen3.8-flash"
-    model_role_reasoning: str = "openai/gpt-6.1-sol"
-    model_role_editorial: str = "google/gemini-3.8-flash"
-    model_role_premium: str = "openai/gpt-6-astra"
+    model_role_reasoning: str = "gpt-6.1-sol"
+    model_role_editorial: str = "gemini-3.8-flash"
+    model_role_premium: str = "gpt-6-astra"
     # Parallel APIMaster calls (foreground / background work).
     provider_max_concurrency: int = 5
     provider_background_max_concurrency: int = 4

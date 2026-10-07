@@ -30,14 +30,14 @@ def test_every_agent_role_maps_to_a_model_role() -> None:
 def test_role_matrix_matches_owner_policy(test_settings: Settings) -> None:
     expected = {
         # High-volume model did not certify (live A/B loops) → reasoning tier.
-        AgentRole.TOPIC_MINER: "openai/gpt-6.1-sol",
-        AgentRole.SEARCH_PLANNER: "openai/gpt-6.1-sol",
-        AgentRole.SEMANTIC_PACKAGE: "openai/gpt-6.1-sol",
-        AgentRole.FIDELITY_CRITIC: "openai/gpt-6.1-sol",
-        AgentRole.COVERAGE_TRANSLATION: "google/gemini-3.8-flash",
-        AgentRole.NATIVE_SPOKEN_CRITIC: "google/gemini-3.8-flash",
-        AgentRole.PERSIAN_SCRIPT_WRITER: "openai/gpt-6-astra",
-        AgentRole.TARGET_FINAL_EDITOR: "openai/gpt-6-astra",
+        AgentRole.TOPIC_MINER: "gpt-6.1-sol",
+        AgentRole.SEARCH_PLANNER: "gpt-6.1-sol",
+        AgentRole.SEMANTIC_PACKAGE: "gpt-6.1-sol",
+        AgentRole.FIDELITY_CRITIC: "gpt-6.1-sol",
+        AgentRole.COVERAGE_TRANSLATION: "gemini-3.8-flash",
+        AgentRole.NATIVE_SPOKEN_CRITIC: "gemini-3.8-flash",
+        AgentRole.PERSIAN_SCRIPT_WRITER: "gpt-6-astra",
+        AgentRole.TARGET_FINAL_EDITOR: "gpt-6-astra",
     }
     for role, model in expected.items():
         assert model_for_role(AGENT_TO_MODEL_ROLE[role], test_settings) == model, role
@@ -122,7 +122,7 @@ def test_factory_routes_roles_to_apimaster_when_enabled(
     )
     provider = resolve_llm_provider(role=AgentRole.FIDELITY_CRITIC)
     assert isinstance(provider, APIMasterProvider)
-    assert provider.config.model == "openai/gpt-6.1-sol"
+    assert provider.config.model == "gpt-6.1-sol"
     assert provider.agent_role == AgentRole.FIDELITY_CRITIC.value
 
 
@@ -141,7 +141,7 @@ def test_factory_premium_roles_run_synchronously_on_premium_model(
     )
     provider = resolve_llm_provider(role=AgentRole.PERSIAN_SCRIPT_WRITER)
     assert isinstance(provider, APIMasterProvider)
-    assert provider.config.model == "openai/gpt-6-astra"
+    assert provider.config.model == "gpt-6-astra"
 
 
 def test_factory_routes_string_roles(
@@ -157,4 +157,4 @@ def test_factory_routes_string_roles(
     )
     provider = resolve_llm_provider(role="topic_miner")
     assert isinstance(provider, APIMasterProvider)
-    assert provider.config.model == "openai/gpt-6.1-sol"
+    assert provider.config.model == "gpt-6.1-sol"
