@@ -93,6 +93,10 @@ def friendly_error(exc: BaseException) -> str:
         if type(exc).__name__ == "APIMasterMissingKeyError":
             kind = "missing_key"
         return _API_MESSAGES.get(kind, f"APIMaster-Fehler: {exc}")
+    from app.voice.elevenlabs import VoiceProviderError
+
+    if isinstance(exc, VoiceProviderError):
+        return str(exc)
     if isinstance(exc, RoutingConfigurationError):
         return f"Konfigurationsfehler: {exc}"
     text = str(exc)

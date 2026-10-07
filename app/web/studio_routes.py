@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+import re
 from pathlib import Path
 from typing import Any, TypedDict, cast
 from urllib.parse import quote
@@ -2067,6 +2068,11 @@ async def brief_workspace(
         research_notice=request.query_params.get("research"),
         error=request.query_params.get("error"),
         job=jobs.get(str(brief_id)),
+        voice_manifests=_voice_manifests(request, brief_id),
+        voice_jobs={
+            code: jobs.get(f"{brief_id}:voice:{code}")
+            for code in ("fa", "de", "en", "ar")
+        },
         translation_jobs={
             code: jobs.get(f"{brief_id}:loc:{code}") for code in _LOCALIZE_LANGUAGES
         },
@@ -2161,6 +2167,18 @@ async def _localization_runs(
     for run in rows:
         latest.setdefault(run.language.value, run)
     return latest
+
+
+def _voice_manifests(request: Request, brief_id: UUID) -> dict[str, object]:
+    from app.voice.render import VOICE_LANGUAGES, read_manifest
+
+    settings = request.app.state.settings
+    found: dict[str, object] = {}
+    for code in VOICE_LANGUAGES:
+        manifest = read_manifest(settings.storage_root, brief_id, code)
+        if manifest is not None:
+            found[code] = manifest
+    return found
 
 
 async def _localized_texts(
@@ -2306,6 +2324,55 @@ async def production_action(request: Request, brief_id: UUID, action: str) -> Re
         )
         return RedirectResponse(f"{back}?error={quote(message)}", status_code=303)
     return RedirectResponse(back, status_code=303)
+
+
+@router.post("/studio/production/{brief_id}/voice/{language}")
+async def production_voice(request: Request, brief_id: UUID, language: str) -> Response:
+    """Record the approved script (fa) or a finished translation."""
+
+    from app.voice.factory import build_voice_service
+    from app.voice.render import VOICE_LANGUAGES
+
+    back = f"/studio/production/{brief_id}?stage=APPROVED#voice"
+    if language not in VOICE_LANGUAGES:
+        return RedirectResponse(back, status_code=303)
+    database = _database(request)
+    effective = await StudioSettingsService(database).effective()
+    settings = request.app.state.settings
+
+    async def work() -> None:
+        service = build_voice_service(database, effective, settings.storage_root)
+        await service.render(brief_id, language)
+
+    started = jobs.start(
+        f"{brief_id}:voice:{language}",
+        "voice",
+        f"Vertonung ({language.upper()})",
+        work,
+    )
+    if not started:
+        message = quote("Diese Vertonung läuft bereits.")
+        return RedirectResponse(f"{back}&error={message}", status_code=303)
+    return RedirectResponse(back, status_code=303)
+
+
+@router.get("/studio/production/{brief_id}/voice/{language}/{filename}")
+async def production_voice_file(
+    request: Request, brief_id: UUID, language: str, filename: str
+) -> Response:
+    from fastapi.responses import FileResponse
+
+    from app.voice.render import VOICE_LANGUAGES
+
+    if language not in VOICE_LANGUAGES or not re.fullmatch(
+        r"(full|block_\d{3})\.mp3", filename
+    ):
+        return HTMLResponse("Not found", status_code=404)
+    settings = request.app.state.settings
+    path = settings.storage_root / "voice" / str(brief_id) / language / filename
+    if not path.is_file():
+        return HTMLResponse("Not found", status_code=404)
+    return FileResponse(path, media_type="audio/mpeg")
 
 
 @router.post("/studio/production/{brief_id}/job/dismiss")

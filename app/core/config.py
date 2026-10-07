@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,6 +82,27 @@ class Settings(BaseSettings):
     # YouTube import: parallel video downloads, how many videos per channel
     # are listed, and which transcript languages count as the source text.
     youtube_import_concurrency: int = 4
+    # Voice (ElevenLabs). The key is read from EMTEDAD_ELEVENLABS_API_KEY or
+    # ELEVENLABS_API_KEY. Voice IDs: the owner's "Fereidoun" voices.
+    elevenlabs_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "EMTEDAD_ELEVENLABS_API_KEY",
+            "ELEVENLABS_API_KEY",
+            "elevenlabs_api_key",
+        ),
+    )
+    voice_model_id: str = "eleven_v3"
+    voice_id_fa: str = "wf5gkA603aCfUGoOTBun"
+    voice_id_de: str = "Cu4Eelnl4Z2jfrxrEpSr"
+    voice_id_en: str = "vGz31R3QkUSQW2f9PuNA"
+    voice_id_ar: str = "nGBZQf1mseVvnsC8kKQI"
+    voice_concurrency: int = 3
+    # Listening pronunciation check (wav2vec2) — Persian only by default;
+    # other languages never load torch/transformers.
+    pronunciation_languages: list[str] = ["fa"]
+    pronunciation_max_rounds: int = 3
+    pronunciation_phoneme_model: str = "facebook/wav2vec2-xlsr-53-espeak-cv-ft"
     youtube_channel_max_videos: int = 2000
     youtube_transcript_languages: list[str] = ["fa"]
     speech_structure_retry_backoff_seconds: int = 300

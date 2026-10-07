@@ -12,6 +12,13 @@ from app.ops.settings.models import OwnerSetting
 # field; the DB row overrides the environment default when present.
 EDITABLE_KEYS: tuple[str, ...] = (
     "web_research_enabled",
+    "voice_model_id",
+    "voice_id_fa",
+    "voice_id_de",
+    "voice_id_en",
+    "voice_id_ar",
+    "voice_concurrency",
+    "pronunciation_max_rounds",
     "web_research_provider",
     "web_research_base_url",
     "web_research_api_key",
@@ -104,6 +111,13 @@ class StudioSettingsService:
 
 _KEY_TYPES: dict[str, type] = {
     "web_research_enabled": bool,
+    "voice_model_id": str,
+    "voice_id_fa": str,
+    "voice_id_de": str,
+    "voice_id_en": str,
+    "voice_id_ar": str,
+    "voice_concurrency": int,
+    "pronunciation_max_rounds": int,
     "web_research_provider": str,
     "web_research_base_url": str,
     "web_research_api_key": str,

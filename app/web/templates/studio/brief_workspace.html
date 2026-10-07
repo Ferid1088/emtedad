@@ -785,6 +785,7 @@
       {% endfor %}
     </tbody>
   </table>
+
   {% if llm_costs %}
   <h3>Modellkosten (provider-gemeldet)</h3>
   <table>
@@ -809,6 +810,49 @@
   </table>
   {% endif %}
 </section>
+<section class="card">
+  <h2 id="voice">Vertonung</h2>
+  <p class="muted">ElevenLabs-Stimmen aus den Settings. Persisch wird nach jeder Aufnahme abgehört: falsch gelesene Wörter bekommen Harakat (dann volle Harakat, eindeutige Schreibweise, Synonym) und der Block wird neu aufgenommen.</p>
+  {% set language_names_v = {'fa': 'Persisch', 'de': 'Deutsch', 'en': 'Englisch', 'ar': 'Arabisch'} %}
+  <table>
+    <thead><tr><th>Sprache</th><th>Aufnahme</th><th>Aussprache</th><th></th></tr></thead>
+    <tbody>
+      {% for code in ['fa', 'de', 'en', 'ar'] %}
+      {% set vjob = voice_jobs.get(code) %}
+      {% set manifest = voice_manifests.get(code) %}
+      {% set ready = code == 'fa' or (localization_runs.get(code) and localization_runs.get(code).stage.value == 'READY_FOR_VOICE') %}
+      <tr>
+        <td>{{ language_names_v[code] }}</td>
+        <td>
+          {% if vjob and vjob.running %}<span class="badge warning">läuft seit {{ vjob.elapsed_seconds // 60 }} Min.</span>
+          <script>setTimeout(function () { window.location.reload(); }, 10000);</script>
+          {% elif vjob and vjob.error %}<span class="error">{{ vjob.error }}</span>
+          {% endif %}
+          {% if manifest %}
+          <audio controls preload="none" src="/studio/production/{{ brief.id }}/voice/{{ code }}/full.mp3" style="width:100%"></audio>
+          <span class="muted">{{ manifest.blocks|length }} Blöcke · {{ manifest.created_at[:16].replace('T', ' ') }}</span>
+          {% elif not (vjob and vjob.running) %}<span class="muted">noch keine</span>{% endif %}
+        </td>
+        <td>
+          {% if manifest %}
+            {% if manifest.note %}<span class="muted">{{ manifest.note }}</span>{% endif %}
+            {% if manifest.unresolved %}<span class="badge warning">bitte anhören: </span> <span dir="rtl">{{ manifest.unresolved|join('، ') }}</span>
+            {% elif code == 'fa' and not manifest.note %}<span class="badge success">alle geprüften Wörter korrekt</span>{% endif %}
+          {% endif %}
+        </td>
+        <td>
+          {% if ready and not (vjob and vjob.running) and approved_draft %}
+          <form method="post" action="/studio/production/{{ brief.id }}/voice/{{ code }}" class="inline-form">
+            <button type="submit" class="button{% if manifest %} secondary{% endif %}">{% if manifest %}Neu aufnehmen{% else %}Vertonen{% endif %}</button>
+          </form>
+          {% elif not ready %}<span class="muted">erst übersetzen</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
 {% else %}
 {{ not_built('Approved', 'Einen geprüften Entwurf freigeben, um diese Stufe zu erreichen.') }}
 {% endif %}

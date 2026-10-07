@@ -23,6 +23,16 @@ dependencies = [
     "sentence-transformers>=5.1,<6",
 ]
 
+[project.optional-dependencies]
+# Persian listening pronunciation check (wav2vec2). Only needed on machines
+# that record Persian voice: uv sync --extra voice-check (plus ffmpeg).
+voice-check = [
+    "torch>=2.4",
+    "transformers>=4.44",
+    "huggingface-hub>=0.24",
+    "numpy>=1.26",
+]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28,<1",
