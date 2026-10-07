@@ -2067,6 +2067,9 @@ async def brief_workspace(
         research_notice=request.query_params.get("research"),
         error=request.query_params.get("error"),
         job=jobs.get(str(brief_id)),
+        translation_jobs={
+            code: jobs.get(f"{brief_id}:loc:{code}") for code in _LOCALIZE_LANGUAGES
+        },
         action_labels=_ACTION_LABELS,
         localization_runs=localization_runs,
         localized_texts=await _localized_texts(database, localization_runs),
@@ -2261,7 +2264,7 @@ async def production_action(request: Request, brief_id: UUID, action: str) -> Re
     if action == "localize":
         form = await request.form()
         language = str(form.get("language") or "de")
-        if language not in _LOCALIZE_LANGUAGES:
+        if language not in (*_LOCALIZE_LANGUAGES, "all"):
             return RedirectResponse(
                 f"{back}?error={quote('Unbekannte Zielsprache')}", status_code=303
             )
@@ -2274,7 +2277,22 @@ async def production_action(request: Request, brief_id: UUID, action: str) -> Re
         return RedirectResponse(f"{back}?error={quote(message)}", status_code=303)
     label = _ACTION_LABELS[action]
     if action == "localize":
-        label = f"{label} ({language.upper()})"
+        # Every language is its own job, so DE, EN and AR run in parallel.
+        languages = _LOCALIZE_LANGUAGES if language == "all" else (language,)
+        started_any = False
+        for code in languages:
+            started_any |= jobs.start(
+                f"{key}:loc:{code}",
+                action,
+                f"{label} ({code.upper()})",
+                lambda code=code: _run_production_action(  # type: ignore[misc]
+                    database, brief_id, action, code
+                ),
+            )
+        if not started_any:
+            message = "Diese Übersetzung läuft bereits."
+            return RedirectResponse(f"{back}?error={quote(message)}", status_code=303)
+        return RedirectResponse(f"{back}?stage=APPROVED#translations", status_code=303)
     started = jobs.start(
         key,
         action,

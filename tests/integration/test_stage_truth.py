@@ -676,11 +676,13 @@ async def test_channel_pack_checks_reach_the_critic(
 
         await scripts.review_draft(draft.id)
         channel_critic = next(
-            i for i in provider.review_instructions if "CHANNEL_SPECIFIC" in i
+            i for i in provider.review_instructions if "channel critic" in i
         )
         assert "CUSTOM_OWNER_CHECK_42" in channel_critic
         # Other critics still receive no channel checks.
-        fact_critic = next(i for i in provider.review_instructions if "FACT" in i)
+        fact_critic = next(
+            i for i in provider.review_instructions if "the fact critic" in i
+        )
         assert "CUSTOM_OWNER_CHECK_42" not in fact_critic
         # The critic payload carries the bounded context, not just the draft.
         assert provider.review_instructions

@@ -1,5 +1,6 @@
 """Independent critics, findings, revision, and the approval gate."""
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -12,8 +13,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.briefs.models import ContentBrief
+from app.content_engine.critics import (
+    CRITIC_AGENT_ROLES,
+    CRITIC_PROMPT_VERSION_V3,
+    critic_instructions,
+    critics_for,
+    script_integrity,
+)
 from app.content_engine.domain import (
-    CRITIC_PROMPT_VERSION,
     REVISION_PROMPT_VERSION,
     SCRIPT_PROMPT_VERSION,
     CriticRole,
@@ -796,8 +803,8 @@ class ScriptService:
                 round_number=previous + 1,
                 cycle_number=cycle,
                 status=ReviewRunStatus.RUNNING,
-                critic_profile_version=CRITIC_PROMPT_VERSION,
-                critics_requested=len(CriticRole) + deterministic,
+                critic_profile_version=CRITIC_PROMPT_VERSION_V3,
+                critics_requested=len(critics_for(draft.language)) + deterministic,
                 provider=getattr(provider, "name", "unknown"),
                 model=self.model,
             )
@@ -841,39 +848,81 @@ class ScriptService:
         started: float,
         provider: LLMProvider,
     ) -> list[ReviewFinding]:
+        # 1) Load what the critics need, then release the connection —
+        #    LLM calls never run inside a database transaction.
+        async with self.database.transaction() as session:
+            draft_row = await session.get(ScriptDraft, draft_id)
+            if draft_row is None:
+                raise LookupError(f"Unknown script draft {draft_id}")
+            brief_row = await session.get(ContentBrief, draft_row.content_brief_id)
+            channel_checks = (
+                await _channel_checks(session, brief_row) if brief_row else ()
+            )
+            critic_context = await _critic_context(session, draft_row, brief_row)
+            draft_text = draft_row.text
+            draft_language = draft_row.language
+        input_text = json.dumps(
+            {"draft": draft_text, "context": critic_context}, ensure_ascii=False
+        )
+
+        # 2) All specialized critics in parallel, each on its own model role.
+        async def run_critic(role: CriticRole) -> ReviewFindingsOutput:
+            role_checks = (
+                tuple(channel_checks) + tuple(BOOK_REFERENCE_CHECKS)
+                if role is CriticRole.CHANNEL_SPECIFIC
+                else ()
+            )
+            critic_provider = self.provider or resolve_llm_provider(
+                role=CRITIC_AGENT_ROLES[role],
+                recorder=DatabaseLLMRecorder(self.database, run_scope="production"),
+            )
+            result = await critic_provider.extract(
+                StructuredExtractionRequest(
+                    task="script_review",
+                    prompt_version=CRITIC_PROMPT_VERSION_V3,
+                    model=self.model,
+                    instructions=critic_instructions(role, role_checks),
+                    input_text=input_text,
+                    output_model=ReviewFindingsOutput,
+                )
+            )
+            return ReviewFindingsOutput.model_validate(result.model_dump())
+
+        roles = critics_for(draft_language)
+        outputs = await asyncio.gather(*(run_critic(role) for role in roles))
+
+        # 3) Persist everything in one short transaction.
         async with self.database.transaction() as session:
             run = await session.get(ReviewRun, run_id)
             draft = await session.get(ScriptDraft, draft_id)
             if run is None or draft is None:
                 raise LookupError(f"Unknown review run {run_id}")
             brief = await session.get(ContentBrief, draft.content_brief_id)
-            checks = await _channel_checks(session, brief) if brief else ()
-            context = await _critic_context(session, draft, brief)
             findings: list[ReviewFinding] = []
             completed = 0
-            for role in CriticRole:
-                role_checks = (
-                    checks + BOOK_REFERENCE_CHECKS
-                    if role is CriticRole.CHANNEL_SPECIFIC
-                    else ()
+            integrity = script_integrity(draft.text, draft.language)
+            if integrity is not None and not integrity.passed:
+                finding = ReviewFinding(
+                    script_draft_id=draft.id,
+                    review_run_id=run.id,
+                    critic_role=CriticRole.PERSIAN_QUALITY.value,
+                    severity=FindingSeverity.WARNING,
+                    location="whole script",
+                    code="SCRIPT_INTEGRITY",
+                    explanation=(
+                        f"Only {integrity.script_ratio:.0%} of the letters are in "
+                        f"the target script and {integrity.foreign_word_ratio:.1%} "
+                        "of the words are Latin-script (gate: ≥90% / ≤3%)."
+                    ),
+                    correction_constraint=(
+                        "Write foreign terms in the target script or replace "
+                        "them; keep Latin script only for unavoidable names."
+                    ),
                 )
-                result = await provider.extract(
-                    StructuredExtractionRequest(
-                        task="script_review",
-                        prompt_version=CRITIC_PROMPT_VERSION,
-                        model=self.model,
-                        instructions=CRITIC_INSTRUCTIONS.format(
-                            role=role.value, checks=", ".join(role_checks)
-                        ),
-                        input_text=json.dumps(
-                            {"draft": draft.text, "context": context},
-                            ensure_ascii=False,
-                        ),
-                        output_model=ReviewFindingsOutput,
-                    )
-                )
+                session.add(finding)
+                findings.append(finding)
+            for role, output in zip(roles, outputs, strict=True):
                 completed += 1
-                output = ReviewFindingsOutput.model_validate(result.model_dump())
                 for proposal in output.findings:
                     finding = ReviewFinding(
                         script_draft_id=draft.id,

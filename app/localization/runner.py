@@ -9,6 +9,7 @@ An interrupted run (app restart, provider error) resumes from its
 persisted stage the next time the owner starts it.
 """
 
+import asyncio
 from uuid import UUID
 
 from sqlalchemy import select
@@ -32,6 +33,10 @@ TERMINAL_STAGES = frozenset(
         LocalizationPipelineStage.FAILED,
     }
 )
+
+# Languages of one brief run in parallel; choosing/creating the semantic
+# package must not race (one package version per draft is a constraint).
+_PACKAGE_LOCKS: dict[UUID, asyncio.Lock] = {}
 
 # Safety bound for the review ⇄ correct loop; the pipeline itself also
 # enforces its configured budget and moves the run to BLOCKED.
@@ -58,12 +63,14 @@ class NativeLocalizationRunner:
         if language is PublicationLanguage.FA:
             raise GateBlockedError("Persisch ist die Ausgangssprache, kein Ziel.")
         draft = await self.package_service.require_gate(brief_id)
-        run = await self._resumable_run(brief_id, draft.content_hash, language)
-        if run is None:
-            package_id = await self._package_without_run(
-                brief_id, draft.id, draft.content_hash, language
-            )
-            run = await self.pipeline.start(package_id, language)
+        lock = _PACKAGE_LOCKS.setdefault(brief_id, asyncio.Lock())
+        async with lock:
+            run = await self._resumable_run(brief_id, draft.content_hash, language)
+            if run is None:
+                package_id = await self._package_without_run(
+                    brief_id, draft.id, draft.content_hash, language
+                )
+                run = await self.pipeline.start(package_id, language)
         return await self._advance(run)
 
     async def _resumable_run(

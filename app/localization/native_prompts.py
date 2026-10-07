@@ -192,9 +192,45 @@ in the script text.
 """.strip()
 
 
+# Native criteria written IN the target language (TrueCrime approach):
+# the critic judges as a native writer would, not against the source.
+NATIVE_CRITERIA: dict[str, str] = {
+    "de": (
+        "Bewerte den Text auf Deutsch nach diesen Kriterien:\n"
+        "- natürliche deutsche Erzählstimme, keine Übersetzungsartefakte\n"
+        "- keine persische oder englische Satzstruktur im Deutschen\n"
+        "- klare, sprechbare Sätze für ein Video (kein Papierdeutsch, keine "
+        "Schachtelsätze)\n"
+        "- Fachbegriffe aus Philosophie und Mystik korrekt und, wo nötig, "
+        "kurz erklärt\n"
+        "- natürliches Erzähltempo und Spannung, ohne Pathos"
+    ),
+    "en": (
+        "Judge the text in English against these criteria:\n"
+        "- reads as originally written by a skilled English narrator\n"
+        "- no translationese, calques or Persian sentence order\n"
+        "- spoken rhythm: clear sentences a narrator can say in one breath\n"
+        "- philosophical and mystical terms used precisely, glossed when "
+        "needed\n"
+        "- engaging documentary tone without purple prose"
+    ),
+    "ar": (
+        "قيّم النص بالعربية وفق هذه المعايير:\n"
+        "- انسياب السرد العربي الأصيل وغياب تراكيب الترجمة الحرفية\n"
+        "- اتساق المستوى اللغوي (الفصحى المعاصرة الواضحة للإلقاء)\n"
+        "- دقة المصطلحات الفلسفية والصوفية\n"
+        "- إيقاع مناسب للسرد المرئي المسموع\n"
+        "- الطبيعية الثقافية وعدم المبالغة الخطابية"
+    ),
+}
+
+
 def native_critic_instructions(language: PublicationLanguage) -> str:
     profile = LANGUAGE_PROFILES[language]
-    return f"""
+    criteria = NATIVE_CRITERIA.get(language.value, "")
+    return f"""{criteria}
+
+
 You are a native {profile.name} critic. Ask: "If I had never seen the
 Persian original, would I believe an excellent native writer wrote this
 in {profile.name}?"

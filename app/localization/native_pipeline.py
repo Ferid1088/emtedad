@@ -16,6 +16,7 @@ synchronously on the configured premium model.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from collections.abc import Callable
@@ -24,6 +25,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 
+from app.content_engine.critics import script_integrity
 from app.content_engine.domain import DraftStatus, FindingSeverity, FindingStatus
 from app.content_engine.models import (
     NarrativePlanSection,
@@ -767,33 +769,56 @@ class NativeLocalizationPipeline:
         labeled = labeled_script(draft_sections)
         findings_payloads: list[dict[str, object]] = []
         # Native spoken critic — language-model family owns native judgment.
-        native = await self._extract(
-            AgentRole.NATIVE_SPOKEN_CRITIC,
-            "localization_native_critic",
-            native_critic_instructions(language),
-            {
-                "target_script": labeled,
-                "language_profile": profile_payload(language),
-                "language": language.value,
-            },
-            PipelineFindingsOutput,
-            run=run,
+        # Native critic and audience-retention critic run in parallel.
+        native, audience = await asyncio.gather(
+            self._extract(
+                AgentRole.NATIVE_SPOKEN_CRITIC,
+                "localization_native_critic",
+                native_critic_instructions(language),
+                {
+                    "target_script": labeled,
+                    "language_profile": profile_payload(language),
+                    "language": language.value,
+                },
+                PipelineFindingsOutput,
+                run=run,
+            ),
+            # Audience retention — quality is more than grammar.
+            self._extract(
+                AgentRole.AUDIENCE_RETENTION_CRITIC,
+                "localization_audience_critic",
+                audience_critic_instructions(language),
+                {
+                    "target_script": labeled,
+                    "language_profile": profile_payload(language),
+                    "language": language.value,
+                },
+                PipelineFindingsOutput,
+                run=run,
+            ),
         )
         for item in PipelineFindingsOutput.model_validate(_dump(native)).findings:
             findings_payloads.append({"critic_role": "NATIVE_SPOKEN", **_dump(item)})
-        # Audience retention — quality is more than grammar.
-        audience = await self._extract(
-            AgentRole.AUDIENCE_RETENTION_CRITIC,
-            "localization_audience_critic",
-            audience_critic_instructions(language),
-            {
-                "target_script": labeled,
-                "language_profile": profile_payload(language),
-                "language": language.value,
-            },
-            PipelineFindingsOutput,
-            run=run,
-        )
+        integrity = script_integrity(draft_text, language.value)
+        if integrity is not None and not integrity.passed:
+            findings_payloads.append(
+                {
+                    "critic_role": "NATIVE_SPOKEN",
+                    "severity": "WARNING",
+                    "location": "whole script",
+                    "code": "SCRIPT_INTEGRITY",
+                    "explanation": (
+                        f"Only {integrity.script_ratio:.0%} of the letters are "
+                        f"in the target script; {integrity.foreign_word_ratio:.1%} "
+                        "Latin-script words (gate ≥90% / ≤3%)."
+                    ),
+                    "correction_constraint": (
+                        "Write foreign terms in the target script; keep Latin "
+                        "script only for unavoidable names."
+                    ),
+                    "section_id": "",
+                }
+            )
         for item in PipelineFindingsOutput.model_validate(_dump(audience)).findings:
             findings_payloads.append(
                 {"critic_role": "AUDIENCE_RETENTION", **_dump(item)}

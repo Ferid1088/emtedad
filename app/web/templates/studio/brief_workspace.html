@@ -736,6 +736,12 @@
     'READY_FOR_VOICE': 'fertig für Voice', 'BLOCKED': 'blockiert — Prüfung nötig',
     'STALE_SOURCE': 'veraltet (persisches Skript geändert)', 'FAILED': 'fehlgeschlagen'
   } %}
+  {% if 'localize' in state.allowed_actions %}
+  <form method="post" action="/studio/production/{{ brief.id }}/actions/localize" class="inline-form">
+    <input type="hidden" name="language" value="all">
+    <button type="submit" class="button">Alle drei Sprachen gleichzeitig übersetzen</button>
+  </form>
+  {% endif %}
   <table>
     <thead><tr><th>Sprache</th><th>Status</th><th>Review-Runden</th><th>Hinweis</th><th></th></tr></thead>
     <tbody>
@@ -752,7 +758,14 @@
         <td>{{ run.review_loop if run else '—' }}</td>
         <td class="muted">{{ (run.error or '')[:160] if run else '' }}</td>
         <td>
-          {% if not (job and job.running) and 'localize' in state.allowed_actions %}
+          {% set tjob = translation_jobs.get(code) %}
+          {% if tjob and tjob.running %}
+          <span class="badge warning">läuft seit {{ tjob.elapsed_seconds // 60 }} Min.</span>
+          <script>setTimeout(function () { window.location.reload(); }, 8000);</script>
+          {% elif tjob and tjob.error %}
+          <span class="error">{{ tjob.error }}</span>
+          {% endif %}
+          {% if not (tjob and tjob.running) and 'localize' in state.allowed_actions %}
           <form method="post" action="/studio/production/{{ brief.id }}/actions/localize" class="inline-form">
             <input type="hidden" name="language" value="{{ code }}">
             <button type="submit" class="button{% if run %} secondary{% endif %}">
