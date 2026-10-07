@@ -45,6 +45,9 @@ class FailureClass(StrEnum):
 
     QUOTA = "quota"  # provider quota/billing — retry later, unbounded
     RATE_LIMIT = "rate_limit"  # provider concurrency/throttling — retry later
+    # Setup problem (missing/rejected API key, retired provider, routing):
+    # not the source's fault — retried later without consuming attempts.
+    CONFIGURATION = "configuration"
     FAILED = "failed"  # real analysis failure — counted against max attempts
 
 
@@ -61,6 +64,21 @@ def classify_failure(error: str | None) -> FailureClass:
         return FailureClass.QUOTA
     if "429" in text or "rate limit" in text or "parallele sessions" in text:
         return FailureClass.RATE_LIMIT
+    if any(
+        marker in text
+        for marker in (
+            "routingconfiguration",
+            "routing is off",
+            "llm_routing",
+            "devin",
+            "api key is not configured",
+            "apimastermissingkey",
+            "apimasterautherror",
+            "rejected the api key",
+            "model_not_found",
+        )
+    ):
+        return FailureClass.CONFIGURATION
     return FailureClass.FAILED
 
 

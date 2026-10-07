@@ -4,7 +4,9 @@ import asyncio
 import json
 import re
 import subprocess
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from youtube_transcript_api import (
@@ -111,9 +113,13 @@ class YouTubeAdapter:
         *,
         metadata_timeout_seconds: int = 60,
         yt_dlp_executable: str = "yt-dlp",
+        channel_max_videos: int = 2000,
+        transcript_languages: tuple[str, ...] = ("fa",),
     ) -> None:
         self._timeout = metadata_timeout_seconds
         self._executable = yt_dlp_executable
+        self._channel_max_videos = channel_max_videos
+        self._transcript_languages = transcript_languages
 
     async def acquire(self, locator: str) -> ExternalSourceSnapshot:
         video_id = parse_youtube_video_id(locator)
@@ -201,7 +207,9 @@ class YouTubeAdapter:
         """List public videos without downloading transcripts or importing them."""
 
         url = parse_youtube_channel_locator(locator)
-        payload = await asyncio.to_thread(self._channel_metadata, url, 100)
+        payload = await asyncio.to_thread(
+            self._channel_metadata, url, self._channel_max_videos
+        )
         entries = payload.get("entries", [])
         if not isinstance(entries, list):
             raise YouTubeAdapterError("YouTube channel returned no video list")
@@ -213,7 +221,7 @@ class YouTubeAdapter:
             # The channel landing page can resolve to tab playlists
             # (Videos/Live/Shorts) instead of uploads; retry the videos tab.
             payload = await asyncio.to_thread(
-                self._channel_metadata, f"{url}/videos", 100
+                self._channel_metadata, f"{url}/videos", self._channel_max_videos
             )
             entries = payload.get("entries", [])
             if not isinstance(entries, list):
@@ -231,6 +239,39 @@ class YouTubeAdapter:
                     title=_optional_string(entry.get("title")) or video_id,
                     published_at=_upload_date(entry.get("upload_date")),
                     thumbnail_url=_optional_string(entry.get("thumbnail")),
+                    duration_seconds=int(entry["duration"])
+                    if isinstance(entry.get("duration"), int | float)
+                    else None,
+                )
+            )
+        return tuple(videos)
+
+    async def search_videos(
+        self, query: str, limit: int = 20
+    ) -> tuple[ChannelVideoSnapshot, ...]:
+        """YouTube search without an API key (yt-dlp ``ytsearch``)."""
+
+        query = query.strip()
+        if not query:
+            return ()
+        payload = await asyncio.to_thread(
+            self._channel_metadata, f"ytsearch{max(1, min(limit, 100))}:{query}", 100
+        )
+        entries = payload.get("entries", [])
+        videos: list[ChannelVideoSnapshot] = []
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            video_id = _optional_string(entry.get("id"))
+            if video_id is None or not _VIDEO_ID.fullmatch(video_id):
+                continue
+            videos.append(
+                ChannelVideoSnapshot(
+                    youtube_video_id=video_id,
+                    title=_optional_string(entry.get("title")) or video_id,
+                    published_at=_upload_date(entry.get("upload_date")),
+                    thumbnail_url=_optional_string(entry.get("thumbnail"))
+                    or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
                     duration_seconds=int(entry["duration"])
                     if isinstance(entry.get("duration"), int | float)
                     else None,
@@ -287,7 +328,7 @@ class YouTubeAdapter:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=self._timeout,
+                timeout=self._timeout if limit <= 100 else self._timeout * 10,
                 shell=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -304,19 +345,22 @@ class YouTubeAdapter:
             raise YouTubeAdapterError("YouTube channel metadata must be an object")
         return value
 
-    @staticmethod
     def _transcript(
+        self,
         video_id: str,
     ) -> tuple[tuple[TranscriptEntry, ...], str, str]:
         try:
             transcripts = YouTubeTranscriptApi().list(video_id)
             available = list(transcripts)
             if not available:
-                raise YouTubeAdapterError("video has no transcript")
-            preferred = next(
-                (item for item in available if item.language_code.startswith("fa")),
-                available[0],
-            )
+                raise YouTubeTranscriptUnavailableError("video has no transcript")
+            preferred = choose_transcript(available, self._transcript_languages)
+            if preferred is None:
+                found = ", ".join(sorted({item.language_code for item in available}))
+                raise YouTubeTranscriptUnavailableError(
+                    "no transcript in the channel language "
+                    f"({'/'.join(self._transcript_languages)}); available: {found}"
+                )
             fetched = preferred.fetch(preserve_formatting=True)
         except YouTubeAdapterError:
             raise
@@ -352,6 +396,24 @@ class YouTubeAdapter:
         language = preferred.language_code
         kind = "generated" if preferred.is_generated else "manual"
         return entries, language, kind
+
+
+def choose_transcript(available: Sequence[Any], languages: Sequence[str]) -> Any | None:
+    """Best transcript in the wanted languages: manual before auto-generated,
+    earlier languages first. Never silently falls back to another language
+    (an English auto-caption imported as a Persian source is worse than a
+    clearly failed import)."""
+
+    for language in languages:
+        matches = [
+            item for item in available if item.language_code.startswith(language)
+        ]
+        manual = [item for item in matches if not item.is_generated]
+        if manual:
+            return manual[0]
+        if matches:
+            return matches[0]
+    return None
 
 
 def _optional_string(value: object) -> str | None:

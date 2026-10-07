@@ -135,7 +135,11 @@ def evaluate_source(
 
     # FAILED: decide between retry-pending and exhausted.
     failure = classify_failure(info.last_error)
-    if failure in {FailureClass.QUOTA, FailureClass.RATE_LIMIT}:
+    if failure in {
+        FailureClass.QUOTA,
+        FailureClass.RATE_LIMIT,
+        FailureClass.CONFIGURATION,
+    }:
         if info.last_failed_at is None:
             return SourceEvaluation(DisplayStatus.PENDING, True, failure.value)
         due = info.last_failed_at + timedelta(seconds=quota_backoff_seconds)

@@ -74,11 +74,16 @@ class Settings(BaseSettings):
     model_role_premium: str = "openai/gpt-6-astra"
     # Parallel APIMaster calls (foreground / background work).
     provider_max_concurrency: int = 5
-    provider_background_max_concurrency: int = 2
+    provider_background_max_concurrency: int = 4
     background_processing_paused: bool = False
-    speech_structure_concurrency: int = 2
-    speech_structure_scan_interval_seconds: int = 300
+    speech_structure_concurrency: int = 4
+    speech_structure_scan_interval_seconds: int = 60
     speech_structure_max_attempts: int = 3
+    # YouTube import: parallel video downloads, how many videos per channel
+    # are listed, and which transcript languages count as the source text.
+    youtube_import_concurrency: int = 4
+    youtube_channel_max_videos: int = 2000
+    youtube_transcript_languages: list[str] = ["fa"]
     speech_structure_retry_backoff_seconds: int = 300
     speech_structure_quota_backoff_seconds: int = 1800
     # Soft quality warnings for KnowledgeUnit granularity (review triggers,

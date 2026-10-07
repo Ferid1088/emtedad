@@ -52,7 +52,7 @@ def test_disabled_transcripts_map_to_dedicated_error(
 
     monkeypatch.setattr(youtube_module, "YouTubeTranscriptApi", lambda: _Api())
     with pytest.raises(YouTubeTranscriptUnavailableError):
-        YouTubeAdapter._transcript("abcdefghijk")
+        YouTubeAdapter()._transcript("abcdefghijk")
 
 
 def test_other_transcript_failures_stay_retryable(
@@ -64,7 +64,7 @@ def test_other_transcript_failures_stay_retryable(
 
     monkeypatch.setattr(youtube_module, "YouTubeTranscriptApi", lambda: _Api())
     with pytest.raises(YouTubeAdapterError) as excinfo:
-        YouTubeAdapter._transcript("abcdefghijk")
+        YouTubeAdapter()._transcript("abcdefghijk")
     assert not isinstance(excinfo.value, YouTubeTranscriptUnavailableError)
 
 
@@ -77,7 +77,7 @@ def test_ip_blocked_maps_to_rate_limited_error(
 
     monkeypatch.setattr(youtube_module, "YouTubeTranscriptApi", lambda: _Api())
     with pytest.raises(YouTubeRateLimitedError):
-        YouTubeAdapter._transcript("abcdefghijk")
+        YouTubeAdapter()._transcript("abcdefghijk")
 
 
 def test_channel_video_list_falls_back_to_videos_tab(

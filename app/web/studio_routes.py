@@ -625,12 +625,18 @@ async def studio_youtube_import(request: Request, channel_id: UUID) -> Response:
             f"/studio/youtube/{channel_id}?error=Bitte+Videos+ausw%C3%A4hlen.",
             status_code=303,
         )
-    results = await _yt_service(request).import_selected(channel_id, candidate_ids)
-    imported = sum(1 for r in results if r.success)
-    failed = sum(1 for r in results if not r.success)
-    msg = f"{imported}+Video(s)+importiert."
-    if failed:
-        msg += f"+{failed}+fehlgeschlagen."
+    queued = await _yt_service(request).import_selected(channel_id, candidate_ids)
+    msg = quote(
+        f"{queued} Video(s) in der Import-Warteschlange — der Import läuft im "
+        "Hintergrund, die Verarbeitung startet automatisch danach."
+    )
+    return RedirectResponse(f"/studio/youtube/{channel_id}?msg={msg}", status_code=303)
+
+
+@router.post("/studio/youtube/{channel_id}/retry-failed")
+async def studio_youtube_retry_failed(request: Request, channel_id: UUID) -> Response:
+    queued = await _yt_service(request).retry_failed(channel_id)
+    msg = quote(f"{queued} fehlgeschlagene(s) Video(s) erneut in der Warteschlange.")
     return RedirectResponse(f"/studio/youtube/{channel_id}?msg={msg}", status_code=303)
 
 

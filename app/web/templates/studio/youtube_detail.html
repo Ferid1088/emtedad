@@ -23,6 +23,28 @@
 {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
+{% set queued = (counts.get('SELECTED', 0) or 0) + (counts.get('IMPORTING', 0) or 0) %}
+<section class="card">
+  <h2>Import-Status</h2>
+  <p>
+    <span class="badge">neu {{ counts.get('NEW', 0) }}</span>
+    <span class="badge warning">in Warteschlange {{ counts.get('SELECTED', 0) }}</span>
+    <span class="badge warning">wird importiert {{ counts.get('IMPORTING', 0) }}</span>
+    <span class="badge success">importiert {{ counts.get('IMPORTED', 0) }}</span>
+    <span class="badge danger">fehlgeschlagen {{ counts.get('FAILED', 0) }}</span>
+    <span class="badge muted">ignoriert {{ counts.get('IGNORED', 0) }}</span>
+  </p>
+  {% if queued %}
+  <p class="notice">Import läuft im Hintergrund. Diese Seite aktualisiert sich automatisch.</p>
+  <script>setTimeout(function () { window.location.reload(); }, 10000);</script>
+  {% endif %}
+  {% if counts.get('FAILED', 0) %}
+  <form method="post" action="/studio/youtube/{{ yt_channel.id }}/retry-failed" class="inline-form">
+    <button class="button secondary" type="submit">Alle fehlgeschlagenen erneut versuchen</button>
+  </form>
+  {% endif %}
+</section>
+
 <section class="card">
   <h2>Gefundene Videos</h2>
   {% if candidates %}
@@ -44,7 +66,7 @@
             <td>
               <span class="badge {{ 'success' if c.status.value == 'IMPORTED' else ('danger' if c.status.value == 'FAILED' else ('muted' if c.status.value == 'IGNORED' else 'warning')) }}">{{ c.status.value }}</span>
               {% if c.imported_source_id %}<br><a class="linkbutton" href="/library/{{ c.imported_source_id }}">Ressource öffnen</a>{% endif %}
-              {% if c.last_error %}<details class="tech-details"><summary>Technische Details</summary><pre>{{ c.last_error }}</pre></details>{% endif %}
+              {% if c.last_error %}<p class="muted" dir="auto">{{ c.last_error }}</p>{% endif %}
             </td>
             <td>
               {% if c.status.value == 'NEW' %}

@@ -23,6 +23,7 @@ from app.api.routes.lecture import router as lecture_router
 from app.api.routes.research import router as research_router
 from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.ritual import router as ritual_router
+from app.channel_monitoring.import_worker import init_import_worker
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ApplicationError
 from app.db.health import DatabaseReadinessService, ReadinessService
@@ -96,6 +97,7 @@ def create_app(
             app.state.readiness_service = readiness_service
 
         scanner_task: asyncio.Task[None] | None = None
+        import_task: asyncio.Task[None] | None = None
         if database is not None:
             scheduler = init_scheduler(
                 database,
@@ -108,6 +110,11 @@ def create_app(
                     resolved_settings.speech_structure_scan_interval_seconds
                 )
             )
+            import_worker = init_import_worker(
+                database, resolved_settings.youtube_import_concurrency
+            )
+            app.state.import_worker = import_worker
+            import_task = asyncio.create_task(import_worker.run_forever())
 
         logger.info(
             "application.started",
@@ -121,6 +128,11 @@ def create_app(
                 scanner_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await scanner_task
+            if import_task is not None:
+                import_worker.stop()
+                import_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await import_task
             if database is not None:
                 await database.dispose()
             logger.info("application.stopped")

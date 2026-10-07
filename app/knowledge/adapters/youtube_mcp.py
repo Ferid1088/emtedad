@@ -430,7 +430,10 @@ def resolve_youtube_adapter(
                 timeout_seconds=resolved.youtube_mcp_timeout_seconds,
             )
         )
-    return YouTubeAdapter()
+    return YouTubeAdapter(
+        channel_max_videos=resolved.youtube_channel_max_videos,
+        transcript_languages=tuple(resolved.youtube_transcript_languages),
+    )
 
 
 def _parse_response_body(response: httpx.Response) -> dict[str, Any]:

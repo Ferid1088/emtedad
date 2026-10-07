@@ -10,16 +10,11 @@ from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import ChannelVideoCandidate, MonitoredChannel
 from app.db.session import Database
 from app.knowledge.adapters.base import SourceAdapter
-from app.knowledge.adapters.youtube import (
-    YouTubeRateLimitedError,
-    YouTubeTranscriptUnavailableError,
-)
 from app.knowledge.adapters.youtube_mcp import resolve_youtube_adapter
 from app.knowledge.importer import ExternalKnowledgeImporter
 from app.knowledge.llm.factory import resolve_llm_provider
 from app.knowledge.llm.roles import AgentRole
 from app.knowledge.models import Source
-from app.knowledge.structure.scheduler import schedule_structure_analysis
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,9 +157,13 @@ class ChannelDiscoveryService:
                 )
             )
 
-    async def import_selected(
-        self, channel_id: UUID, candidate_ids: list[UUID]
-    ) -> list[CandidateImportResult]:
+    async def import_selected(self, channel_id: UUID, candidate_ids: list[UUID]) -> int:
+        """Queue the chosen videos; the background worker imports them.
+
+        Returns how many videos were queued. NEW and FAILED videos can be
+        queued (FAILED = retry).
+        """
+
         async with self.database.transaction() as session:
             candidates = list(
                 await session.scalars(
@@ -178,50 +177,35 @@ class ChannelDiscoveryService:
                 )
             )
             for candidate in candidates:
-                candidate.status = CandidateStatus.IMPORTING
-            await session.flush()
-            work = [
-                (candidate.id, candidate.youtube_video_id) for candidate in candidates
-            ]
-        results: list[CandidateImportResult] = []
-        for candidate_id, video_id in work:
-            try:
-                imported = await self.importer.ingest(video_id)
-            except Exception as exc:
-                if isinstance(exc, YouTubeTranscriptUnavailableError):
-                    message = (
-                        "Video hat kein abrufbares Transkript; "
-                        "automatischer Import nicht möglich."
-                    )
-                elif isinstance(exc, YouTubeRateLimitedError):
-                    message = (
-                        "YouTube drosselt diese IP vorübergehend; "
-                        "später erneut versuchen."
-                    )
-                else:
-                    message = (
-                        "Import fehlgeschlagen; der Versuch kann wiederholt werden."
-                    )
-                async with self.database.transaction() as session:
-                    updated = await session.get(ChannelVideoCandidate, candidate_id)
-                    if updated is not None:
-                        updated.status = CandidateStatus.FAILED
-                        updated.last_error = type(exc).__name__
-                results.append(
-                    CandidateImportResult(candidate_id, video_id, False, message)
+                candidate.status = CandidateStatus.SELECTED
+                candidate.last_error = None
+        from app.channel_monitoring.import_worker import get_import_worker
+
+        worker = get_import_worker()
+        if worker is not None:
+            worker.wake()
+        return len(candidates)
+
+    async def retry_failed(self, channel_id: UUID | None = None) -> int:
+        """Queue every FAILED video again (optionally for one channel)."""
+
+        async with self.database.transaction() as session:
+            statement = select(ChannelVideoCandidate).where(
+                ChannelVideoCandidate.status == CandidateStatus.FAILED
+            )
+            if channel_id is not None:
+                statement = statement.where(
+                    ChannelVideoCandidate.channel_id == channel_id
                 )
-            else:
-                async with self.database.transaction() as session:
-                    updated = await session.get(ChannelVideoCandidate, candidate_id)
-                    if updated is not None:
-                        updated.status = CandidateStatus.IMPORTED
-                        updated.imported_source_id = imported.source_id
-                        updated.last_error = None
-                schedule_structure_analysis(self.database, imported.source_id)
-                results.append(
-                    CandidateImportResult(candidate_id, video_id, True, "importiert")
-                )
-        return results
+            rows = list(await session.scalars(statement))
+            for row in rows:
+                row.status = CandidateStatus.SELECTED
+        from app.channel_monitoring.import_worker import get_import_worker
+
+        worker = get_import_worker()
+        if worker is not None:
+            worker.wake()
+        return len(rows)
 
     async def ignore(self, channel_id: UUID, candidate_id: UUID) -> bool:
         async with self.database.transaction() as session:
