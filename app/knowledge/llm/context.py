@@ -30,6 +30,7 @@ ROLE_CONTEXT_KEYS: dict[AgentRole, frozenset[str]] = {
     AgentRole.TOPIC_MINER: frozenset(
         {"strategy", "units", "concepts", "recent_signatures", "language"}
     ),
+    AgentRole.PRONUNCIATION_EDITOR: frozenset({"sentences", "language"}),
     AgentRole.SEARCH_PLANNER: frozenset(
         {"brief", "thesis", "evidence_gaps", "source_policy", "language"}
     ),

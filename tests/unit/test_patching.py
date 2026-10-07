@@ -268,3 +268,20 @@ def test_candidate_rank_hard_ordering() -> None:
     )
     # Ties keep the incumbent.
     assert not is_better_candidate(clean, clean)
+
+
+def test_less_engaging_revision_never_replaces_incumbent() -> None:
+    from app.content_engine.patching import candidate_rank, is_better_candidate
+
+    base = {
+        "blockers": 0,
+        "warnings": 0,
+        "fidelity_failed": False,
+        "duration_in_band": True,
+        "encoding_clean": True,
+    }
+    incumbent = candidate_rank(**base, total_findings=6, engagement_issues=1)
+    flatter = candidate_rank(**base, total_findings=3, engagement_issues=2)
+    livelier = candidate_rank(**base, total_findings=7, engagement_issues=0)
+    assert not is_better_candidate(flatter, incumbent)
+    assert is_better_candidate(livelier, incumbent)

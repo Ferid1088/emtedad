@@ -62,6 +62,7 @@ class AgentRole(StrEnum):
     # Premium creation
     PERSIAN_SEMANTIC_MASTER = "persian_semantic_master"
     PERSIAN_SCRIPT_WRITER = "persian_script_writer"
+    PRONUNCIATION_EDITOR = "pronunciation_editor"
     PREMIUM_TARGETED_REVISION = "premium_targeted_revision"
     TARGET_FINAL_EDITOR = "target_final_editor"
     PREMIUM_CONFLICT_RESOLVER = "premium_conflict_resolver"
@@ -119,6 +120,7 @@ AGENT_TO_MODEL_ROLE: dict[AgentRole, ModelRole] = {
     AgentRole.DESCRIPTION_CANDIDATE: ModelRole.MULTILINGUAL_EDITORIAL,
     AgentRole.PERSIAN_SEMANTIC_MASTER: ModelRole.PREMIUM_CREATION,
     AgentRole.PERSIAN_SCRIPT_WRITER: ModelRole.PREMIUM_CREATION,
+    AgentRole.PRONUNCIATION_EDITOR: ModelRole.PREMIUM_CREATION,
     AgentRole.PREMIUM_TARGETED_REVISION: ModelRole.PREMIUM_CREATION,
     AgentRole.TARGET_FINAL_EDITOR: ModelRole.PREMIUM_CREATION,
     AgentRole.PREMIUM_CONFLICT_RESOLVER: ModelRole.PREMIUM_CREATION,

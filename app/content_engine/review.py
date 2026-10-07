@@ -40,6 +40,10 @@ from app.content_engine.models import (
     ScriptDraft,
 )
 from app.content_engine.patching import candidate_rank, is_better_candidate
+from app.content_engine.section_writer import (
+    smooth_transitions,
+    write_sections_parallel,
+)
 from app.content_engine.service import GateBlockedError
 from app.content_engine.writing.books import (
     BOOK_REFERENCE_CHECKS,
@@ -151,6 +155,12 @@ class RevisionOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1)
+
+
+_ENGAGEMENT_ROLES = (
+    CriticRole.RETENTION.value,
+    CriticRole.PERSIAN_QUALITY.value,
+)
 
 
 SCRIPT_INSTRUCTIONS = """Write a complete script draft for the given channel \
@@ -567,17 +577,61 @@ class ScriptService:
                 "language": language,
                 "allowed_book_references": [ref.model_dump() for ref in book_refs],
             }
-            result = await provider.extract(
-                StructuredExtractionRequest(
-                    task="script_draft",
-                    prompt_version=SCRIPT_PROMPT_VERSION,
+            parallel = str(effective.get("script_parallel_sections", True)).lower()
+            if parallel not in {"false", "0", "no"} and len(sections) > 1:
+                # One writer per section in parallel, then a transition
+                # editor — the Semantic Master is the director's plan.
+                section_ordinal = {s.id: s.ordinal for s in sections}
+                claims_by_section: dict[int, list[dict[str, object]]] = {}
+                general_claims: list[dict[str, object]] = []
+                for claim, claim_payload in zip(claims, claim_payloads, strict=True):
+                    ordinal = section_ordinal.get(claim.section_id)  # type: ignore[arg-type]
+                    if ordinal is None:
+                        general_claims.append(claim_payload)
+                    else:
+                        claims_by_section.setdefault(ordinal, []).append(claim_payload)
+                base_payload = {
+                    key: value
+                    for key, value in payload.items()
+                    if key != "semantic_master"
+                }
+                base_payload["semantic_master"] = {
+                    key: value
+                    for key, value in dict(payload["semantic_master"]).items()  # type: ignore[call-overload]
+                    if key not in {"sections", "claims"}
+                }
+                texts = await write_sections_parallel(
+                    provider=provider,
                     model=self.model,
-                    instructions=_script_instructions(channel_slug, language),
-                    input_text=json.dumps(payload, ensure_ascii=False),
-                    output_model=ScriptDraftOutput,
+                    base_instructions=_script_instructions(channel_slug, language),
+                    base_payload=base_payload,
+                    sections=section_payloads,
+                    claims_by_section=claims_by_section,
+                    general_claims=general_claims,
+                    concurrency=int(str(effective.get("script_writer_concurrency", 6))),
                 )
-            )
-            draft = ScriptDraftOutput.model_validate(result.model_dump())
+                joined = "\n\n".join(texts)
+                draft = ScriptDraftOutput(
+                    text=await smooth_transitions(
+                        provider=provider,
+                        model=self.model,
+                        text=joined,
+                        language=language,
+                    ),
+                    estimated_duration_seconds=int(len(joined.split()) / wpm * 60),
+                )
+            else:
+                result = await provider.extract(
+                    StructuredExtractionRequest(
+                        task="script_draft",
+                        prompt_version=SCRIPT_PROMPT_VERSION,
+                        model=self.model,
+                        instructions=_script_instructions(channel_slug, language),
+                        input_text=json.dumps(payload, ensure_ascii=False),
+                        output_model=ScriptDraftOutput,
+                    )
+                )
+                draft = ScriptDraftOutput.model_validate(result.model_dump())
             # Generation validation: a draft that violates the generation
             # contract (encoding, duration band, collapsed structure,
             # quality blockers) is corrected inside generation — it must
@@ -1123,6 +1177,12 @@ class ScriptService:
             duration_in_band=in_band(draft.text),
             encoding_clean="\ufffd" not in draft.text,
             total_findings=run.finding_count or 0,
+            engagement_issues=sum(
+                1
+                for f in findings
+                if f.critic_role in _ENGAGEMENT_ROLES
+                and f.severity is not FindingSeverity.INFO
+            ),
         )
         parent_rank = candidate_rank(
             blockers=parent_run.blocking_count or 0,
@@ -1131,6 +1191,16 @@ class ScriptService:
             duration_in_band=in_band(parent.text),
             encoding_clean="\ufffd" not in parent.text,
             total_findings=parent_run.finding_count or 0,
+            engagement_issues=int(
+                await session.scalar(
+                    select(func.count(ReviewFinding.id)).where(
+                        ReviewFinding.review_run_id == parent_run.id,
+                        ReviewFinding.critic_role.in_(_ENGAGEMENT_ROLES),
+                        ReviewFinding.severity != FindingSeverity.INFO,
+                    )
+                )
+                or 0
+            ),
         )
         decision = {
             "candidate_rank": list(cand_rank),

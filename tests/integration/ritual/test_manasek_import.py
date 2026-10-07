@@ -109,7 +109,8 @@ async def test_manasek_import_is_idempotent_structured_and_exposed_by_api(
         async with (
             app.router.lifespan_context(app),
             httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url="http://test"
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://localhost",
             ) as client,
         ):
             families = await client.get("/ritual/families")

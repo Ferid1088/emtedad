@@ -446,11 +446,14 @@ def candidate_rank(
     duration_in_band: bool,
     encoding_clean: bool,
     total_findings: int,
-) -> tuple[int, int, int, int, int, int]:
-    """Hard ordering: blockers → majors → fidelity → duration → encoding.
+    engagement_issues: int = 0,
+) -> tuple[int, int, int, int, int, int, int]:
+    """Hard ordering: blockers → majors → fidelity → duration → encoding →
+    engagement/native-language issues → total findings.
 
-    The last element is the soft tie-breaker (total findings proxies
-    native/narrative quality when hard gates tie). Strictly-lower wins.
+    Engagement comes before the total (TrueCrime rule): a revision that
+    makes the script less engaging or less natural never replaces a
+    better incumbent, even with fewer minor findings. Strictly-lower wins.
     """
 
     return (
@@ -459,6 +462,7 @@ def candidate_rank(
         1 if fidelity_failed else 0,
         0 if duration_in_band else 1,
         0 if encoding_clean else 1,
+        engagement_issues,
         total_findings,
     )
 

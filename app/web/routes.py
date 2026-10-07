@@ -71,12 +71,31 @@ async def studio_voice_prepare(request: Request) -> HTMLResponse:
         lexicon_version=lexicon.version,
         provider_profile=DEFAULT_PROVIDER_PROFILE,
     )
+    key = None
+    error = None
+    voice_text = result.voice_text
+    if language == "fa" and form.get("harakat") == "1":
+        # Pronunciation agent: harakat for every word a voice could misread.
+        from app.knowledge.llm.factory import resolve_llm_provider
+        from app.knowledge.llm.roles import AgentRole
+        from app.voice.pronunciation_key import PronunciationKeyEditor
+        from app.web.jobs import friendly_error
+
+        try:
+            key = await PronunciationKeyEditor(
+                resolve_llm_provider(role=AgentRole.PRONUNCIATION_EDITOR)
+            ).annotate(result.voice_text)
+            voice_text = key.voice_text("vowelled")
+        except Exception as exc:  # noqa: BLE001 — shown to the owner
+            error = "Aussprache-Schlüssel fehlgeschlagen: " + friendly_error(exc)
     return await _render(
         request,
         "studio_voice.html",
         title="Text für Voice vorbereiten",
         result=result,
-        error=None,
+        voice_text=voice_text,
+        key=key,
+        error=error,
     )
 
 

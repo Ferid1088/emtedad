@@ -187,7 +187,7 @@ async def test_search_api_returns_authority_and_complete_provenance(
     app.state.embedding_provider = object()
     app.include_router(router)
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://localhost"
     ) as client:
         result = await client.post(
             "/retrieval/search",
