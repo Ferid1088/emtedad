@@ -60,6 +60,8 @@ def build_provider(
 ) -> WebResearchProvider:
     if not config.base_url:
         raise WebResearchError("web_research_base_url is not configured")
+    if config.provider == "searxng":
+        return _SearxngProvider(config, transport)
     if config.provider == "tavily":
         return _TavilyProvider(config, transport)
     if config.provider == "custom":
@@ -241,6 +243,68 @@ class _WikipediaProvider:
                 )
         return WebResearchReport(
             provider="wikipedia",
+            query=query,
+            answer_text="",
+            findings=_dedupe(findings, self.config.max_results),
+        )
+
+
+class _SearxngProvider:
+    """Emtedad search engine: planner agents per language (fa, en) write
+    native queries in parallel; SearXNG answers them in parallel; results
+    are ranked by source quality, relevance and agreement."""
+
+    def __init__(
+        self, config: ResearchConfig, transport: httpx.AsyncBaseTransport | None
+    ) -> None:
+        self.config = config
+        self.transport = transport
+
+    async def research(self, query: str, context: str) -> WebResearchReport:
+        from app.knowledge.llm.factory import resolve_llm_provider
+        from app.knowledge.llm.roles import AgentRole
+        from app.search_engine.engine import SearchEngine
+        from app.search_engine.models import SearchKind
+        from app.search_engine.planner import QueryPlanner
+        from app.search_engine.searxng import SearchBackendError, SearxngClient
+
+        try:
+            planner: QueryPlanner | None = QueryPlanner(
+                resolve_llm_provider(role=AgentRole.SEARCH_PLANNER)
+            )
+        except Exception:  # noqa: BLE001 — plain search without planning
+            planner = None
+        engine = SearchEngine(
+            SearxngClient(
+                self.config.base_url,
+                timeout_seconds=self.config.timeout_seconds,
+                transport=self.transport,
+            ),
+            planner=planner,
+        )
+        queries = await engine.plan_queries(
+            topic=query, thesis=context[:1500], per_language=3
+        )
+        for language_queries in queries.values():
+            if query not in language_queries:
+                language_queries.insert(0, query)
+        try:
+            hits = await engine.search(
+                queries,
+                kind=SearchKind.TEXT,
+                topic=f"{query} {context[:300]}",
+                limit=self.config.max_results * 3,
+            )
+        except SearchBackendError as exc:
+            raise WebResearchError(str(exc)) from exc
+        # Low-value categories are not ingested as research sources.
+        useful = [h for h in hits if h.quality_weight >= 0.35]
+        findings = [
+            WebFinding(title=hit.title, url=hit.url, snippet=hit.snippet)
+            for hit in useful
+        ]
+        return WebResearchReport(
+            provider="searxng",
             query=query,
             answer_text="",
             findings=_dedupe(findings, self.config.max_results),

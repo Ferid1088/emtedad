@@ -1,5 +1,6 @@
 """Web research orchestration: search → fetch pages → ingest as sources."""
 
+import asyncio
 import contextlib
 import re
 import time
@@ -13,7 +14,7 @@ from app.db.session import Database
 from app.knowledge.file_import import FileImportError, import_web_resource
 from app.ops.settings.service import StudioSettingsService
 from app.web_research.classify import classify_web_page
-from app.web_research.domain import IngestedWebSource, WebResearchReport
+from app.web_research.domain import IngestedWebSource, WebFinding, WebResearchReport
 from app.web_research.models import WebResearchRun
 from app.web_research.providers import (
     ResearchConfig,
@@ -183,9 +184,12 @@ class WebResearchService:
             )
             return outcome
         outcome.report = report
-        for finding in report.findings:
-            outcome.ingested.append(
-                await self._fetch_and_ingest(
+        # Pages are fetched and ingested in parallel (bounded).
+        semaphore = asyncio.Semaphore(4)
+
+        async def ingest(finding: WebFinding) -> IngestedWebSource:
+            async with semaphore:
+                return await self._fetch_and_ingest(
                     config,
                     finding.url,
                     finding.title,
@@ -194,7 +198,10 @@ class WebResearchService:
                     language=language,
                     schedule=schedule,
                 )
-            )
+
+        outcome.ingested.extend(
+            await asyncio.gather(*(ingest(f) for f in report.findings))
+        )
         await self._record_run(
             outcome,
             query,
@@ -328,6 +335,29 @@ class WebResearchService:
             status="ingested" if created else "existing",
             publication_type=assessment.publication_type,
             retrieval_weight=assessment.retrieval_weight,
+        )
+
+    async def ingest_url(
+        self,
+        url: str,
+        title: str,
+        *,
+        language: str = "fa",
+        channel_ids: tuple[UUID, ...] = (),
+    ) -> IngestedWebSource:
+        """Owner picked one search result: fetch it and ingest it as a
+        source; processing starts automatically in the background."""
+
+        config = ResearchConfig(await self._effective())
+        report = WebResearchReport(provider="owner-search", query=title, findings=[])
+        return await self._fetch_and_ingest(
+            config,
+            url,
+            title,
+            report,
+            channel_ids=channel_ids,
+            language=language,
+            schedule=True,
         )
 
     async def _effective(self) -> dict[str, object]:

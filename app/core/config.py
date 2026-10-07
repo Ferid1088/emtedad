@@ -99,14 +99,16 @@ class Settings(BaseSettings):
     # overrides but is refused at build time: an LLM answer endpoint cannot
     # provide verifiable source URLs — retrieval must come from a real
     # search backend. Owner overrides persist in the owner_settings table.
-    web_research_enabled: bool = False
-    web_research_provider: Literal["apimaster", "tavily", "custom", "wikipedia"] = (
-        "tavily"
-    )
-    web_research_base_url: str = "https://api.tavily.com"
+    # Web search is part of every production: Persian + English via the
+    # self-hosted SearXNG container (docker compose up -d searxng).
+    web_research_enabled: bool = True
+    web_research_provider: Literal[
+        "searxng", "apimaster", "tavily", "custom", "wikipedia"
+    ] = "searxng"
+    web_research_base_url: str = "http://127.0.0.1:8085"
     web_research_api_key: SecretStr | None = None
     web_research_model: str = ""
-    web_research_max_results: int = 5
+    web_research_max_results: int = 8
     web_research_timeout_seconds: int = 90
     web_research_max_page_bytes: int = 1_500_000
     # Video length target (minutes): plan at 27.5, accept 25–30.

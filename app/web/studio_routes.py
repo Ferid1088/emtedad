@@ -785,6 +785,118 @@ async def studio_translations(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/studio/research", response_class=HTMLResponse)
+async def studio_research(request: Request) -> HTMLResponse:
+    """Professional search: Persian + English, text / video / image."""
+
+    from app.knowledge.llm.factory import resolve_llm_provider
+    from app.knowledge.llm.roles import AgentRole
+    from app.search_engine.engine import SearchEngine
+    from app.search_engine.models import SearchKind
+    from app.search_engine.planner import QueryPlanner
+    from app.search_engine.searxng import SearchBackendError, SearxngClient
+
+    query = str(request.query_params.get("q") or "").strip()
+    kind_raw = str(request.query_params.get("kind") or "text")
+    kind = (
+        SearchKind(kind_raw)
+        if kind_raw in {k.value for k in SearchKind}
+        else (SearchKind.TEXT)
+    )
+    use_planner = request.query_params.get("plan", "1") == "1"
+    hits = []
+    queries: dict[str, list[str]] = {}
+    error = request.query_params.get("error")
+    if query:
+        effective = await StudioSettingsService(_database(request)).effective()
+        planner = None
+        if use_planner:
+            try:
+                planner = QueryPlanner(
+                    resolve_llm_provider(role=AgentRole.SEARCH_PLANNER)
+                )
+            except Exception:  # noqa: BLE001 — search still works unplanned
+                planner = None
+        engine = SearchEngine(
+            SearxngClient(
+                str(effective.get("web_research_base_url") or "http://127.0.0.1:8085")
+            ),
+            planner=planner,
+        )
+        queries = await engine.plan_queries(topic=query, per_language=4)
+        for language_queries in queries.values():
+            if query not in language_queries:
+                language_queries.insert(0, query)
+        try:
+            hits = await engine.search(
+                queries,
+                kind=kind,
+                topic=query,
+                limit=60 if kind is SearchKind.IMAGE else 40,
+            )
+        except SearchBackendError as exc:
+            error = str(exc)
+    job = jobs.get("research")
+    return await _render(
+        request,
+        "studio/research.html",
+        title="Recherche",
+        query=query,
+        kind=kind.value,
+        use_planner=use_planner,
+        hits=hits,
+        queries=queries,
+        error=error,
+        notice=request.query_params.get("msg"),
+        job=job,
+    )
+
+
+@router.post("/studio/research/ingest")
+async def studio_research_ingest(request: Request) -> Response:
+    form = await request.form()
+    url = str(form.get("url") or "")
+    title = str(form.get("title") or url)
+    language = str(form.get("language") or "fa")
+    back = str(form.get("back") or "/studio/research")
+    if not url.startswith(("http://", "https://")):
+        return RedirectResponse(back, status_code=303)
+    database = _database(request)
+
+    async def work() -> None:
+        from app.web_research.service import WebResearchService
+
+        result = await WebResearchService(database).ingest_url(
+            url, title, language=language
+        )
+        if result.status == "failed":
+            raise ValueError(f"Seite konnte nicht übernommen werden: {result.detail}")
+
+    jobs.start("research", "ingest", f"Übernehme „{title[:60]}“", work)
+    return RedirectResponse(back, status_code=303)
+
+
+@router.post("/studio/research/import-video")
+async def studio_research_import_video(request: Request) -> Response:
+    form = await request.form()
+    video_url = str(form.get("url") or "")
+    title = str(form.get("title") or video_url)
+    back = str(form.get("back") or "/studio/research")
+    database = _database(request)
+
+    async def work() -> None:
+        from app.knowledge.adapters.youtube import parse_youtube_video_id
+        from app.knowledge.structure.scheduler import schedule_structure_analysis
+
+        imported = await ChannelDiscoveryService(database).importer.ingest(
+            parse_youtube_video_id(video_url)
+        )
+        schedule_structure_analysis(database, imported.source_id)
+
+    jobs.start("research", "import_video", f"Importiere Video „{title[:60]}“", work)
+    return RedirectResponse(back, status_code=303)
+
+
 @router.get("/studio/publishing", response_class=HTMLResponse)
 async def studio_publishing(request: Request) -> HTMLResponse:
     database = _database(request)

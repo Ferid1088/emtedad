@@ -32,7 +32,7 @@
   <div class="form-grid">
     <label>Anbieter
       <select name="web_research_provider">
-        {% for option in [('tavily', 'Tavily / Such-API'), ('custom', 'Eigener Endpunkt (JSON)'), ('wikipedia', 'Wikipedia (schlüssellos)')] %}
+        {% for option in [('searxng', 'Emtedad-Suchmaschine (SearXNG, ohne Key)'), ('tavily', 'Tavily / Such-API'), ('custom', 'Eigener Endpunkt (JSON)'), ('wikipedia', 'Wikipedia (schlüssellos)')] %}
         <option value="{{ option[0] }}" {% if web_research.web_research_provider == option[0] %}selected{% endif %}>{{ option[1] }}</option>
         {% endfor %}
       </select>

@@ -1,0 +1,106 @@
+{% extends "studio/layout.html" %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="eyebrow">Recherche</p>
+    <h1>Suche</h1>
+    <p class="lede">Persisch + Englisch gleichzeitig. Planer-Agenten schreiben pro Sprache passende Suchanfragen; die Treffer kommen aus echten Suchmaschinen und werden nach Quellenqualität, Relevanz und Übereinstimmung sortiert.</p>
+  </div>
+</div>
+
+<section class="card">
+  <form method="get" action="/studio/research" class="inline-form" style="flex-wrap:wrap;gap:8px">
+    <input type="search" name="q" value="{{ query }}" dir="auto" placeholder="Thema, Begriff, Person, Werk …" style="flex:1;min-width:260px" required>
+    <select name="kind">
+      {% for value, label in [('text', 'Texte'), ('video', 'Videos'), ('image', 'Bilder')] %}
+      <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label class="muted"><input type="checkbox" name="plan" value="1" {% if use_planner %}checked{% endif %}> KI-Suchplanung</label>
+    <button class="button" type="submit">Suchen</button>
+  </form>
+</section>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{% if job %}
+  {% if job.running %}
+  <p class="notice">Läuft: {{ job.label }} …</p>
+  <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
+  {% elif job.error %}<p class="error">{{ job.label }} fehlgeschlagen: {{ job.error }}</p>
+  {% else %}<p class="notice">✓ {{ job.label }} — erledigt. Die Verarbeitung läuft automatisch in der <a href="/library">Library</a>.</p>{% endif %}
+{% endif %}
+
+{% if queries %}
+<details class="card">
+  <summary>Verwendete Suchanfragen</summary>
+  {% for language, items in queries.items() %}
+  <p><strong>{{ 'Persisch' if language == 'fa' else 'Englisch' }}:</strong></p>
+  <ul>{% for q in items %}<li dir="auto">{{ q }}</li>{% endfor %}</ul>
+  {% endfor %}
+</details>
+{% endif %}
+
+{% if query and not hits and not error %}
+<section class="card"><p class="muted">Keine Treffer.</p></section>
+{% endif %}
+
+{% if hits and kind == 'image' %}
+<section class="card">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+    {% for hit in hits %}
+    <figure style="margin:0">
+      <a href="{{ hit.image_url or hit.url }}" target="_blank" rel="noopener noreferrer">
+        <img src="{{ hit.thumbnail_url or hit.image_url }}" alt="{{ hit.title }}" loading="lazy" style="width:100%;height:140px;object-fit:cover;border-radius:6px">
+      </a>
+      <figcaption class="muted" dir="auto" style="font-size:12px">{{ hit.title[:70] }}<br>
+        <a href="{{ hit.url }}" target="_blank" rel="noopener noreferrer">{{ hit.domain }}</a> · {{ hit.quality_category }}<br>
+        <em>Lizenz vor Verwendung prüfen</em></figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% elif hits %}
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Treffer</th><th>Quelle</th><th>Sprache</th><th>Score</th><th></th></tr></thead>
+      <tbody>
+        {% for hit in hits %}
+        <tr>
+          <td>{% if hit.thumbnail_url %}<img src="{{ hit.thumbnail_url }}" alt="" loading="lazy" style="width:96px;border-radius:4px">{% endif %}</td>
+          <td dir="auto">
+            <a href="{{ hit.url }}" target="_blank" rel="noopener noreferrer"><strong>{{ hit.title }}</strong></a>
+            {% if hit.snippet %}<br><span class="muted">{{ hit.snippet[:220] }}</span>{% endif %}
+            {% if hit.duration_seconds %}<br><span class="muted">{{ hit.duration_seconds // 60 }} Min.</span>{% endif %}
+            {% if hit.found_by|length > 1 %}<br><span class="muted">von {{ hit.found_by|length }} Suchanfragen gefunden</span>{% endif %}
+          </td>
+          <td>{{ hit.domain }}<br><span class="badge {% if hit.quality_weight >= 0.8 %}success{% elif hit.quality_weight < 0.4 %}warning{% endif %}">{{ hit.quality_category }}</span></td>
+          <td>{{ hit.language }}</td>
+          <td>{{ '%.2f' % hit.score }}</td>
+          <td>
+            {% if kind == 'video' and ('youtube.com/watch' in hit.url) %}
+            <form method="post" action="/studio/research/import-video" class="inline-form">
+              <input type="hidden" name="url" value="{{ hit.url }}">
+              <input type="hidden" name="title" value="{{ hit.title }}">
+              <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+              <button class="button secondary" type="submit" {% if job and job.running %}disabled{% endif %}>Als Ressource importieren</button>
+            </form>
+            {% elif kind == 'text' %}
+            <form method="post" action="/studio/research/ingest" class="inline-form">
+              <input type="hidden" name="url" value="{{ hit.url }}">
+              <input type="hidden" name="title" value="{{ hit.title }}">
+              <input type="hidden" name="language" value="{{ hit.language }}">
+              <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+              <button class="button secondary" type="submit" {% if job and job.running %}disabled{% endif %}>Als Ressource übernehmen</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

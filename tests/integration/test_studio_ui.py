@@ -734,7 +734,8 @@ async def test_brief_defaults_to_27_5_minutes_and_shows_gap(studio_client) -> No
         page = client.get(f"/studio/production/{briefs[0].id}")
         assert page.status_code == 200
         assert "Lücke:" in page.text
-        assert "Im Internet recherchieren" not in page.text  # feature off
+        # Web research is on by default → the manual button is offered.
+        assert "Im Internet recherchieren" in page.text
     finally:
         await database.dispose()
 
@@ -764,7 +765,10 @@ async def test_web_research_button_and_disabled_notice(studio_client) -> None:
             ),
         )
 
-        # Disabled: POST reports the feature is off.
+        # Owner turns web research off → POST reports the feature is off.
+        from app.ops.settings.service import StudioSettingsService
+
+        await StudioSettingsService(database).set_many({"web_research_enabled": False})
         response = client.post(
             f"/studio/production/{brief.id}/web-research",
             follow_redirects=False,

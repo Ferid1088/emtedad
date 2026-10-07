@@ -19,5 +19,17 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  searxng:
+    # Emtedad search engine backend: metasearch over Google, Bing,
+    # DuckDuckGo, Wikipedia, YouTube, image engines … without API keys.
+    image: searxng/searxng:latest
+    ports:
+      - "127.0.0.1:${SEARXNG_PORT:-8085}:8080"
+    volumes:
+      - ./docker/searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:${SEARXNG_PORT:-8085}/
+    restart: unless-stopped
+
 volumes:
   postgres_data:

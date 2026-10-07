@@ -89,10 +89,10 @@ class TestSettingsService:
         database, settings = web_db
         service = StudioSettingsService(database, settings)
         effective = await service.effective()
-        assert effective["web_research_enabled"] is False
+        assert effective["web_research_enabled"] is True
         # Retrieval defaults to a real URL backend; the APIMaster LLM
         # answer path was demoted — it cannot supply verifiable URLs.
-        assert effective["web_research_provider"] == "tavily"
+        assert effective["web_research_provider"] == "searxng"
         assert effective["target_duration_default_minutes"] == 27.5
         assert effective["units_per_video_minute"] == 1.5
 
@@ -119,7 +119,7 @@ class TestSettingsService:
         await service.set_many({"web_research_max_results": 9})
         await service.set_many({"web_research_max_results": None})
         effective = await service.effective()
-        assert effective["web_research_max_results"] == 5
+        assert effective["web_research_max_results"] == 8
 
     async def test_unknown_key_rejected(self, web_db) -> None:
         database, settings = web_db
