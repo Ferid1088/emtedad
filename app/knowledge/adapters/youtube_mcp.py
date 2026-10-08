@@ -27,6 +27,7 @@ from app.knowledge.adapters.youtube import (
     YouTubeAdapterError,
     YouTubeRateLimitedError,
     YouTubeTranscriptUnavailableError,
+    YouTubeVideoInaccessibleError,
     parse_youtube_channel_locator,
     parse_youtube_video_id,
 )
@@ -331,7 +332,13 @@ class YouTubeMcpClient:
 class YouTubeMcpAdapter:
     """``SourceAdapter`` implementation backed by the YouTube MCP server."""
 
-    def __init__(self, client: YouTubeMcpClient | None = None) -> None:
+    def __init__(
+        self,
+        client: YouTubeMcpClient | None = None,
+        *,
+        channel_max_videos: int = 2000,
+        transcript_languages: tuple[str, ...] = ("fa",),
+    ) -> None:
         if client is None:
             settings = get_settings()
             client = YouTubeMcpClient(
@@ -339,13 +346,18 @@ class YouTubeMcpAdapter:
                 timeout_seconds=settings.youtube_mcp_timeout_seconds,
             )
         self._client = client
+        # Both limits are owner settings; this transport used to hardcode
+        # them, so an enabled MCP silently listed 100 videos per channel
+        # instead of youtube_channel_max_videos.
+        self._channel_max_videos = max(1, channel_max_videos)
+        self._transcript_languages = transcript_languages or ("fa",)
 
     async def acquire(self, locator: str) -> ExternalSourceSnapshot:
         video_id = parse_youtube_video_id(locator)
         url = f"https://www.youtube.com/watch?v={video_id}"
         metadata, transcript = await asyncio.gather(
             self._client.get_video_info(url),
-            self._client.get_transcript(url, language="fa"),
+            self._client.get_transcript(url, language=self._transcript_languages[0]),
         )
         entries = tuple(
             TranscriptEntry(
@@ -404,7 +416,9 @@ class YouTubeMcpAdapter:
         self, locator: str
     ) -> tuple[ChannelVideoSnapshot, ...]:
         url = parse_youtube_channel_locator(locator)
-        videos = await self._client.get_channel_videos(url, limit=100)
+        videos = await self._client.get_channel_videos(
+            url, limit=self._channel_max_videos
+        )
         return tuple(
             ChannelVideoSnapshot(
                 youtube_video_id=video.video_id,
@@ -428,7 +442,9 @@ def resolve_youtube_adapter(
             YouTubeMcpClient(
                 resolved.youtube_mcp_url,
                 timeout_seconds=resolved.youtube_mcp_timeout_seconds,
-            )
+            ),
+            channel_max_videos=resolved.youtube_channel_max_videos,
+            transcript_languages=tuple(resolved.youtube_transcript_languages),
         )
     return YouTubeAdapter(
         channel_max_videos=resolved.youtube_channel_max_videos,
@@ -467,10 +483,25 @@ def _content_text(result: dict[str, Any]) -> str:
     return ""
 
 
+# Access refusals yt-dlp reports verbatim through the MCP server. These are
+# permanent for this account, so the queue must not keep retrying them.
+_INACCESSIBLE_MARKERS = (
+    "members-only",
+    "join this channel",
+    "private video",
+    "sign in to confirm your age",
+    "age-restricted",
+    "video has been removed",
+    "account associated with this video has been terminated",
+)
+
+
 def _raise_tool_error(name: str, message: str) -> None:
     text = message.lower()
     if "blocking" in text or "rate" in text or "429" in text:
         raise YouTubeRateLimitedError(f"{name}: {message}")
+    if any(marker in text for marker in _INACCESSIBLE_MARKERS):
+        raise YouTubeVideoInaccessibleError(f"{name}: {message}")
     if "no transcript" in text or "disabled" in text or "unavailable" in text:
         raise YouTubeTranscriptUnavailableError(f"{name}: {message}")
     raise YouTubeMcpError(f"{name}: {message}")

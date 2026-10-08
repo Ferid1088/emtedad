@@ -10,6 +10,7 @@ from app.knowledge.adapters import youtube_mcp
 from app.knowledge.adapters.youtube import (
     YouTubeRateLimitedError,
     YouTubeTranscriptUnavailableError,
+    YouTubeVideoInaccessibleError,
 )
 from app.knowledge.adapters.youtube_mcp import (
     YouTubeMcpAdapter,
@@ -268,6 +269,57 @@ async def test_adapter_list_channel_videos() -> None:
 
 
 @pytest.mark.asyncio
+async def test_mcp_adapter_uses_the_owner_video_limit_not_a_hardcoded_100() -> None:
+    """Regression: the MCP transport ignored ``youtube_channel_max_videos``.
+
+    ``list_channel_videos`` asked the MCP server for 100 videos no matter
+    what the owner configured, so with MCP enabled a channel was capped at
+    100 instead of the configured 2000 — silently, with no error.
+    """
+
+    _script(_sse(_tool_result([])))
+    adapter = resolve_youtube_adapter(
+        _settings(youtube_mcp_enabled=True, youtube_channel_max_videos=2000)
+    )
+    assert isinstance(adapter, YouTubeMcpAdapter)
+    await adapter.list_channel_videos("https://www.youtube.com/@chan")
+    arguments = _FakeAsyncClient.calls[-1]["json"]["params"]["arguments"]
+    assert arguments["limit"] == 2000
+
+
+@pytest.mark.asyncio
+async def test_mcp_adapter_asks_for_the_configured_transcript_language() -> None:
+    """Regression: the transcript language was hardcoded to "fa"."""
+
+    info = {
+        "id": "dQw4w9WgXcQ",
+        "title": "Talk",
+        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "channel": "Chan",
+        "channel_url": "https://www.youtube.com/channel/UCx",
+        "duration_seconds": 120,
+        "upload_date": "20260101",
+        "description": "desc",
+    }
+    _script(
+        _sse(_tool_result(info)),
+        _sse(_tool_result([{"text": "eins", "start_seconds": 0.0}])),
+    )
+    adapter = resolve_youtube_adapter(
+        _settings(youtube_mcp_enabled=True, youtube_transcript_languages=["de"])
+    )
+    assert isinstance(adapter, YouTubeMcpAdapter)
+    await adapter.acquire("https://youtu.be/dQw4w9WgXcQ")
+    languages = [
+        params["arguments"].get("language")
+        for call in _FakeAsyncClient.calls
+        for params in [call["json"].get("params") or {}]
+        if params.get("name") == "get_transcript"
+    ]
+    assert languages == ["de"]
+
+
+@pytest.mark.asyncio
 async def test_adapter_resolve_channel() -> None:
     _script(
         _sse(
@@ -303,3 +355,27 @@ def test_settings_have_mcp_fields() -> None:
     assert settings.youtube_mcp_enabled is True
     assert settings.youtube_mcp_url == "http://127.0.0.1:9999"
     assert settings.youtube_mcp_timeout_seconds == 15
+
+
+def test_members_only_message_is_classified_as_permanently_inaccessible() -> None:
+    """Regression: seen live importing from @bpluspodcast.
+
+    yt-dlp's "Join this channel to get access to members-only content"
+    fell through to the generic YouTubeMcpError, so the import queue
+    treated a permanently closed video as a retryable failure.
+    """
+
+    with pytest.raises(YouTubeVideoInaccessibleError):
+        youtube_mcp._raise_tool_error(
+            "get_video_info",
+            "Failed to get video info: ERROR: [youtube] j_aWp7ZBMjI: Join this "
+            "channel to get access to members-only content like this video.",
+        )
+
+
+def test_rate_limiting_still_wins_over_the_access_markers() -> None:
+    with pytest.raises(YouTubeRateLimitedError):
+        youtube_mcp._raise_tool_error(
+            "get_transcript",
+            "YouTube is temporarily blocking transcript requests from your IP.",
+        )
