@@ -2430,8 +2430,9 @@ async def topic_create_brief(request: Request, candidate_id: UUID) -> Response:
         float(effective.get("target_duration_min_minutes") or 25),
         float(effective.get("target_duration_max_minutes") or 30),
     )
+    briefs = BriefService(database)
     try:
-        brief = await BriefService(database).create_for_candidate(
+        brief = await briefs.create_for_candidate(
             candidate_id,
             BriefInput(
                 question=candidate.video_question,
@@ -2440,6 +2441,11 @@ async def topic_create_brief(request: Request, candidate_id: UUID) -> Response:
                 angle=candidate.angle,
             ),
         )
+        # The brief is complete by construction — create_for_candidate
+        # refuses an incomplete one — and the Studio has no brief editor, so
+        # leaving it DRAFT would strand it: nothing in the UI could ever
+        # finish it and the workspace would only say "noch ein Entwurf".
+        await briefs.mark_ready(brief.id)
     except (LookupError, ValueError) as exc:
         return HTMLResponse(str(exc), status_code=400)
     return RedirectResponse(f"/studio/production/{brief.id}", status_code=303)
