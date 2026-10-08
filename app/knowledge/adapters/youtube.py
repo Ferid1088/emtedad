@@ -37,11 +37,29 @@ class YouTubeAdapterError(RuntimeError):
 
 
 class YouTubeTranscriptUnavailableError(YouTubeAdapterError):
-    """Raised when a video has no transcript at all — retrying cannot help."""
+    """Raised when a video has no transcript at all — retrying cannot help.
+
+    ``available`` carries the transcript languages YouTube does offer, so
+    owner-facing messages can name them without parsing this message —
+    substring matching on it mistook "unavailable:" for "available:".
+    """
+
+    def __init__(self, message: str, *, available: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.available = available
 
 
 class YouTubeRateLimitedError(YouTubeAdapterError):
     """Raised when YouTube blocks this IP on the transcript endpoint — retry later."""
+
+
+class YouTubeVideoInaccessibleError(YouTubeAdapterError):
+    """Raised when the video itself cannot be fetched — retrying cannot help.
+
+    Members-only, private, age-gated or removed videos. Distinct from
+    throttling, which the import queue retries, and from a missing
+    transcript, where the video itself is readable.
+    """
 
 
 def parse_youtube_video_id(locator: str) -> str:
@@ -356,10 +374,12 @@ class YouTubeAdapter:
                 raise YouTubeTranscriptUnavailableError("video has no transcript")
             preferred = choose_transcript(available, self._transcript_languages)
             if preferred is None:
-                found = ", ".join(sorted({item.language_code for item in available}))
+                found = tuple(sorted({item.language_code for item in available}))
                 raise YouTubeTranscriptUnavailableError(
                     "no transcript in the channel language "
-                    f"({'/'.join(self._transcript_languages)}); available: {found}"
+                    f"({'/'.join(self._transcript_languages)}); "
+                    f"available: {', '.join(found)}",
+                    available=found,
                 )
             fetched = preferred.fetch(preserve_formatting=True)
         except YouTubeAdapterError:

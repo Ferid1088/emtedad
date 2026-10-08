@@ -97,6 +97,34 @@ def friendly_error(exc: BaseException) -> str:
 
     if isinstance(exc, VoiceProviderError):
         return str(exc)
+    from app.knowledge.adapters.youtube import (
+        YouTubeAdapterError,
+        YouTubeRateLimitedError,
+        YouTubeTranscriptUnavailableError,
+        YouTubeVideoInaccessibleError,
+    )
+
+    # A Studio import is a single owner action, not a queued one — unlike
+    # ChannelImportWorker it is never retried on its own, so the message
+    # says what the owner has to do (see import_error_message there).
+    if isinstance(exc, YouTubeRateLimitedError):
+        return (
+            "YouTube drosselt gerade Transkript-Anfragen von dieser IP. "
+            "Bitte den Import in ein paar Stunden erneut starten."
+        )
+    if isinstance(exc, YouTubeVideoInaccessibleError):
+        return (
+            "Dieses Video ist nicht abrufbar (nur für Mitglieder, privat, "
+            "altersbeschränkt oder entfernt)."
+        )
+    if isinstance(exc, YouTubeTranscriptUnavailableError):
+        if exc.available:
+            return "Kein persisches Transkript — vorhanden nur: " + ", ".join(
+                exc.available
+            )
+        return "Dieses Video hat kein abrufbares Transkript."
+    if isinstance(exc, YouTubeAdapterError):
+        return f"YouTube-Import fehlgeschlagen: {exc}"
     if isinstance(exc, RoutingConfigurationError):
         return f"Konfigurationsfehler: {exc}"
     text = str(exc)

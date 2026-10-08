@@ -21,6 +21,7 @@ from app.db.session import Database
 from app.knowledge.adapters.youtube import (
     YouTubeRateLimitedError,
     YouTubeTranscriptUnavailableError,
+    YouTubeVideoInaccessibleError,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,16 +33,21 @@ def import_error_message(exc: BaseException) -> str:
     """Owner-readable reason, stored on the candidate."""
 
     if isinstance(exc, YouTubeTranscriptUnavailableError):
-        detail = str(exc)
-        if "available:" in detail:
-            return (
-                "Kein persisches Transkript — vorhanden nur: "
-                + detail.split("available:", 1)[1].strip()
+        if exc.available:
+            return "Kein persisches Transkript — vorhanden nur: " + ", ".join(
+                exc.available
             )
         return "Video hat kein abrufbares Transkript."
     if isinstance(exc, YouTubeRateLimitedError):
         return "YouTube drosselt diese IP vorübergehend — wird später wiederholt."
-    return f"Import fehlgeschlagen ({type(exc).__name__}) — erneut versuchbar."
+    if isinstance(exc, YouTubeVideoInaccessibleError):
+        return (
+            "Video ist nicht abrufbar (nur für Mitglieder, privat, "
+            "altersbeschränkt oder entfernt) — ein erneuter Versuch hilft nicht."
+        )
+    # Unknown causes stay retryable, but the owner needs the reason to judge
+    # that — hiding it behind the class name alone says nothing.
+    return f"Import fehlgeschlagen ({type(exc).__name__}): {exc} — erneut versuchbar."
 
 
 class ChannelImportWorker:
