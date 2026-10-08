@@ -1,10 +1,11 @@
 """Studio shell routes against a real migrated database (Phase 2)."""
 
+import asyncio
 import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -15,6 +16,7 @@ from pydantic import SecretStr
 from sqlalchemy.engine import make_url
 
 from alembic import command
+from app.briefs.domain import BriefStatus
 from app.briefs.service import BriefInput, BriefService
 from app.channel_monitoring.domain import CandidateStatus
 from app.channel_monitoring.models import (
@@ -41,6 +43,7 @@ from app.knowledge.structure.service import SourceStructureService
 from app.knowledge.units.service import KnowledgeUnitService
 from app.main import create_app
 from app.ops.settings.service import StudioSettingsService
+from app.production.service import ProductionService
 from app.research.generic import GenericResearchService
 from app.topics.service import TopicService
 from tests.integration.test_topics import _build_source_with_units, _Provider
@@ -67,9 +70,37 @@ def _url_for_database(url: str, database: str) -> str:
     return make_url(url).set(database=database).render_as_string(hide_password=False)
 
 
+def _disable_web_research(url: str) -> None:
+    """Persist the owner override the test app runs with."""
+
+    from app.ops.settings.service import StudioSettingsService
+
+    async def apply() -> None:
+        database = Database(url)
+        try:
+            await StudioSettingsService(database).set_many(
+                {"web_research_enabled": False}
+            )
+        finally:
+            await database.dispose()
+
+    asyncio.run(apply())
+
+
 @pytest.fixture
 def studio_client(tmp_path: Path) -> Iterator[tuple[TestClient, str]]:
-    """Disposable migrated database behind a TestClient."""
+    """Disposable migrated database behind a TestClient.
+
+    Web research is switched off through an owner override. With it on,
+    ``plan_research`` sends live queries to whatever answers on
+    ``web_research_base_url`` (the default is a local SearXNG port), so the
+    suite depended on the internet and on a container it does not own, and
+    real searches pushed the background step past the job timeout. The
+    override is the owner's own mechanism, and it is what the services read:
+    ``StudioSettingsService`` resolves its fallback through
+    ``get_settings()``, not through the ``Settings`` passed to
+    ``create_app``, so setting the field here would have no effect.
+    """
 
     base_url = _database_url()
     name = f"emtedad_test_{uuid4().hex}"
@@ -86,6 +117,7 @@ def studio_client(tmp_path: Path) -> Iterator[tuple[TestClient, str]]:
         database_url=SecretStr(url),
         storage_root=tmp_path / "storage",
     )
+    _disable_web_research(url)
     try:
         with TestClient(create_app(settings)) as client:
             yield client, url
@@ -734,7 +766,11 @@ async def test_brief_defaults_to_27_5_minutes_and_shows_gap(studio_client) -> No
         page = client.get(f"/studio/production/{briefs[0].id}")
         assert page.status_code == 200
         assert "Lücke:" in page.text
-        # Web research is on by default → the manual button is offered.
+        # With web research on, the workspace offers the manual button. The
+        # fixture keeps it off so the suite stays offline, so turn it on
+        # here — rendering the button makes no outbound call.
+        await StudioSettingsService(database).set_many({"web_research_enabled": True})
+        page = client.get(f"/studio/production/{briefs[0].id}")
         assert "Im Internet recherchieren" in page.text
     finally:
         await database.dispose()
@@ -1173,5 +1209,50 @@ async def test_approved_stage_cost_truth(studio_client) -> None:
         assert "$0.0000" not in body
         assert "0.0123" in body
         assert "(1/2 Calls)" in body
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_brief_created_from_a_topic_is_ready_to_produce(studio_client) -> None:
+    """Regression: a new brief was stranded in DRAFT.
+
+    "Brief erstellen" on a topic was the only brief control in the whole
+    Studio — nothing could move the brief from DRAFT to READY — so the
+    workspace answered every production attempt with "Der Brief ist noch
+    ein Entwurf" and the pipeline could never be started for a new topic.
+    """
+
+    client, database_url = studio_client
+    _seed(client)
+    database = Database(database_url)
+    try:
+        channels = EditorialChannelService(database)
+        channel = await channels.get_channel("emtedad")
+        strategy = next(
+            s
+            for s in await channels.list_strategies(channel.id)
+            if s.status.value == "ACTIVE"
+        )
+        candidate = await TopicService(database).create_manual(
+            channel.id,
+            strategy.id,
+            question="Warum Rituale?",
+            thesis="Rituale tragen Bedeutung, die Argumente allein nicht tragen.",
+        )
+        response = client.post(
+            f"/studio/topics/{candidate.id}/brief", follow_redirects=False
+        )
+        assert response.status_code == 303
+        brief_id = UUID(response.headers["location"].rsplit("/", 1)[-1])
+
+        brief = await BriefService(database).get(brief_id)
+        assert brief is not None
+        assert brief.status is BriefStatus.READY
+
+        state = await ProductionService(database).state_for_brief(brief_id)
+        assert state.next_action == "plan_research"
+        page = client.get(f"/studio/production/{brief_id}")
+        assert "noch ein Entwurf" not in page.text
     finally:
         await database.dispose()

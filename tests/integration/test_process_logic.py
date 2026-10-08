@@ -3,14 +3,18 @@ readable errors, Persian-only workspace drafts, native translations."""
 
 import asyncio
 import hashlib
+from pathlib import Path
 from uuid import UUID
 
+import httpx
 import pytest
+from pydantic import SecretStr
 
 import app.knowledge.llm.factory as factory
 from app.briefs.service import BriefInput, BriefService
 from app.content_engine.domain import DraftStatus, ProductionStage, StageHealth
 from app.content_engine.models import ScriptDraft
+from app.core.config import Environment, Settings
 from app.db.session import Database
 from app.editorial_channels.domain import ChannelResourceRole
 from app.editorial_channels.service import EditorialChannelService
@@ -117,9 +121,25 @@ async def test_missing_api_key_becomes_readable_job_error(
     studio_client,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """An unconfigured gateway must read as a setup hint, not a crash.
+
+    The absence of a key is patched in explicitly: relying on the developer
+    environment not having one made this test pass only on machines without
+    an APIMaster key — and on every other machine it quietly spent a real,
+    billed model call before failing.
+    """
+
     client, url = studio_client
     _seed(client)
     database = Database(url)
+    without_key = Settings(
+        _env_file=None,
+        environment=Environment.TEST,
+        database_url=SecretStr(url),
+        storage_root=Path("/tmp/emtedad-test-storage"),
+        apimaster_api_key=None,
+    )
+    monkeypatch.setattr(factory, "get_settings", lambda: without_key)
     try:
         brief_id = await _brief_with_material(database)
         for action in ("plan_research", "build_evidence", "freeze_research"):
@@ -309,5 +329,40 @@ async def test_localize_runs_the_native_pipeline(
         assert calls == [(brief_id, "ar")]
         location = _act(client, brief_id, "localize", language="xx")
         assert "error=" in location
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_research_step_makes_no_outbound_http_calls(
+    studio_client,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The suite must not depend on the internet.
+
+    Web research is the only production step that talks to the outside
+    world. It used to be on in the test fixture, so ``plan_research`` sent
+    live queries to whatever answered on ``web_research_base_url`` — the
+    step then outran the job timeout and the test failed with
+    "background step did not finish". With the feature off the step must
+    finish without a single outbound HTTP call.
+    """
+
+    client, url = studio_client
+    _seed(client)
+    database = Database(url)
+    monkeypatch.setattr(factory, "_apimaster_provider", lambda **_: _Provider())
+
+    async def _refuse(*args: object, **kwargs: object) -> object:
+        raise AssertionError("integration tests must not call the network")
+
+    monkeypatch.setattr(httpx.AsyncClient, "send", _refuse)
+    try:
+        brief_id = await _brief_with_material(database)
+        _act(client, brief_id, "plan_research")
+        job = jobs.get(str(brief_id))
+        assert job is not None and job.error is None, job and job.error
+        state = await ProductionService(database).state_for_brief(brief_id)
+        assert state.next_action == "build_evidence"
     finally:
         await database.dispose()

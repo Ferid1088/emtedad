@@ -68,7 +68,8 @@ class _FakeImporter:
             await asyncio.sleep(0.05)
             if video_id in self.fail:
                 raise YouTubeTranscriptUnavailableError(
-                    "no transcript in the channel language (fa); available: en"
+                    "no transcript in the channel language (fa); available: en",
+                    available=("en",),
                 )
             from app.knowledge.domain import IngestionStatus, SourceType
             from app.knowledge.models import Source
@@ -92,11 +93,11 @@ class _FakeImporter:
 
 
 @pytest.fixture
-def database() -> Database:
-    url = os.environ.get("EMTEDAD_DATABASE_URL")
-    if not url:
-        pytest.skip("EMTEDAD_DATABASE_URL is required")
-    return Database(url)
+def database(migrated_database_url: str) -> Database:
+    """A disposable database — this suite writes channels, candidates and
+    sources, and must never do that to the owner's corpus."""
+
+    return Database(migrated_database_url)
 
 
 @pytest.mark.asyncio
@@ -174,3 +175,23 @@ async def test_interrupted_imports_are_requeued_after_restart(
     finally:
         await service.delete_channel(channel.id)
         await database.dispose()
+
+
+def test_writing_suites_never_use_the_owner_database(
+    migrated_database_url: str,
+) -> None:
+    """Regression: this suite used to write into ``EMTEDAD_DATABASE_URL``.
+
+    Every run left a monitored channel, eight candidates and seven
+    ``V0000000000`` sources in the owner's corpus — visible in the Studio
+    library and eligible for topic mining. Tests that write take a
+    disposable database (tests/integration/conftest.py).
+    """
+
+    from sqlalchemy.engine import make_url
+
+    configured = os.environ.get("EMTEDAD_DATABASE_URL") or ""
+    assert configured, "EMTEDAD_DATABASE_URL is required"
+    disposable = make_url(migrated_database_url).database or ""
+    assert disposable.startswith("emtedad_test_")
+    assert disposable != make_url(configured).database

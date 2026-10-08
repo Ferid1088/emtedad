@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -41,11 +40,12 @@ class FakeChannelAdapter:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_discovery_is_approval_gated_and_idempotent() -> None:
-    database_url = os.environ.get("EMTEDAD_DATABASE_URL")
-    if not database_url:
-        pytest.skip("EMTEDAD_DATABASE_URL is required")
-    database = Database(database_url)
+async def test_discovery_is_approval_gated_and_idempotent(
+    migrated_database_url: str,
+) -> None:
+    # Disposable database: this test registers a channel and discovers
+    # videos, which must never land in the owner's corpus.
+    database = Database(migrated_database_url)
     service = ChannelDiscoveryService(
         database,
         adapter=FakeChannelAdapter(),  # type: ignore[arg-type]
@@ -84,14 +84,11 @@ async def _source_count(database: Database) -> int:
 
 
 @pytest.mark.integration
-def test_unknown_channel_delete_returns_404() -> None:
-    database_url = os.environ.get("EMTEDAD_DATABASE_URL")
-    if not database_url:
-        pytest.skip("EMTEDAD_DATABASE_URL is required")
+def test_unknown_channel_delete_returns_404(migrated_database_url: str) -> None:
     settings = Settings(
         _env_file=None,
         environment=Environment.TEST,
-        database_url=SecretStr(database_url),
+        database_url=SecretStr(migrated_database_url),
         storage_root=Path("/tmp/emtedad-owner-web-test"),
     )
     with TestClient(create_app(settings)) as client:
