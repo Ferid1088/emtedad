@@ -286,6 +286,26 @@ def test_gemini_uses_json_object_mode_not_strict_schema() -> None:
     assert schema["required"] == ["status"]  # type: ignore[index]
 
 
+def test_free_form_object_models_fall_back_to_json_object_mode() -> None:
+    """Regression: strict mode cannot express ``dict[str, object]``.
+
+    Seen live while processing an ingested web page: APIMaster answered
+    ``SourceStructureOutputRaw`` with 400 "Invalid schema for
+    response_format … In context=('properties', 'nodes', 'items'),
+    'additionalProperties' is required to be supplied and to be false."
+    The items schema is a bare ``{"type": "object"}`` — forbidding extra
+    properties there would allow only ``{}``, so the whole model has to go
+    through json_object mode, where the schema travels in the prompt.
+    """
+
+    class _FreeForm(BaseModel):
+        nodes: list[dict[str, object]] = []
+
+    assert json_response_format("gpt-6.1-sol", _FreeForm) == {"type": "json_object"}
+    # A fully declared model is unaffected and stays strict.
+    assert json_response_format("gpt-6.1-sol", _Output)["type"] == "json_schema"
+
+
 # ---------------------------------------------------------------------
 # Sol Responses protocol (§34–38): opt-in route + explicit chat fallback
 # ---------------------------------------------------------------------

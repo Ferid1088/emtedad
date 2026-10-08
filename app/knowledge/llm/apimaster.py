@@ -269,6 +269,28 @@ def _strictify(node: object) -> None:
             _strictify(item)
 
 
+def _has_free_form_object(node: object) -> bool:
+    """True when the schema contains an object without declared properties.
+
+    ``dict[str, object]`` fields render as ``{"type": "object"}`` with no
+    ``properties``. Strict structured output cannot express that: the
+    provider demands ``additionalProperties: false`` on every object, and
+    adding it to a property-less object would only permit ``{}``. Such a
+    model has to go through ``json_object`` mode, where the schema travels
+    in the prompt and Pydantic validates the answer.
+    """
+
+    if isinstance(node, dict):
+        if node.get("type") == "object" and not isinstance(
+            node.get("properties"), dict
+        ):
+            return True
+        return any(_has_free_form_object(value) for value in node.values())
+    if isinstance(node, list):
+        return any(_has_free_form_object(item) for item in node)
+    return False
+
+
 def json_response_format(
     model: str,
     output_model: type[BaseModel],
@@ -285,6 +307,8 @@ def json_response_format(
     if model in json_object_models or bare_model_id(model) in json_object_models:
         return {"type": "json_object"}
     schema = output_model.model_json_schema()
+    if _has_free_form_object(schema):
+        return {"type": "json_object"}
     _strictify(schema)
     return {
         "type": "json_schema",
