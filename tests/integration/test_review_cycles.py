@@ -729,3 +729,45 @@ async def test_improved_revision_promotes_and_keeps_parent_archived(
             assert decision["decision"] == "promoted"
     finally:
         await database.dispose()
+
+
+@pytest.mark.asyncio
+async def test_critic_calls_are_billed_to_their_production(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: critic telemetry was recorded without the brief.
+
+    Every other production call passes ``content_brief_id`` to its
+    recorder; the critics did not, so the heaviest calls of a run landed in
+    ``ops.llm_call_events`` unattributed and the workspace's per-production
+    token and cost figures silently left them out.
+    """
+
+    from app.content_engine import review as review_module
+
+    database = Database(migrated_database_url)
+    recorders: list[object] = []
+    real_resolve = review_module.resolve_llm_provider
+
+    def capture(**kwargs: object):  # type: ignore[no-untyped-def]
+        recorders.append(kwargs.get("recorder"))
+        return _Provider()
+
+    monkeypatch.setattr(review_module, "resolve_llm_provider", capture)
+    try:
+        brief = await _brief(database, "Wem gehört ein Kritiker-Call?")
+        draft = await _fresh_draft(database, brief)
+        # No injected provider: this is the path that builds its own.
+        await ScriptService(database).review_draft(draft.id)
+
+        assert recorders, "no provider was resolved — the path changed"
+        attributed = [
+            r for r in recorders if getattr(r, "content_brief_id", None) == brief.id
+        ]
+        assert len(attributed) == len(recorders), [
+            getattr(r, "content_brief_id", None) for r in recorders
+        ]
+        assert real_resolve is not capture
+    finally:
+        await database.dispose()

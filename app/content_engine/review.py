@@ -876,9 +876,19 @@ class ScriptService:
         review; a provider failure leaves a FAILED run with its error.
         """
 
+        async with self.database.transaction() as session:
+            draft = await session.get(ScriptDraft, draft_id)
+            if draft is None:
+                raise LookupError(f"Unknown script draft {draft_id}")
+            brief_id, language = draft.content_brief_id, draft.language
         provider = self.provider or resolve_llm_provider(
             role=AgentRole.FACT_CRITIC,
-            recorder=DatabaseLLMRecorder(self.database, run_scope="production"),
+            recorder=DatabaseLLMRecorder(
+                self.database,
+                run_scope="production",
+                content_brief_id=brief_id,
+                language=language,
+            ),
         )
         run_id = await self._start_review_run(draft_id, provider)
         started = time.monotonic()
@@ -915,6 +925,7 @@ class ScriptService:
             critic_context = await _critic_context(session, draft_row, brief_row)
             draft_text = draft_row.text
             draft_language = draft_row.language
+            draft_brief_id = draft_row.content_brief_id
         input_text = json.dumps(
             {"draft": draft_text, "context": critic_context}, ensure_ascii=False
         )
@@ -928,7 +939,15 @@ class ScriptService:
             )
             critic_provider = self.provider or resolve_llm_provider(
                 role=CRITIC_AGENT_ROLES[role],
-                recorder=DatabaseLLMRecorder(self.database, run_scope="production"),
+                # Critics are the heaviest calls in a production; without the
+                # brief they were recorded unattributed and the workspace's
+                # per-production token and cost figures left them out.
+                recorder=DatabaseLLMRecorder(
+                    self.database,
+                    run_scope="production",
+                    content_brief_id=draft_brief_id,
+                    language=draft_language,
+                ),
             )
             result = await critic_provider.extract(
                 StructuredExtractionRequest(
